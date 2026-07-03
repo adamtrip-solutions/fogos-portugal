@@ -1,4 +1,6 @@
 using Fogos.Infrastructure.DependencyInjection;
+using Fogos.Worker.Jobs.Planes;
+using Fogos.Worker.Jobs.Weather;
 using Fogos.Worker.Queue;
 using Fogos.Worker.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,9 +26,9 @@ builder.Services.AddQuartz();
 builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
 // Ingestion jobs are registered by the next waves — each agent edits only its own marker line:
-// [jobs:weather] registered in wave 2
-// [jobs:risk] registered in wave 2
-// [jobs:planes] registered in wave 2
+builder.Services.AddWeatherJobs(); // [jobs:weather] registered in wave 2
+Fogos.Worker.Jobs.Risk.RiskFirmsJobRegistration.AddRiskAndFirmsJobs(builder.Services, builder.Configuration); // [jobs:risk]
+builder.Services.AddPlaneJobs(); // [jobs:planes] registered in wave 2
 // [jobs:incidents] registered in wave 3
 
 // Change-stream → subscriptions bridge (publisher side of the SAME Redis provider the Api

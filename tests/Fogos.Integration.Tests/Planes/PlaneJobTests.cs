@@ -1,0 +1,356 @@
+using System.Net;
+using Fogos.Domain.Aircraft;
+using Fogos.Domain.Time;
+using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Notifications;
+using Fogos.Infrastructure.Options;
+using Fogos.Infrastructure.Publishing;
+using Fogos.Infrastructure.Reads;
+using Fogos.Infrastructure.Sources;
+using Fogos.Worker.Jobs.Planes;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using MongoDB.Driver;
+using StackExchange.Redis;
+
+namespace Fogos.Integration.Tests.Planes;
+
+/// <summary>
+/// Container-backed tests for the three plane pollers: FR24 gates + first-sighting dedup + credits,
+/// and the ADS-B append + consecutive-duplicate skip. Each test gets its own Mongo database and a
+/// flushed Redis so the credit meter / freshness state never leaks.
+/// </summary>
+[Collection("fogos")]
+public sealed class PlaneJobTests(ContainerFixture fixture)
+{
+    private static readonly DateTimeOffset LisbonMidday = new(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset LisbonNight = new(2026, 6, 15, 2, 0, 0, TimeSpan.Zero);
+
+    // ── FR24 ───────────────────────────────────────────────────────────────────────────────────
+
+    [SkippableFact]
+    public async Task Fr24_happy_path_appends_positions_records_credits_and_posts_first_sighting()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await SeedFleetAsync(mongo, notify: true);
+
+        await using var redis = await ConnectRedisAsync();
+        var clock = new FakeClock(LisbonMidday);
+        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft));
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(1, ctx.Handler.Attempts);
+        Assert.Equal(2, await CountBySourceAsync(mongo, "fr24"));
+
+        // Credits recorded via the legacy 2 + rows×0.04 model → ceil(2.08) = 3.
+        Assert.Equal(3, await ctx.Meter.CurrentAsync());
+
+        // Both notify aircraft are first sightings → one X + FB post each, one push each.
+        Assert.Equal(2, ctx.Twitter.Posts.Count);
+        Assert.Equal(2, ctx.Facebook.Posts.Count);
+        Assert.Equal(2, ctx.Push.Dispatched.Count);
+        Assert.All(ctx.Twitter.Posts, p => Assert.Contains("Meio aéreo do DECIR", p.Text));
+        Assert.All(ctx.Twitter.Posts, p => Assert.Contains("#FogosPT", p.Text));
+    }
+
+    [SkippableFact]
+    public async Task Fr24_message_shape_matches_legacy_fields()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await mongo.TrackedAircraft.InsertOneAsync(new TrackedAircraft
+        {
+            Icao = PlaneFixtures.Hex1,
+            Registration = PlaneFixtures.Reg1,
+            Name = "Bombeiros 01",
+            Type = "AT-802",
+            Base = "Viseu",
+            Notify = true,
+            Active = true,
+        });
+
+        await using var redis = await ConnectRedisAsync();
+        var ctx = BuildFr24(mongo, redis, new FakeClock(LisbonMidday), RespondWith(SingleAircraftFr24));
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        var post = Assert.Single(ctx.Twitter.Posts);
+        Assert.Equal(
+            "🚁ℹ️ Meio aéreo do DECIR Bombeiros 01 - AT-802 - CS-ABC com base em Viseu no radar! #FogosPT ℹ️🚁",
+            post.Text);
+    }
+
+    [SkippableFact]
+    public async Task Fr24_dedups_within_30min_and_reposts_after_the_gap()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await SeedFleetAsync(mongo, notify: true);
+
+        await using var redis = await ConnectRedisAsync();
+        var clock = new FakeClock(LisbonMidday);
+        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft));
+
+        // Run 1: fresh sightings → 2 posts.
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+        Assert.Equal(2, ctx.Twitter.Posts.Count);
+
+        // Run 2 immediately: previous positions are < 30 min old → no new posts.
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+        Assert.Equal(2, ctx.Twitter.Posts.Count);
+        Assert.Equal(4, await CountBySourceAsync(mongo, "fr24")); // positions still appended
+
+        // Age every stored position past the 30-minute gap, then run again → reposts.
+        await mongo.FlightPositions.UpdateManyAsync(
+            FilterDefinition<FlightPosition>.Empty,
+            Builders<FlightPosition>.Update.Set(x => x.SampledAt, clock.UtcNow - TimeSpan.FromMinutes(40)));
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+        Assert.Equal(4, ctx.Twitter.Posts.Count);
+    }
+
+    [SkippableFact]
+    public async Task Fr24_outside_daylight_window_makes_no_api_call()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await SeedFleetAsync(mongo, notify: true);
+
+        await using var redis = await ConnectRedisAsync();
+        var ctx = BuildFr24(mongo, redis, new FakeClock(LisbonNight), RespondWith(PlaneFixtures.Fr24TwoAircraft));
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(0, ctx.Handler.Attempts);
+        Assert.Equal(0, await CountBySourceAsync(mongo, "fr24"));
+    }
+
+    [SkippableFact]
+    public async Task Fr24_without_active_aerial_incident_makes_no_api_call()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedFleetAsync(mongo, notify: true); // fleet present, but no aerial incident seeded
+
+        await using var redis = await ConnectRedisAsync();
+        var ctx = BuildFr24(mongo, redis, new FakeClock(LisbonMidday), RespondWith(PlaneFixtures.Fr24TwoAircraft));
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(0, ctx.Handler.Attempts);
+    }
+
+    [SkippableFact]
+    public async Task Fr24_credit_guard_tripped_makes_no_api_call()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await SeedFleetAsync(mongo, notify: true);
+
+        await using var redis = await ConnectRedisAsync();
+        var clock = new FakeClock(LisbonMidday);
+        // Budget 20 → guard at 19; pre-spend 19 so the guard is already tripped.
+        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft), monthlyBudget: 20);
+        for (var i = 0; i < 19; i++)
+            await ctx.Meter.TryConsumeAsync();
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(0, ctx.Handler.Attempts);
+        Assert.Equal(19, await ctx.Meter.CurrentAsync()); // untouched by the gated run
+    }
+
+    // ── ADS-B (adsb.fi / airplanes.live) ─────────────────────────────────────────────────────────
+
+    [SkippableFact]
+    public async Task Adsbfi_appends_positions_with_its_source_label()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedFleetAsync(mongo, notify: false);
+
+        await using var redis = await ConnectRedisAsync();
+        var handler = new StubHttpMessageHandler(RespondWith(PlaneFixtures.AdsbTwoAircraftPlusStale));
+        var job = BuildAdsbfi(mongo, redis, new FakeClock(LisbonMidday), handler);
+
+        await job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(1, handler.Attempts);
+        Assert.Equal(2, await CountBySourceAsync(mongo, "adsbfi")); // stale (seen_pos 720) dropped
+        Assert.Equal(0, await CountBySourceAsync(mongo, "fr24"));
+    }
+
+    [SkippableFact]
+    public async Task AirplanesLive_labels_positions_with_its_own_source()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedFleetAsync(mongo, notify: false);
+
+        await using var redis = await ConnectRedisAsync();
+        var handler = new StubHttpMessageHandler(RespondWith(PlaneFixtures.AdsbTwoAircraftPlusStale));
+        var job = BuildAirplanesLive(mongo, redis, new FakeClock(LisbonMidday), handler);
+
+        await job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(2, await CountBySourceAsync(mongo, "airplaneslive"));
+    }
+
+    [SkippableFact]
+    public async Task Adsbfi_skips_consecutive_duplicate_sample()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedFleetAsync(mongo, notify: false);
+
+        await using var redis = await ConnectRedisAsync();
+        var clock = new FakeClock(LisbonMidday); // fixed clock ⇒ identical coords + same minute on both runs
+        var handler = new StubHttpMessageHandler(RespondWith(PlaneFixtures.AdsbTwoAircraftPlusStale));
+        var job = BuildAdsbfi(mongo, redis, clock, handler);
+
+        await job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+        await job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        // Second run's samples are exact repeats (same icao + coords + minute) → skipped.
+        Assert.Equal(2, await CountBySourceAsync(mongo, "adsbfi"));
+    }
+
+    // ── builders / helpers ───────────────────────────────────────────────────────────────────────
+
+    private const string SingleAircraftFr24 = """
+    { "data": [ { "fr24_id": "z1", "hex": "4CA7B1", "reg": "CS-ABC", "lat": 40.1, "lon": -8.2, "alt": 5000, "timestamp": "2026-06-15T11:59:00Z" } ] }
+    """;
+
+    private sealed record Fr24Context(
+        ProcessFr24PlanesJob Job,
+        StubHttpMessageHandler Handler,
+        RecordingTwitter Twitter,
+        RecordingFacebook Facebook,
+        RecordingDelayedDispatcher Push,
+        Fr24CreditMeter Meter);
+
+    private static Func<int, HttpResponseMessage> RespondWith(string json) =>
+        _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
+
+    private Fr24Context BuildFr24(
+        MongoContext mongo,
+        IConnectionMultiplexer redis,
+        FakeClock clock,
+        Func<int, HttpResponseMessage> responder,
+        int monthlyBudget = 0,
+        PublisherMode fr24Channel = PublisherMode.DryRun)
+    {
+        var sources = Options.Create(new FogosSourcesOptions
+        {
+            Fr24 = new Fr24Options { ApiKey = "test-key", MonthlyBudget = monthlyBudget },
+        });
+        var publishing = Options.Create(new PublishingOptions { Channels = { ["fr24"] = fr24Channel } });
+        var fcmOptions = Options.Create(new FcmOptions());
+
+        var handler = new StubHttpMessageHandler(responder);
+        var fr24Client = new Fr24Client(new HttpClient(handler), sources);
+        var meter = new Fr24CreditMeter(redis, clock, sources);
+        var ops = new RecordingOps();
+        var freshness = new PlaneJobFreshness(redis, clock, ops);
+        var twitter = new RecordingTwitter();
+        var facebook = new RecordingFacebook();
+        var push = new RecordingDelayedDispatcher();
+
+        var fcm = new FcmNotifier(
+            new RecordingFcmSender(), publishing, fcmOptions, ops,
+            new FakeHostEnvironment("Production"), NullLogger<FcmNotifier>.Instance);
+        var notifications = new NotificationScheduler(push, fcmOptions);
+
+        var job = new ProcessFr24PlanesJob(
+            fr24Client, meter, new AircraftReads(mongo), mongo, clock, ops,
+            twitter, facebook, notifications, fcm,
+            sources, publishing, fcmOptions, freshness, NullLogger<ProcessFr24PlanesJob>.Instance);
+
+        return new Fr24Context(job, handler, twitter, facebook, push, meter);
+    }
+
+    private static ProcessAdsbfiPlanesJob BuildAdsbfi(MongoContext mongo, IConnectionMultiplexer redis, FakeClock clock, StubHttpMessageHandler handler)
+    {
+        var sources = Options.Create(new FogosSourcesOptions
+        {
+            AdsbFi = new PlaneSourceOptions { BaseUrl = "https://opendata.adsb.fi/api/v2" },
+        });
+        var ops = new RecordingOps();
+        var client = new AdsbFiClient(new HttpClient(handler), sources);
+        return new ProcessAdsbfiPlanesJob(
+            client, sources, new AircraftReads(mongo), mongo, clock, ops,
+            new PlaneJobFreshness(redis, clock, ops), NullLogger<ProcessAdsbfiPlanesJob>.Instance);
+    }
+
+    private static ProcessAirplanesLivePlanesJob BuildAirplanesLive(MongoContext mongo, IConnectionMultiplexer redis, FakeClock clock, StubHttpMessageHandler handler)
+    {
+        var sources = Options.Create(new FogosSourcesOptions
+        {
+            AirplanesLive = new PlaneSourceOptions { BaseUrl = "https://api.airplanes.live/v2" },
+        });
+        var ops = new RecordingOps();
+        var client = new AirplanesLiveClient(new HttpClient(handler), sources);
+        return new ProcessAirplanesLivePlanesJob(
+            client, sources, new AircraftReads(mongo), mongo, clock, ops,
+            new PlaneJobFreshness(redis, clock, ops), NullLogger<ProcessAirplanesLivePlanesJob>.Instance);
+    }
+
+    private MongoContext NewMongo() =>
+        new(new MongoClient(fixture.MongoConnectionString),
+            Options.Create(new MongoOptions
+            {
+                ConnectionString = fixture.MongoConnectionString,
+                Database = "planes_test_" + Guid.NewGuid().ToString("N")[..8],
+            }));
+
+    private async Task<ConnectionMultiplexer> ConnectRedisAsync() =>
+        await ConnectionMultiplexer.ConnectAsync(fixture.RedisConnectionString);
+
+    private static async Task SeedAerialFireAsync(MongoContext mongo) =>
+        await mongo.Incidents.InsertOneAsync(SeedData.Incident("inc-aerial"));
+
+    private static async Task SeedFleetAsync(MongoContext mongo, bool notify)
+    {
+        await mongo.TrackedAircraft.InsertManyAsync(new[]
+        {
+            new TrackedAircraft
+            {
+                Icao = PlaneFixtures.Hex1, Registration = PlaneFixtures.Reg1,
+                Name = "Bombeiros 01", Type = "AT-802", Base = "Viseu", Notify = notify, Active = true,
+            },
+            new TrackedAircraft
+            {
+                Icao = PlaneFixtures.Hex2, Registration = PlaneFixtures.Reg2,
+                Name = "Bombeiros 02", Type = "EC-145", Base = "Loulé", Notify = notify, Active = true,
+            },
+        });
+    }
+
+    private static async Task<long> CountBySourceAsync(MongoContext mongo, string source) =>
+        await mongo.FlightPositions.CountDocumentsAsync(Builders<FlightPosition>.Filter.Eq(x => x.Source, source));
+}

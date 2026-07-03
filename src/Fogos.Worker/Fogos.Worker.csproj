@@ -15,6 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Risk pipeline: concelho polygon set for RCM GeoJSON assembly (extracted from legacy ProcessRCM.php). -->
+    <EmbeddedResource Include="Jobs\Risk\ConcelhoPolygons.geojson" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Fogos.Domain\Fogos.Domain.csproj" />
     <ProjectReference Include="..\Fogos.Infrastructure\Fogos.Infrastructure.csproj" />
   </ItemGroup>

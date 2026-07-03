@@ -1,5 +1,6 @@
 using Fogos.Api.GraphQL.DataLoaders;
 using Fogos.Api.GraphQL.Queries;
+using Fogos.Api.GraphQL.RateLimiting;
 using Fogos.Api.GraphQL.Subscriptions;
 using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Aircraft;
@@ -48,6 +49,23 @@ public static class GraphQLServiceCollectionExtensions
             }))
             .BindRuntimeType<DateOnly, DateType>()
             .AddMaxExecutionDepthRule(12, skipIntrospectionFields: true)
+            // Scope policies (write:incidents / write:warnings / moderate:photos) usable on mutations,
+            // which land in a later phase; the @authorize directive resolves against the caller principal
+            // via the ASP.NET authorization bridge (DefaultAuthorizationHandler).
+            .AddAuthorization()
+            .AddCostAnalyzer()
+            .ModifyCostOptions(o =>
+            {
+                o.MaxFieldCost = 1_000_000;
+                o.MaxTypeCost = 1_000_000;
+                o.EnforceCostLimits = true;
+            })
+            // Resolve caller identity from the websocket connect payload and enforce subscription caps.
+            .AddSocketSessionInterceptor(sp => new SubscriptionSessionInterceptor(
+                sp.GetRequiredService<Fogos.Api.Auth.JwtService>(),
+                sp.GetRequiredService<Fogos.Api.Auth.ApiKeyResolver>(),
+                sp.GetRequiredService<Fogos.Infrastructure.RateLimiting.SubscriptionLimiter>(),
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Fogos.Infrastructure.Options.RateLimitOptions>>()))
             .AddRedisSubscriptions(sp => sp.GetRequiredService<IConnectionMultiplexer>());
 
         return services;

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using Fogos.Domain.Auth;
 using Fogos.Domain.Geo;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
@@ -24,6 +27,38 @@ public static class SeedData
         await ctx.Hotspots.DeleteManyAsync(FilterDefinition<Hotspots>.Empty);
         await ctx.WeatherStations.DeleteManyAsync(FilterDefinition<WeatherStation>.Empty);
         await ctx.WeatherHourly.DeleteManyAsync(FilterDefinition<WeatherObservation>.Empty);
+        await ctx.ApiClients.DeleteManyAsync(FilterDefinition<ApiClient>.Empty);
+    }
+
+    /// <summary>The SHA-256 hex hash used for API-key lookup (mirrors <c>ApiKeyResolver.Hash</c>).</summary>
+    public static string HashKey(string apiKey) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)));
+
+    /// <summary>Inserts an <see cref="ApiClient"/> for <paramref name="plaintext"/> and returns its id.</summary>
+    public static async Task<string> InsertApiKeyAsync(
+        ContainerFixture fixture,
+        string plaintext,
+        ApiTier tier,
+        string name = "test key",
+        IEnumerable<string>? scopes = null,
+        bool publicContext = false,
+        IEnumerable<string>? allowedOrigins = null,
+        bool revoked = false)
+    {
+        var ctx = Context(fixture);
+        var client = new ApiClient
+        {
+            Name = name,
+            KeyHash = HashKey(plaintext),
+            Tier = tier,
+            Scopes = scopes?.ToList() ?? [],
+            PublicContext = publicContext,
+            AllowedOrigins = allowedOrigins?.ToList() ?? [],
+            CreatedAt = DateTimeOffset.UtcNow,
+            RevokedAt = revoked ? DateTimeOffset.UtcNow : null,
+        };
+        await ctx.ApiClients.InsertOneAsync(client);
+        return client.Id;
     }
 
     public static Incident Incident(

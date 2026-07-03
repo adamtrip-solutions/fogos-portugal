@@ -1,4 +1,6 @@
+using Fogos.Api.Auth;
 using Fogos.Api.GraphQL;
+using Fogos.Api.GraphQL.RateLimiting;
 using Fogos.Api.Rest;
 using Fogos.Infrastructure.DependencyInjection;
 using Fogos.Infrastructure.Mongo;
@@ -17,6 +19,8 @@ if (!string.IsNullOrWhiteSpace(sentryDsn))
 }
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);
+builder.Services.AddFogosAuth();
+builder.Services.AddFogosRateLimiting(builder.Configuration);
 
 // GraphQL (+ Redis subscriptions) only when Redis is configured. A plain `dotnet build`
 // and `--info`-style runs must not require a running Redis; integration tests supply it.
@@ -27,6 +31,19 @@ if (redisConfigured)
 }
 
 var app = builder.Build();
+
+// Resolve caller identity (JWT → API key → anonymous) and pin Origins for every request.
+app.UseMiddleware<AuthenticationMiddleware>();
+
+// Request-rate + GraphQL cost budget (both Redis-backed, fail-open) run only where Redis exists.
+if (redisConfigured)
+{
+    app.UseMiddleware<RateLimitMiddleware>();
+    app.UseMiddleware<GraphQLCostMiddleware>();
+}
+
+// REST auth surface (token exchange, refresh rotation, JWKS, scope probe).
+app.MapAuth();
 
 // REST v3 format outputs (only need Mongo) are always available.
 app.MapV3();

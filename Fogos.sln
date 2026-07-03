@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fogos.Importer.Tests", "tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fogos.Integration.Tests", "tests\Fogos.Integration.Tests\Fogos.Integration.Tests.csproj", "{61133B9D-EC2F-44E7-8B34-FC1AB396FD81}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fogos.AdminCli", "src\Fogos.AdminCli\Fogos.AdminCli.csproj", "{5BBCAD53-DD87-4621-8B49-9C39E15AB109}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +131,18 @@ Global
 		{61133B9D-EC2F-44E7-8B34-FC1AB396FD81}.Release|x64.Build.0 = Release|Any CPU
 		{61133B9D-EC2F-44E7-8B34-FC1AB396FD81}.Release|x86.ActiveCfg = Release|Any CPU
 		{61133B9D-EC2F-44E7-8B34-FC1AB396FD81}.Release|x86.Build.0 = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|x64.Build.0 = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Debug|x86.Build.0 = Debug|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|x64.ActiveCfg = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|x64.Build.0 = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|x86.ActiveCfg = Release|Any CPU
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -142,5 +156,6 @@ Global
 		{1885FDAC-3D97-499E-9931-E7506A3D2435} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{414C2007-8B75-43BB-BCD6-C87B6EABDEF0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{61133B9D-EC2F-44E7-8B34-FC1AB396FD81} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{5BBCAD53-DD87-4621-8B49-9C39E15AB109} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

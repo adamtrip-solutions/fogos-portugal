@@ -1,0 +1,11 @@
+{
+  "_id": { "$oid": "5f1d7f0a9b2c3d4e5f6a7b8d" },
+  "id": "2022080899999",
+  "dateTime": { "sec": 1660000000 },
+  "location": "Algum sítio",
+  "lat": -8.6,
+  "lng": 41.1,
+  "statusCode": 5,
+  "naturezaCode": "3101",
+  "isFire": true
+}

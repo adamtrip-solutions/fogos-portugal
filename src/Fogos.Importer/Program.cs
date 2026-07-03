@@ -31,13 +31,14 @@ switch (command)
         return await Seeder.RunAsync(host.Services, path);
 
     case "import":
-        Console.WriteLine("importer arrives in Phase 1");
-        return 2;
+        return await ImportCommand.RunAsync(host.Services, args);
 
     default:
         Console.Error.WriteLine("Usage: Fogos.Importer <command>");
         Console.Error.WriteLine("  seed [--path <dir>]   load dev fixtures into MongoDB (default dev/seed)");
-        Console.Error.WriteLine("  import ...            legacy Mongo import (Phase 1)");
+        Console.Error.WriteLine("  import --source <uri> [--source-db fires] [--target <uri>] [--target-db fogos]");
+        Console.Error.WriteLine("         [--collections a,b] [--since <ISO8601>] [--dry-run]");
+        Console.Error.WriteLine("                        legacy Mongo → new schema; idempotent upserts + quarantine");
         return 1;
 }
 

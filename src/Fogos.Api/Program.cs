@@ -1,3 +1,5 @@
+using Fogos.Api.GraphQL;
+using Fogos.Api.Rest;
 using Fogos.Infrastructure.DependencyInjection;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Ops;
@@ -16,7 +18,24 @@ if (!string.IsNullOrWhiteSpace(sentryDsn))
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);
 
+// GraphQL (+ Redis subscriptions) only when Redis is configured. A plain `dotnet build`
+// and `--info`-style runs must not require a running Redis; integration tests supply it.
+var redisConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["Redis:ConnectionString"]);
+if (redisConfigured)
+{
+    builder.Services.AddFogosGraphQL();
+}
+
 var app = builder.Build();
+
+// REST v3 format outputs (only need Mongo) are always available.
+app.MapV3();
+
+if (redisConfigured)
+{
+    app.UseWebSockets();
+    app.MapGraphQL();
+}
 
 app.MapGet("/healthz/live", () => Results.Text("ok"));
 
@@ -70,3 +89,6 @@ _ = Task.Run(async () =>
 });
 
 app.Run();
+
+/// <summary>Exposed so the integration tests can boot the API through <c>WebApplicationFactory</c>.</summary>
+public partial class Program;

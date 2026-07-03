@@ -1,0 +1,128 @@
+using System.Text.Json;
+using Fogos.Domain.Incidents;
+using MongoDB.Driver;
+
+namespace Fogos.Integration.Tests;
+
+[Collection("fogos")]
+public sealed class ReadApiTests(ContainerFixture fixture)
+{
+    [SkippableFact]
+    public async Task Incidents_and_incident_return_expected_shape_with_status_color()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+        await ctx.Incidents.InsertOneAsync(SeedData.Incident("F1", statusCode: IncidentStatusCatalog.EmCurso));
+
+        var byQuery = await fixture.GraphQLAsync("{ incidents(first:5){ nodes { id kind status { code label color } } pageInfo { hasNextPage } } }");
+        var node = byQuery.RootElement.GetProperty("data").GetProperty("incidents").GetProperty("nodes")[0];
+        Assert.Equal("F1", node.GetProperty("id").GetString());
+        Assert.Equal("FIRE", node.GetProperty("kind").GetString());
+        Assert.Equal(IncidentStatusCatalog.EmCurso, node.GetProperty("status").GetProperty("code").GetInt32());
+        Assert.Equal("B81E1F", node.GetProperty("status").GetProperty("color").GetString());
+
+        var single = await fixture.GraphQLAsync(
+            "query($id:ID!){ incident(id:$id){ id concelho } }", new { id = "F1" });
+        Assert.Equal("F1", single.RootElement.GetProperty("data").GetProperty("incident").GetProperty("id").GetString());
+    }
+
+    [SkippableFact]
+    public async Task ActiveIncidents_defaults_to_fire_only()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+        await ctx.Incidents.InsertManyAsync(
+        [
+            SeedData.Incident("FIRE1", IncidentKind.Fire, active: true),
+            SeedData.Incident("URBAN1", IncidentKind.UrbanFire, active: true),
+            SeedData.Incident("FIRE_INACTIVE", IncidentKind.Fire, active: false),
+        ]);
+
+        var doc = await fixture.GraphQLAsync("{ activeIncidents { id kind } }");
+        var nodes = doc.RootElement.GetProperty("data").GetProperty("activeIncidents").EnumerateArray().ToList();
+
+        Assert.Single(nodes);
+        Assert.Equal("FIRE1", nodes[0].GetProperty("id").GetString());
+        Assert.All(nodes, n => Assert.Equal("FIRE", n.GetProperty("kind").GetString()));
+    }
+
+    [SkippableFact]
+    public async Task IncidentFilter_day_concelho_and_all_are_honoured()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+
+        var june15 = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.FromHours(1));
+        var june14 = new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.FromHours(1));
+        await ctx.Incidents.InsertManyAsync(
+        [
+            SeedData.Incident("D15", occurredAt: june15, concelho: "Porto"),
+            SeedData.Incident("D14", occurredAt: june14, concelho: "Lisboa"),
+            SeedData.Incident("URB", IncidentKind.UrbanFire, occurredAt: june15, concelho: "Porto"),
+        ]);
+
+        // day filter → only the June 15 fires (fire-only default excludes URB).
+        var day = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ day:\"2026-06-15\" }){ nodes { id } } }"));
+        Assert.Equal(new[] { "D15" }, day.Order().ToArray());
+
+        // concelho filter.
+        var porto = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ concelho:\"Porto\" }){ nodes { id } } }"));
+        Assert.Equal(new[] { "D15" }, porto.Order().ToArray());
+
+        // all:true removes the fire-only restriction.
+        var all = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ all:true }){ nodes { id } } }"));
+        Assert.Equal(new[] { "D14", "D15", "URB" }, all.Order().ToArray());
+
+        // default (no all) is fire-only.
+        var fireOnly = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ }){ nodes { id } } }"));
+        Assert.Equal(new[] { "D14", "D15" }, fireOnly.Order().ToArray());
+    }
+
+    [SkippableFact]
+    public async Task Ten_incidents_with_photos_and_weather_resolve_without_error()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+
+        await ctx.WeatherStations.InsertOneAsync(SeedData.Station(1));
+        await ctx.WeatherHourly.InsertOneAsync(SeedData.Observation(1));
+
+        var incidents = Enumerable.Range(0, 10)
+            .Select(i => SeedData.Incident($"B{i}", nearestStation: 1))
+            .ToList();
+        await ctx.Incidents.InsertManyAsync(incidents);
+        await ctx.IncidentPhotos.InsertManyAsync(
+        [
+            SeedData.Photo("B0"),
+            SeedData.Photo("B0"),
+            SeedData.Photo("B1"),
+        ]);
+
+        var doc = await fixture.GraphQLAsync(
+            "{ incidents(first:10){ nodes { id photos { id publicUrl } weather { stationName distanceKm } } } }");
+
+        Assert.False(doc.RootElement.TryGetProperty("errors", out _), doc.RootElement.ToString());
+        var nodes = doc.RootElement.GetProperty("data").GetProperty("incidents").GetProperty("nodes");
+        Assert.Equal(10, nodes.GetArrayLength());
+
+        var b0 = nodes.EnumerateArray().First(n => n.GetProperty("id").GetString() == "B0");
+        Assert.Equal(2, b0.GetProperty("photos").GetArrayLength());
+        Assert.StartsWith("https://cdn.example.test/", b0.GetProperty("photos")[0].GetProperty("publicUrl").GetString());
+        Assert.Equal("Lisboa (Geofísico)", b0.GetProperty("weather").GetProperty("stationName").GetString());
+    }
+
+    private static Task<List<string>> Ids(JsonDocument doc)
+    {
+        var ids = doc.RootElement.GetProperty("data").GetProperty("incidents").GetProperty("nodes")
+            .EnumerateArray().Select(n => n.GetProperty("id").GetString()!).ToList();
+        return Task.FromResult(ids);
+    }
+}

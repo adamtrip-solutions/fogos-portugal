@@ -6,6 +6,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="HotChocolate.AspNetCore" Version="15.1.11" />
+    <PackageReference Include="HotChocolate.Subscriptions.Redis" Version="15.1.11" />
     <PackageReference Include="Sentry.AspNetCore" Version="6.6.0" />
   </ItemGroup>
 

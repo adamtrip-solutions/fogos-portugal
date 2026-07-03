@@ -50,6 +50,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IOpsNotifier, DiscordOpsNotifier>();
         services.AddSingleton<IClock, FogosClock>();
 
+        // Read-side query layer (thin, driver-direct) used by GraphQL resolvers/DataLoaders and REST v3.
+        services.AddSingleton<Reads.IncidentReads>();
+        services.AddSingleton<Reads.WeatherReads>();
+        services.AddSingleton<Reads.RiskReads>();
+        services.AddSingleton<Reads.WarningReads>();
+        services.AddSingleton<Reads.AircraftReads>();
+        services.AddSingleton<Reads.StatsReads>();
+
         return services;
     }
 }

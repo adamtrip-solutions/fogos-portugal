@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="HotChocolate.Execution" Version="15.1.11" />
+    <PackageReference Include="HotChocolate.Subscriptions.Redis" Version="15.1.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Quartz.Extensions.Hosting" Version="3.18.2" />
   </ItemGroup>

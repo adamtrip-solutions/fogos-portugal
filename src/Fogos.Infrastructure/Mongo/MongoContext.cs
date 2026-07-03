@@ -54,4 +54,10 @@ public sealed class MongoContext
 
     /// <summary>Rows that fit no importer mapping land here with a reason — nothing silently dropped.</summary>
     public IMongoCollection<BsonDocument> ImportQuarantine => Database.GetCollection<BsonDocument>("import_quarantine");
+
+    /// <summary>
+    /// Queue messages that exhausted their retries: <c>{stream, eventType, payload, error, attempts, diedAt}</c>.
+    /// The last stop before a message is lost — paired with an ops error so a human sees it.
+    /// </summary>
+    public IMongoCollection<BsonDocument> DeadLetters => Database.GetCollection<BsonDocument>("dead_letters");
 }

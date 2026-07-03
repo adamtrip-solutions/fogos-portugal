@@ -1,0 +1,123 @@
+# fogos.pt API — docker compose.
+#
+# Application services (api, worker) always run. The dev profile adds local stand-ins for
+# the managed infrastructure (Mongo replica set, Redis, MinIO as the R2 stand-in):
+#
+#   docker compose --profile dev up -d      # full local stack
+#   docker compose up -d api worker         # app only, pointed at external infra via env
+#
+# All publishers default to DryRun and all webhooks are empty — nothing goes live by accident.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Fogos.Api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongodb:27017/?replicaSet=rs0}
+      Mongo__Database: ${MONGO_DATABASE:-fogos}
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
+      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__ForcePathStyle: "true"
+      Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
+      Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
+      Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
+      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
+      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
+      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
+      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
+      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
+      Sentry__Dsn: ${SENTRY_DSN:-}
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: src/Fogos.Worker/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongodb:27017/?replicaSet=rs0}
+      Mongo__Database: ${MONGO_DATABASE:-fogos}
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
+      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__ForcePathStyle: "true"
+      Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
+      Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
+      Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
+      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
+      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
+      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
+      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
+      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
+      Sentry__Dsn: ${SENTRY_DSN:-}
+    restart: unless-stopped
+
+  # renderer: (Phase 3) Node/Playwright social-screenshot service — placeholder.
+
+  mongodb:
+    image: mongo:7
+    profiles: ["dev"]
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Single-node replica set (change streams need one). Idempotent: initiate once, then report OK.
+      test:
+        - CMD-SHELL
+        - >
+          mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongodb:27017' }] }).ok }"
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["dev"]
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    profiles: ["dev"]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc
+    profiles: ["dev"]
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do sleep 1; done;
+        mc mb --ignore-existing local/incident-photos;
+        mc anonymous set download local/incident-photos;
+        exit 0;
+
+volumes:
+  mongo-data:
+  minio-data:

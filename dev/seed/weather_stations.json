@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1200579,
+    "coordinates": [-9.1272, 38.7667],
+    "name": "Lisboa (Gago Coutinho)",
+    "place": "Lisboa",
+    "updatedAt": "2026-07-03T12:00:00Z"
+  },
+  {
+    "id": 1210702,
+    "coordinates": [-8.6817, 41.2481],
+    "name": "Porto (Pedras Rubras)",
+    "place": "Maia",
+    "updatedAt": "2026-07-03T12:00:00Z"
+  },
+  {
+    "id": 1200554,
+    "coordinates": [-7.9739, 37.0144],
+    "name": "Faro (Aeroporto)",
+    "place": "Faro",
+    "updatedAt": "2026-07-03T12:00:00Z"
+  }
+]

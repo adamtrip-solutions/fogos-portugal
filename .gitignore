@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+.DS_Store
+TestResults/
+artifacts/
+*.received.*
+appsettings.*.local.json
+.env
+.env.*
+!/.env.example

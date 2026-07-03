@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+.git/
+.github/
+.vscode/
+TestResults/
+artifacts/
+docs/
+tests/
+**/*.user
+**/appsettings.*.local.json
+.env
+.env.*
+*.md
+.DS_Store

@@ -21,5 +21,11 @@ public sealed record SocialPost
     /// <summary>Telegram <c>message_thread_id</c> for forum-style channels (optional).</summary>
     public string? TelegramThreadId { get; init; }
 
+    /// <summary>
+    /// Per-call Telegram chat/channel override (a project channel, say). Falls back to the configured
+    /// default channel when unset — the common case stays untouched.
+    /// </summary>
+    public string? TelegramChatId { get; init; }
+
     public bool HasImage => ImageBytes is { Length: > 0 } || !string.IsNullOrWhiteSpace(ImagePath);
 }

@@ -9,6 +9,7 @@ public sealed class FogosSourcesOptions
     public const string SectionName = "Sources";
 
     public ArcGisOptions ArcGis { get; set; } = new();
+    public AnepcOptions Anepc { get; set; } = new();
     public IcnfOptions Icnf { get; set; } = new();
     public IpmaOptions Ipma { get; set; } = new();
     public FirmsOptions Firms { get; set; } = new();
@@ -27,6 +28,16 @@ public sealed class ArcGisOptions
 
     /// <summary>Records per page (legacy paged 1000/page via <c>resultOffset</c>).</summary>
     public int PageSize { get; set; } = 1000;
+}
+
+/// <summary>ANEPC direct API (Basic-auth JSON). The registered-but-unscheduled fallback ingester.</summary>
+public sealed class AnepcOptions
+{
+    /// <summary>ANEPC_API_URL — empty by default (the source is selectable via config, not scheduled).</summary>
+    public string ApiUrl { get; set; } = "";
+
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }
 
 /// <summary>ICNF fire data (HTML table, per-occurrence XML, KML perimeters). TLS relaxed behind a flag.</summary>

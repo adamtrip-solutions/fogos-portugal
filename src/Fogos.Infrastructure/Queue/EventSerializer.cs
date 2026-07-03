@@ -23,6 +23,7 @@ public static class EventSerializer
         [nameof(IncidentResourcesChanged)] = typeof(IncidentResourcesChanged),
         [nameof(IncidentStatusChanged)] = typeof(IncidentStatusChanged),
         [nameof(IcnfEnriched)] = typeof(IcnfEnriched),
+        [nameof(ProcessIcnfFireData)] = typeof(ProcessIcnfFireData),
         [nameof(WarningCreated)] = typeof(WarningCreated),
         [nameof(PhotoSubmitted)] = typeof(PhotoSubmitted),
         [nameof(PushNotificationRequested)] = typeof(PushNotificationRequested),

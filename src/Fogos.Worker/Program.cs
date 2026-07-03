@@ -29,7 +29,7 @@ builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete
 builder.Services.AddWeatherJobs(); // [jobs:weather] registered in wave 2
 Fogos.Worker.Jobs.Risk.RiskFirmsJobRegistration.AddRiskAndFirmsJobs(builder.Services, builder.Configuration); // [jobs:risk]
 builder.Services.AddPlaneJobs(); // [jobs:planes] registered in wave 2
-// [jobs:incidents] registered in wave 3
+Fogos.Worker.Jobs.Incidents.IncidentJobsRegistration.AddIncidentJobs(builder.Services, builder.Configuration); // [jobs:incidents]
 
 // Change-stream → subscriptions bridge (publisher side of the SAME Redis provider the Api
 // subscribes to). Only when Redis is configured; a plain run without Redis stays a no-op.
@@ -43,4 +43,25 @@ if (redisConfigured)
 }
 
 var host = builder.Build();
+
+// Ensure indexes from the Worker too — jobs ($near station assignment, TTL, uniques) must not
+// depend on the Api having booted first against this database. Background and non-fatal.
+_ = Task.Run(async () =>
+{
+    using var scope = host.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        await scope.ServiceProvider
+            .GetRequiredService<Fogos.Infrastructure.Mongo.MongoIndexInitializer>()
+            .EnsureIndexesAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Mongo index initialization failed");
+        await scope.ServiceProvider.GetRequiredService<Fogos.Infrastructure.Ops.IOpsNotifier>()
+            .ErrorAsync($"Worker index initialization failed: {ex.Message}");
+    }
+});
+
 host.Run();

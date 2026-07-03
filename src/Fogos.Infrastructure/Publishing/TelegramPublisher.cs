@@ -32,13 +32,16 @@ public sealed class TelegramPublisher(
         var client = httpFactory.CreateClient(HttpClientName);
         var baseUrl = $"https://api.telegram.org/bot{opts.BotToken}";
 
+        // Per-call chat id override (e.g. a project channel) → default channel when unset.
+        var chatId = string.IsNullOrWhiteSpace(post.TelegramChatId) ? opts.ChatId : post.TelegramChatId;
+
         HttpResponseMessage response;
         if (post.HasImage)
         {
             var bytes = post.ImageBytes ?? await File.ReadAllBytesAsync(post.ImagePath!, ct);
             using var form = new MultipartFormDataContent
             {
-                { new StringContent(opts.ChatId), "chat_id" },
+                { new StringContent(chatId), "chat_id" },
                 { new StringContent(post.Text), "caption" },
                 { new StringContent("HTML"), "parse_mode" },
             };
@@ -52,7 +55,7 @@ public sealed class TelegramPublisher(
         {
             var payload = new Dictionary<string, object>
             {
-                ["chat_id"] = opts.ChatId,
+                ["chat_id"] = chatId,
                 ["text"] = post.Text,
                 ["parse_mode"] = "HTML",
             };

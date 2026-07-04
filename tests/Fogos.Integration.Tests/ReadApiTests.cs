@@ -28,6 +28,36 @@ public sealed class ReadApiTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Incidents_totalCount_covers_all_pages_regardless_of_cursor()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+        await ctx.Incidents.InsertManyAsync(Enumerable.Range(1, 7).Select(i =>
+            SeedData.Incident($"TC{i}", IncidentKind.Fire)));
+        await ctx.Incidents.InsertOneAsync(SeedData.Incident("TC_FMA", IncidentKind.Fma));
+
+        // Default filter is fire-only: totalCount is 7 even though the page holds 3.
+        var page1 = await fixture.GraphQLAsync(
+            "{ incidents(first:3){ totalCount nodes { id } pageInfo { hasNextPage endCursor } } }");
+        var conn = page1.RootElement.GetProperty("data").GetProperty("incidents");
+        Assert.Equal(7, conn.GetProperty("totalCount").GetInt32());
+        Assert.Equal(3, conn.GetProperty("nodes").GetArrayLength());
+        Assert.True(conn.GetProperty("pageInfo").GetProperty("hasNextPage").GetBoolean());
+
+        // totalCount ignores the after-cursor: page 2 reports the same total.
+        var cursor = conn.GetProperty("pageInfo").GetProperty("endCursor").GetString();
+        var page2 = await fixture.GraphQLAsync(
+            "query($after:String){ incidents(first:3, after:$after){ totalCount nodes { id } } }",
+            new { after = cursor });
+        Assert.Equal(7, page2.RootElement.GetProperty("data").GetProperty("incidents").GetProperty("totalCount").GetInt32());
+
+        // With all=true the FMA joins the count.
+        var all = await fixture.GraphQLAsync("{ incidents(filter:{ all: true }, first:3){ totalCount } }");
+        Assert.Equal(8, all.RootElement.GetProperty("data").GetProperty("incidents").GetProperty("totalCount").GetInt32());
+    }
+
+    [SkippableFact]
     public async Task ActiveIncidents_defaults_to_fire_only()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);

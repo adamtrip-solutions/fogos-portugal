@@ -90,4 +90,15 @@ public sealed class IncidentConnection
     public required IReadOnlyList<IncidentEdge> Edges { get; init; }
     public required IReadOnlyList<Incident> Nodes { get; init; }
     public required IncidentPageInfo PageInfo { get; init; }
+
+    /// <summary>The filter WITHOUT the after-cursor predicate — totals cover the whole result set.</summary>
+    [GraphQLIgnore]
+    public required MongoDB.Driver.FilterDefinition<Incident> UnpagedFilter { get; init; }
+
+    /// <summary>
+    /// Total matches for the filter across all pages. Resolved lazily — queries that don't select
+    /// it never pay the count.
+    /// </summary>
+    public async Task<int> TotalCount(Fogos.Infrastructure.Reads.IncidentReads reads, CancellationToken ct) =>
+        (int)Math.Min(int.MaxValue, await reads.CountAsync(UnpagedFilter, ct));
 }

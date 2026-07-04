@@ -32,6 +32,10 @@ public sealed class IncidentReads(MongoContext context)
     public async Task<List<Incident>> FindAsync(FilterDefinition<Incident> filter, int limit, CancellationToken ct = default) =>
         await context.Incidents.Find(filter).Sort(StandardSort).Limit(limit).ToListAsync(ct);
 
+    /// <summary>Count of documents matching a hand-built filter (connection totals).</summary>
+    public async Task<long> CountAsync(FilterDefinition<Incident> filter, CancellationToken ct = default) =>
+        await context.Incidents.CountDocumentsAsync(filter, cancellationToken: ct);
+
     public async Task<IReadOnlyList<Incident>> ActiveAsync(IReadOnlyList<IncidentKind> kinds, CancellationToken ct = default)
     {
         var filter = Builders<Incident>.Filter.Eq(x => x.Active, true);

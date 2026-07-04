@@ -34,6 +34,7 @@ public sealed class Query
     {
         first = Math.Clamp(first, 1, 100);
         var filterDef = IncidentFilterMapper.Build(filter, clock);
+        var unpagedFilter = filterDef;
 
         if (after is not null && IncidentCursor.TryDecode(after, out var occ, out var id))
         {
@@ -53,6 +54,7 @@ public sealed class Query
         {
             Nodes = page,
             Edges = edges,
+            UnpagedFilter = unpagedFilter,
             PageInfo = new IncidentPageInfo
             {
                 HasNextPage = hasNext,

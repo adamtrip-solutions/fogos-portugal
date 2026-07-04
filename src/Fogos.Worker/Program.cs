@@ -1,5 +1,6 @@
 using Fogos.Infrastructure.DependencyInjection;
 using Fogos.Worker.Jobs.Planes;
+using Fogos.Worker.Jobs.Summaries;
 using Fogos.Worker.Jobs.Weather;
 using Fogos.Worker.Queue;
 using Fogos.Worker.Subscriptions;
@@ -31,6 +32,7 @@ Fogos.Worker.Jobs.Risk.RiskFirmsJobRegistration.AddRiskAndFirmsJobs(builder.Serv
 builder.Services.AddPlaneJobs(); // [jobs:planes] registered in wave 2
 Fogos.Worker.Jobs.Incidents.IncidentJobsRegistration.AddIncidentJobs(builder.Services, builder.Configuration); // [jobs:incidents]
 Fogos.Worker.Jobs.Photos.PhotoJobsRegistration.AddPhotoJobs(builder.Services); // [jobs:photos] Phase 4
+builder.Services.AddSummaryJobs(); // [jobs:summaries] Phase 5
 
 // Change-stream → subscriptions bridge (publisher side of the SAME Redis provider the Api
 // subscribes to). Only when Redis is configured; a plain run without Redis stays a no-op.

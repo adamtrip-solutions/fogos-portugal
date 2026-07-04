@@ -74,4 +74,8 @@ public static class IncidentCopy
     /// <summary>ProcessICNFFireData source-only post.</summary>
     public static string IcnfSource(Incident i, string domain) =>
         $"ℹ Alerta via:  {i.Icnf?.AlertSource} {FogoUrl(domain, i.Id)} {Hashtag(i)} #FogosPT  ℹ";
+
+    /// <summary>addKML perimeter-announce post (legacy default branch; two spaces after the @VostPT mention).</summary>
+    public static string KmlPerimeter(Incident i, string domain) =>
+        $"🗺 Nova área de interesse por @VostPT  {DetalheUrl(domain, i.Id)} {Hashtag(i)} 🗺";
 }

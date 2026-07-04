@@ -38,11 +38,22 @@ internal static class IncidentFixtures
         "] }";
 
     // ── ICNF ────────────────────────────────────────────────────────────────
-    /// <summary>faztable: two header rows, then one occurrence (field 0 = id, field 12 = estado).</summary>
-    public static string IcnfTable(string id) =>
-        "resultado = [" +
-        "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
-        $"['{id}','x','','','','','','','','','','','Em Curso','']];";
+    /// <summary>faztable: two header rows, then occurrences (field 0 = id, field 2 = DHInicio, field 12 = estado).</summary>
+    public static string IcnfTable(params (string Id, DateTimeOffset? StartedAt)[] rows)
+    {
+        var body = string.Join(",", rows.Select(r =>
+        {
+            var dh = r.StartedAt is { } at
+                ? TimeZoneInfo.ConvertTime(at, Fogos.Domain.Time.FogosClock.Lisbon).ToString("dd-MM-yyyy HH:mm:ss")
+                : "";
+            return $"['{r.Id}','x','{dh}','','','','','','','','','','Em Curso','']";
+        }));
+        return "resultado = [" +
+               "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
+               body + "];";
+    }
+
+    public static string IcnfTable(string id) => IcnfTable((id, null));
 
     public static string IcnfNewFireXml(string id, DateTimeOffset? alertAt = null)
     {

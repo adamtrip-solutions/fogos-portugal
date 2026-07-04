@@ -2,8 +2,12 @@ using System.Text.RegularExpressions;
 
 namespace Fogos.Worker.Jobs.Icnf;
 
-/// <summary>One row of the ICNF <c>faztable.asp</c> occurrences table: the numeric id + normalized status.</summary>
-public sealed record IcnfTableRow(string Id, string StatusLabel);
+/// <summary>
+/// One row of the ICNF <c>faztable.asp</c> occurrences table: the numeric id, normalized status, and
+/// the raw <c>DHInicio</c> start timestamp (field 2, <c>dd-MM-yyyy HH:mm:ss</c> Lisbon; "" when absent) —
+/// lets the job age-filter rows without fetching their XML.
+/// </summary>
+public sealed record IcnfTableRow(string Id, string StatusLabel, string StartedAtRaw = "");
 
 /// <summary>
 /// Parses the ICNF <c>faztable.asp</c> response (ProcessICNFNewFireData.php): a JS array embedded in HTML.
@@ -40,7 +44,8 @@ public static partial class IcnfTableParser
                 continue;
 
             var estado = fields.Length > 12 ? fields[12].TrimStart('\'').Trim() : "";
-            rows.Add(new IcnfTableRow(id, MapStatus(estado)));
+            var startedAt = fields.Length > 2 ? fields[2].TrimStart('\'').Trim() : "";
+            rows.Add(new IcnfTableRow(id, MapStatus(estado), startedAt));
         }
 
         return rows;

@@ -70,33 +70,31 @@ public sealed class IcnfPipelineTests(ContainerFixture fixture)
         using var h = new IncidentPipelineHarness(fixture);
         const string idOld = "2026009001", idFresh = "2026009002", idCapped = "2026009003";
 
-        h.Icnf.Table =
-            "resultado = [" +
-            "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
-            $"['{idOld}','x','','','','','','','','','','','Em Curso','']," +
-            $"['{idFresh}','x','','','','','','','','','','','Em Curso','']," +
-            $"['{idCapped}','x','','','','','','','','','','','Em Curso','']];";
+        h.Icnf.Table = IncidentFixtures.IcnfTable(
+            (idOld, h.Clock.UtcNow.AddDays(-10)),   // ruled out from DHInicio alone — no XML fetch
+            (idFresh, h.Clock.UtcNow.AddHours(-2)),
+            (idCapped, (DateTimeOffset?)null));      // unknown table date — must fall back to the XML
         h.Icnf.XmlByNcco[idOld] = IncidentFixtures.IcnfNewFireXml(idOld, h.Clock.UtcNow.AddDays(-10));
         h.Icnf.XmlByNcco[idFresh] = IncidentFixtures.IcnfNewFireXml(idFresh, h.Clock.UtcNow.AddHours(-2));
         h.Icnf.XmlByNcco[idCapped] = IncidentFixtures.IcnfNewFireXml(idCapped, h.Clock.UtcNow.AddHours(-2));
 
         var opts = Microsoft.Extensions.Options.Options.Create(new FogosSourcesOptions
         {
-            Icnf = { NewFireLookbackDays = 3, MaxOccurrenceFetchesPerRun = 2 },
+            Icnf = { NewFireLookbackDays = 3, MaxOccurrenceFetchesPerRun = 1 },
         });
         var job = new ProcessIcnfNewFireDataJob(h.Locks, NullLogger<ProcessIcnfNewFireDataJob>.Instance,
             h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Processed, opts, h.Clock, h.Ops);
 
-        // Run 1: cap of 2 → the old row is judged (and permanently ruled out), the fresh one is
-        // created, and the third is deferred without a fetch.
+        // Run 1: the old row is ruled out from the table date with NO fetch; the fresh one uses the
+        // single fetch slot and is created; the unknown-date one is deferred by the cap.
         await job.RunAsync(CancellationToken.None);
-        Assert.Equal(2, h.Icnf.OccurrenceRequests.Count);
+        Assert.Equal([idFresh], h.Icnf.OccurrenceRequests);
         Assert.Null(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idOld)).FirstOrDefaultAsync());
         Assert.NotNull(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idFresh)).FirstOrDefaultAsync());
 
-        // Run 2: the old occurrence is never re-fetched; the deferred one gets its turn and is created.
+        // Run 2: the old occurrence stays fetch-free forever; the deferred one gets its turn.
         await job.RunAsync(CancellationToken.None);
-        Assert.Equal(1, h.Icnf.OccurrenceRequests.Count(r => r == idOld));
+        Assert.DoesNotContain(idOld, h.Icnf.OccurrenceRequests);
         Assert.NotNull(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idCapped)).FirstOrDefaultAsync());
         Assert.Null(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idOld)).FirstOrDefaultAsync());
     }

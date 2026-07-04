@@ -38,7 +38,7 @@ public sealed class ProcessIcnfNewFireDataJob(
     private const string TooOldKeyPrefix = "icnf:too-old:";
 
     private static readonly string[] DateFormats =
-        ["dd-MM-yyyy HH:mm", "dd/MM/yyyy HH:mm", "yyyy-MM-dd HH:mm", "dd-MM-yyyy H:mm", "yyyy-MM-dd HH:mm:ss"];
+        ["dd-MM-yyyy HH:mm", "dd/MM/yyyy HH:mm", "yyyy-MM-dd HH:mm", "dd-MM-yyyy H:mm", "yyyy-MM-dd HH:mm:ss", "dd-MM-yyyy HH:mm:ss"];
 
     protected override Task ExecuteCoreAsync(IJobExecutionContext context) => RunAsync(context.CancellationToken);
 
@@ -79,6 +79,16 @@ public sealed class ProcessIcnfNewFireDataJob(
             }
 
             // The faztable lists the entire season; the whole-run flood guards live here.
+            // Cheapest first: the table row's own DHInicio timestamp rules out old occurrences
+            // without spending an XML fetch — a season's backlog dies in one run.
+            if (TryParseLisbon(row.StartedAtRaw, out var rowStartedAt)
+                && rowStartedAt < clock.UtcNow.AddDays(-opts.NewFireLookbackDays))
+            {
+                if (await marker.TryMarkAsync(TooOldKeyPrefix + row.Id, ct))
+                    tooOld++;
+                continue;
+            }
+
             // TryMarkAsync claims the key, so a row is only ruled out after a fetch proved it old.
             if (!await marker.TryMarkAsync(TooOldKeyPrefix + row.Id, ct))
                 continue; // already ruled too old on a previous run
@@ -182,6 +192,18 @@ public sealed class ProcessIcnfNewFireDataJob(
 
         await dispatcher.DispatchAsync(
             new IncidentStatusChanged(existing.Id, previous.Code, previous.Label, next.Code, next.Label), ct: ct);
+    }
+
+    /// <summary>Strict parse of a Lisbon-local feed timestamp; false = unknown, caller falls back to the XML.</summary>
+    private bool TryParseLisbon(string raw, out DateTimeOffset at)
+    {
+        at = default;
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+        if (!DateTime.TryParseExact(raw.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var exact))
+            return false;
+        at = clock.FromLisbon(exact);
+        return true;
     }
 
     private DateTimeOffset ParseWhen(string? date, string? hora)

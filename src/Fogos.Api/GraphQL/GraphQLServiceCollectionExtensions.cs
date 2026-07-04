@@ -32,6 +32,7 @@ public static class GraphQLServiceCollectionExtensions
         services
             .AddGraphQLServer()
             .AddQueryType<Query>()
+            .AddMutationType<Mutations.Mutation>()
             .AddSubscriptionType<Subscription>()
             .AddTypeExtension<IncidentExtensions>()
             .AddTypeExtension<IncidentPhotoExtensions>()

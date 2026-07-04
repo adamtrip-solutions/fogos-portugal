@@ -49,6 +49,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IObjectStorage, S3ObjectStorage>();
         services.AddSingleton<IOpsNotifier, DiscordOpsNotifier>();
         services.AddSingleton<IClock, FogosClock>();
+        services.AddSingleton<Images.ImageProcessor>();
+
+        // Event dispatcher (Redis Streams). The Worker's AddFogosPipeline registers the same impl; the Api
+        // needs it here for the photo-upload and moderation flows (PhotoSubmitted / PhotoApproved).
+        services.AddSingleton<Queue.IEventDispatcher, Queue.RedisEventDispatcher>();
 
         // Read-side query layer (thin, driver-direct) used by GraphQL resolvers/DataLoaders and REST v3.
         services.AddSingleton<Reads.IncidentReads>();

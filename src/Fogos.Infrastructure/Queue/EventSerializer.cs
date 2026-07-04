@@ -26,6 +26,7 @@ public static class EventSerializer
         [nameof(ProcessIcnfFireData)] = typeof(ProcessIcnfFireData),
         [nameof(WarningCreated)] = typeof(WarningCreated),
         [nameof(PhotoSubmitted)] = typeof(PhotoSubmitted),
+        [nameof(PhotoApproved)] = typeof(PhotoApproved),
         [nameof(PushNotificationRequested)] = typeof(PushNotificationRequested),
     };
 

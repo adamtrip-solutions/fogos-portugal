@@ -11,12 +11,14 @@ public sealed class S3ObjectStorage : IObjectStorage, IDisposable
     private readonly IAmazonS3 _client;
     private readonly string _bucket;
     private readonly string _publicBaseUrl;
+    private readonly bool _httpsEndpoint;
 
     public S3ObjectStorage(IOptions<ObjectStorageOptions> options)
     {
         var o = options.Value;
         _bucket = o.Bucket;
         _publicBaseUrl = o.PublicBaseUrl;
+        _httpsEndpoint = o.Endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
         var config = new AmazonS3Config
         {
@@ -36,7 +38,8 @@ public sealed class S3ObjectStorage : IObjectStorage, IDisposable
             InputStream = content,
             ContentType = contentType,
             AutoCloseStream = false,
-            DisablePayloadSigning = true,
+            // Unsigned payloads (an R2 fast-path) are HTTPS-only in the SDK; dev MinIO runs over HTTP.
+            DisablePayloadSigning = _httpsEndpoint,
         };
         await _client.PutObjectAsync(request, ct);
     }

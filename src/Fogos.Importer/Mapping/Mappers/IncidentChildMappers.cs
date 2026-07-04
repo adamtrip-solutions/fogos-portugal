@@ -148,7 +148,7 @@ public sealed class IncidentPhotoMapper(IClock clock) : ILegacyCollectionMapper
         var decision = ReadString(GetAny(d, "decision", "status"));
         if (at is null && decision is null)
             return null;
-        return new PhotoModeration(at ?? clock.UtcNow, decision ?? "", ReadString(GetAny(d, "reason", "note")));
+        return new PhotoModeration(at ?? clock.UtcNow, decision ?? "", Reason: ReadString(GetAny(d, "reason", "note")));
     }
 }
 

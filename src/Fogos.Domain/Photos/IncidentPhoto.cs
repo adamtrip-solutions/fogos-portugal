@@ -47,4 +47,4 @@ public sealed class IncidentPhoto
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed record PhotoModeration(DateTimeOffset At, string Decision, string? Reason);
+public sealed record PhotoModeration(DateTimeOffset At, string Decision, string? By = null, string? Reason = null);

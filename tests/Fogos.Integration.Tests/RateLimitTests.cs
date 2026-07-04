@@ -65,7 +65,16 @@ public sealed class RateLimitTests(ContainerFixture fixture)
         await SeedData.ResetAsync(fixture);
         await fixture.FlushRedisAsync();
 
-        var gates = fixture.Factory.Services.GetRequiredService<PhotoUploadGates>();
+        // The shared factory raises the photo gates (endpoint upload tests share one TestServer IP);
+        // this test asserts the real production defaults, so it builds its own factory with them.
+        using var factory = fixture.CreateFactory(new Dictionary<string, string?>
+        {
+            ["PhotoGate:PerIpPerMinute"] = "3",
+            ["PhotoGate:PerIncidentPerIpPerHour"] = "8",
+            ["PhotoGate:PerIncidentPerHour"] = "80",
+            ["PhotoGate:PendingPerIncident"] = "50",
+        });
+        var gates = factory.Services.GetRequiredService<PhotoUploadGates>();
 
         // 3/min/IP → the 4th attempt trips.
         const string incidentA = "photo-inc-A";

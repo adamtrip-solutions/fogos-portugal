@@ -48,6 +48,9 @@ app.MapAuth();
 // REST v3 format outputs (only need Mongo) are always available.
 app.MapV3();
 
+// Citizen photo submission + public listing (anonymous upload behind the abuse gates).
+app.MapPhotos();
+
 if (redisConfigured)
 {
     app.UseWebSockets();

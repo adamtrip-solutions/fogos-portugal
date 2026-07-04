@@ -52,6 +52,20 @@ public sealed record Aircraft(
     FlightPosition? Position,
     bool Active);
 
+/// <summary>
+/// A photo awaiting moderation, with a short-lived presigned GET URL (pending photos are not public,
+/// so the CDN base cannot serve them). Only reachable through the scope-gated <c>pendingPhotos</c> query.
+/// </summary>
+public sealed record PendingPhoto(
+    [property: ID] string Id,
+    [property: ID] string IncidentId,
+    int Width,
+    int Height,
+    DateTimeOffset? TakenAt,
+    Fogos.Domain.Geo.GeoPoint? Gps,
+    DateTimeOffset CreatedAt,
+    string PresignedUrl);
+
 /// <summary>Delta emitted when the active-incident set changes.</summary>
 public sealed record ActiveIncidentsDelta(
     DateTimeOffset At,

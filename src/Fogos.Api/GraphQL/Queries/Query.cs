@@ -1,13 +1,18 @@
 using Fogos.Api.GraphQL.Filters;
 using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Aircraft;
+using Fogos.Domain.Auth;
 using Fogos.Domain.Incidents;
+using Fogos.Domain.Photos;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Time;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
+using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Reads;
+using Fogos.Infrastructure.Storage;
 using HotChocolate;
+using HotChocolate.Authorization;
 using HotChocolate.Types;
 using MongoDB.Driver;
 
@@ -141,4 +146,33 @@ public sealed class Query
         CancellationToken ct,
         int limit = 20) =>
         await reads.TrackAsync(icao, Math.Clamp(limit, 1, 100), ct);
+
+    /// <summary>
+    /// Moderation queue: pending photos oldest-first, each with a 15-minute presigned GET URL
+    /// (pending photos are not public — the CDN base never serves them). Requires <c>moderate:photos</c>.
+    /// </summary>
+    [Authorize(Policy = ApiScopes.ModeratePhotos)]
+    public async Task<IReadOnlyList<PendingPhoto>> PendingPhotos(
+        MongoContext mongo,
+        IObjectStorage storage,
+        CancellationToken ct,
+        int first = 50)
+    {
+        first = Math.Clamp(first, 1, 200);
+
+        var pending = await mongo.IncidentPhotos
+            .Find(Builders<IncidentPhoto>.Filter.Eq(x => x.Status, ModerationStatus.Pending))
+            .Sort(Builders<IncidentPhoto>.Sort.Ascending(x => x.CreatedAt))
+            .Limit(first)
+            .ToListAsync(ct);
+
+        var result = new List<PendingPhoto>(pending.Count);
+        foreach (var p in pending)
+        {
+            var url = await storage.PresignGetAsync(p.StorageKey, TimeSpan.FromMinutes(15), ct);
+            result.Add(new PendingPhoto(p.Id, p.IncidentId, p.Width, p.Height, p.TakenAt, p.Gps, p.CreatedAt, url));
+        }
+
+        return result;
+    }
 }

@@ -30,6 +30,7 @@ builder.Services.AddWeatherJobs(); // [jobs:weather] registered in wave 2
 Fogos.Worker.Jobs.Risk.RiskFirmsJobRegistration.AddRiskAndFirmsJobs(builder.Services, builder.Configuration); // [jobs:risk]
 builder.Services.AddPlaneJobs(); // [jobs:planes] registered in wave 2
 Fogos.Worker.Jobs.Incidents.IncidentJobsRegistration.AddIncidentJobs(builder.Services, builder.Configuration); // [jobs:incidents]
+Fogos.Worker.Jobs.Photos.PhotoJobsRegistration.AddPhotoJobs(builder.Services); // [jobs:photos] Phase 4
 
 // Change-stream → subscriptions bridge (publisher side of the SAME Redis provider the Api
 // subscribes to). Only when Redis is configured; a plain run without Redis stays a no-op.

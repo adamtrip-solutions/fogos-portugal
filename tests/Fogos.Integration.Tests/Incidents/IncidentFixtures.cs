@@ -44,13 +44,19 @@ internal static class IncidentFixtures
         "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
         $"['{id}','x','','','','','','','','','','','Em Curso','']];";
 
-    public static string IcnfNewFireXml(string id) => $"""
+    public static string IcnfNewFireXml(string id, DateTimeOffset? alertAt = null)
+    {
+        // Default to "2 hours ago" so the new-fire lookback window always sees the fixture as
+        // fresh — a hardcoded date would rot as real time passes it.
+        var at = TimeZoneInfo.ConvertTime(alertAt ?? DateTimeOffset.UtcNow.AddHours(-2), Fogos.Domain.Time.FogosClock.Lisbon);
+        return $"""
         <RESULT><CODIGO>
-            <DATAALERTA>01-08-2026</DATAALERTA><HORAALERTA>14:20</HORAALERTA>
+            <DATAALERTA>{at:dd-MM-yyyy}</DATAALERTA><HORAALERTA>{at:HH:mm}</HORAALERTA>
             <DISTRITO>SANTAREM</DISTRITO><CONCELHO>OUREM</CONCELHO><FREGUESIA>FREIXIANDA</FREGUESIA>
             <LOCAL>Casal do Mato</LOCAL><INE>1408</INE><LAT>39.66</LAT><LON>-8.45</LON>
         </CODIGO></RESULT>
         """;
+    }
 
     /// <summary>Enrichment XML with burn area, cause, source, and a KML url — triggers all three first-seen signals.</summary>
     public static string IcnfEnrichmentXml() => """

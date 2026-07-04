@@ -1,5 +1,6 @@
 using System.Text;
 using Fogos.Domain.Incidents;
+using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Jobs.Icnf;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
@@ -23,10 +24,11 @@ public sealed class IcnfPipelineTests(ContainerFixture fixture)
 
         // ── Phase 1: table → new 3103 fire with -1 sentinels ──────────────────
         h.Icnf.Table = IncidentFixtures.IcnfTable(id);
-        h.Icnf.XmlByNcco[id] = IncidentFixtures.IcnfNewFireXml(id);
+        h.Icnf.XmlByNcco[id] = IncidentFixtures.IcnfNewFireXml(id, h.Clock.UtcNow.AddHours(-1));
 
         var newFireJob = new ProcessIcnfNewFireDataJob(h.Locks, NullLogger<ProcessIcnfNewFireDataJob>.Instance,
-            h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Clock, h.Ops);
+            h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Processed,
+            Microsoft.Extensions.Options.Options.Create(new FogosSourcesOptions()), h.Clock, h.Ops);
         await newFireJob.RunAsync(CancellationToken.None);
 
         var incident = await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, id)).FirstAsync();
@@ -59,5 +61,43 @@ public sealed class IcnfPipelineTests(ContainerFixture fixture)
         Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Area ardida disponível"));
         Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Total de área ardida"));
         Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Alerta via") && p.Text.Contains("Fogueira"));
+    }
+
+    [SkippableFact]
+    public async Task Flood_guards_cap_fetches_and_never_refetch_old_occurrences()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        const string idOld = "2026009001", idFresh = "2026009002", idCapped = "2026009003";
+
+        h.Icnf.Table =
+            "resultado = [" +
+            "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
+            $"['{idOld}','x','','','','','','','','','','','Em Curso','']," +
+            $"['{idFresh}','x','','','','','','','','','','','Em Curso','']," +
+            $"['{idCapped}','x','','','','','','','','','','','Em Curso','']];";
+        h.Icnf.XmlByNcco[idOld] = IncidentFixtures.IcnfNewFireXml(idOld, h.Clock.UtcNow.AddDays(-10));
+        h.Icnf.XmlByNcco[idFresh] = IncidentFixtures.IcnfNewFireXml(idFresh, h.Clock.UtcNow.AddHours(-2));
+        h.Icnf.XmlByNcco[idCapped] = IncidentFixtures.IcnfNewFireXml(idCapped, h.Clock.UtcNow.AddHours(-2));
+
+        var opts = Microsoft.Extensions.Options.Options.Create(new FogosSourcesOptions
+        {
+            Icnf = { NewFireLookbackDays = 3, MaxOccurrenceFetchesPerRun = 2 },
+        });
+        var job = new ProcessIcnfNewFireDataJob(h.Locks, NullLogger<ProcessIcnfNewFireDataJob>.Instance,
+            h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Processed, opts, h.Clock, h.Ops);
+
+        // Run 1: cap of 2 → the old row is judged (and permanently ruled out), the fresh one is
+        // created, and the third is deferred without a fetch.
+        await job.RunAsync(CancellationToken.None);
+        Assert.Equal(2, h.Icnf.OccurrenceRequests.Count);
+        Assert.Null(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idOld)).FirstOrDefaultAsync());
+        Assert.NotNull(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idFresh)).FirstOrDefaultAsync());
+
+        // Run 2: the old occurrence is never re-fetched; the deferred one gets its turn and is created.
+        await job.RunAsync(CancellationToken.None);
+        Assert.Equal(1, h.Icnf.OccurrenceRequests.Count(r => r == idOld));
+        Assert.NotNull(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idCapped)).FirstOrDefaultAsync());
+        Assert.Null(await h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, idOld)).FirstOrDefaultAsync());
     }
 }

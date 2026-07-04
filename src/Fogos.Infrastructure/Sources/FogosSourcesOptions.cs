@@ -49,6 +49,19 @@ public sealed class IcnfOptions
 
     /// <summary>Relax TLS validation for the ICNF hosts (their chain is broken). Scoped to this client only.</summary>
     public bool AllowInsecureTls { get; set; } = true;
+
+    /// <summary>
+    /// Only create incidents for ICNF occurrences newer than this. The faztable lists the whole
+    /// season, so without a window a fresh database would ingest months of history as "new" fires.
+    /// Older occurrences are remembered in Redis and never re-fetched.
+    /// </summary>
+    public int NewFireLookbackDays { get; set; } = 3;
+
+    /// <summary>
+    /// Per-run ceiling on per-occurrence XML fetches — a politeness/backstop cap so a backlog
+    /// (fresh DB, long outage) drains across runs instead of hammering fogos.icnf.pt in one burst.
+    /// </summary>
+    public int MaxOccurrenceFetchesPerRun { get; set; } = 30;
 }
 
 /// <summary>IPMA open-data + scraped pages.</summary>

@@ -13,6 +13,9 @@ internal sealed class IcnfClientStub
     public readonly Dictionary<string, string> XmlByNcco = new(StringComparer.Ordinal);
     public readonly Dictionary<string, byte[]> KmlById = new(StringComparer.Ordinal);
 
+    /// <summary>Every ncco requested from webserviceocorrencias, in order — lets tests assert fetch budgets.</summary>
+    public readonly List<string> OccurrenceRequests = [];
+
     public IcnfClient Client() =>
         new(new HttpClient(new Handler(this)), Options.Create(new FogosSourcesOptions()));
 
@@ -29,6 +32,7 @@ internal sealed class IcnfClientStub
             if (url.Contains("webserviceocorrencias", StringComparison.Ordinal))
             {
                 var ncco = QueryValue(uri.Query, "ncco");
+                stub.OccurrenceRequests.Add(ncco);
                 return stub.XmlByNcco.TryGetValue(ncco, out var xml) ? Ok(xml) : NotFound();
             }
 

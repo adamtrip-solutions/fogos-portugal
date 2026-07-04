@@ -9,4 +9,10 @@ public interface IProcessedMarker
 {
     /// <summary>True when this caller claimed the key (first to see it); false if already marked.</summary>
     Task<bool> TryMarkAsync(string key, CancellationToken ct = default);
+
+    /// <summary>
+    /// Releases a claimed key — for claim-then-verify flows where the claimer decides the mark
+    /// should not stick (e.g. the guarded work turned out transiently impossible and must retry).
+    /// </summary>
+    Task UnmarkAsync(string key, CancellationToken ct = default);
 }

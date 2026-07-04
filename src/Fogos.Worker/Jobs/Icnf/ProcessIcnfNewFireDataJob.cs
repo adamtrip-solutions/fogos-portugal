@@ -29,9 +29,14 @@ public sealed class ProcessIcnfNewFireDataJob(
     IncidentIngestService ingest,
     MongoContext mongo,
     IEventDispatcher dispatcher,
+    IProcessedMarker marker,
+    Microsoft.Extensions.Options.IOptions<FogosSourcesOptions> sources,
     IClock clock,
     IOpsNotifier ops) : UniqueJob(lockService, logger)
 {
+    /// <summary>Redis key prefix for occurrences ruled too old to ingest — never re-fetched.</summary>
+    private const string TooOldKeyPrefix = "icnf:too-old:";
+
     private static readonly string[] DateFormats =
         ["dd-MM-yyyy HH:mm", "dd/MM/yyyy HH:mm", "yyyy-MM-dd HH:mm", "dd-MM-yyyy H:mm", "yyyy-MM-dd HH:mm:ss"];
 
@@ -52,7 +57,11 @@ public sealed class ProcessIcnfNewFireDataJob(
         }
 
         var rows = IcnfTableParser.Parse(html);
+        var opts = sources.Value.Icnf;
         var created = 0;
+        var tooOld = 0;
+        var fetches = 0;
+        var deferred = 0;
 
         foreach (var row in rows)
         {
@@ -63,21 +72,52 @@ public sealed class ProcessIcnfNewFireDataJob(
                 .Find(Builders<Incident>.Filter.Eq(x => x.Id, row.Id))
                 .FirstOrDefaultAsync(ct);
 
-            if (existing is null)
-            {
-                if (await CreateFromIcnfAsync(row, ct))
-                    created++;
-            }
-            else
+            if (existing is not null)
             {
                 await MaybeBumpStatusAsync(existing, row, ct);
+                continue;
+            }
+
+            // The faztable lists the entire season; the whole-run flood guards live here.
+            // TryMarkAsync claims the key, so a row is only ruled out after a fetch proved it old.
+            if (!await marker.TryMarkAsync(TooOldKeyPrefix + row.Id, ct))
+                continue; // already ruled too old on a previous run
+
+            if (fetches >= opts.MaxOccurrenceFetchesPerRun)
+            {
+                await marker.UnmarkAsync(TooOldKeyPrefix + row.Id, ct); // not judged yet — retry next run
+                deferred++;
+                continue;
+            }
+
+            fetches++;
+            switch (await CreateFromIcnfAsync(row, opts.NewFireLookbackDays, ct))
+            {
+                case CreateOutcome.Created:
+                    await marker.UnmarkAsync(TooOldKeyPrefix + row.Id, ct); // it exists now; key is noise
+                    created++;
+                    break;
+                case CreateOutcome.TooOld:
+                    tooOld++; // keep the marker: never fetch this occurrence again
+                    break;
+                case CreateOutcome.Failed:
+                    await marker.UnmarkAsync(TooOldKeyPrefix + row.Id, ct); // transient — retry next run
+                    break;
             }
         }
 
-        logger.LogInformation("ICNF new-fire: {Created} incidents created from {Rows} table rows.", created, rows.Count);
+        if (deferred > 0)
+            logger.LogWarning(
+                "ICNF new-fire: fetch cap ({Cap}) reached; {Deferred} occurrences deferred to the next run.",
+                opts.MaxOccurrenceFetchesPerRun, deferred);
+        logger.LogInformation(
+            "ICNF new-fire: {Created} created, {TooOld} too old, {Deferred} deferred ({Rows} table rows).",
+            created, tooOld, deferred, rows.Count);
     }
 
-    private async Task<bool> CreateFromIcnfAsync(IcnfTableRow row, CancellationToken ct)
+    private enum CreateOutcome { Created, TooOld, Failed }
+
+    private async Task<CreateOutcome> CreateFromIcnfAsync(IcnfTableRow row, int lookbackDays, CancellationToken ct)
     {
         IcnfOccurrence? occ;
         try
@@ -87,16 +127,20 @@ public sealed class ProcessIcnfNewFireDataJob(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "ICNF occurrence XML fetch failed for {Id}.", row.Id);
-            return false;
+            return CreateOutcome.Failed;
         }
 
         if (occ is null)
-            return false;
+            return CreateOutcome.Failed;
+
+        var occurredAt = ParseWhen(occ.DataAlerta, occ.HoraAlerta);
+        if (occurredAt < clock.UtcNow.AddDays(-lookbackDays))
+            return CreateOutcome.TooOld;
 
         var raw = new RawIncident
         {
             Id = row.Id,
-            OccurredAt = ParseWhen(occ.DataAlerta, occ.HoraAlerta),
+            OccurredAt = occurredAt,
             NaturezaCode = "3103",
             Natureza = "Mato",
             StatusLabel = row.StatusLabel,
@@ -112,7 +156,7 @@ public sealed class ProcessIcnfNewFireDataJob(
         };
 
         var outcome = await ingest.IngestAsync([raw], ct);
-        return outcome.Created > 0;
+        return outcome.Created > 0 ? CreateOutcome.Created : CreateOutcome.Failed;
     }
 
     private async Task MaybeBumpStatusAsync(Incident existing, IcnfTableRow row, CancellationToken ct)

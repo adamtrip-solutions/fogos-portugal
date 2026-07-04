@@ -15,4 +15,7 @@ public sealed class RedisProcessedMarker(IConnectionMultiplexer redis, IOptions<
             "1",
             expiry: options.Value.ProcessedMarkerTtl,
             when: When.NotExists);
+
+    public Task UnmarkAsync(string key, CancellationToken ct = default) =>
+        Db.KeyDeleteAsync(QueueKeys.Processed(key));
 }

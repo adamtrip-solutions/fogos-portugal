@@ -32,6 +32,13 @@ public sealed class RateLimitOptions
 {
     public const string SectionName = "RateLimit";
 
+    /// <summary>
+    /// Master switch for all general rate limiting (request rate, GraphQL cost budget, subscription
+    /// caps). Meant for local development only — the photo-upload abuse gates are product rules and
+    /// are NOT covered by this flag.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
     public int WindowSeconds { get; set; } = 60;
 
     /// <summary>

@@ -20,6 +20,7 @@ public sealed class RateLimitTests(ContainerFixture fixture)
 
         using var factory = fixture.CreateFactory(new Dictionary<string, string?>
         {
+            ["RateLimit:Enabled"] = "true", // Development config disables limiting; this test needs it on.
             ["RateLimit:Anonymous:Requests"] = "5",
         });
         var client = factory.CreateClient();
@@ -42,6 +43,7 @@ public sealed class RateLimitTests(ContainerFixture fixture)
 
         using var factory = fixture.CreateFactory(new Dictionary<string, string?>
         {
+            ["RateLimit:Enabled"] = "true", // Development config disables limiting; this test needs it on.
             ["RateLimit:Anonymous:CostBudget"] = "20",
         });
         var client = factory.CreateClient();

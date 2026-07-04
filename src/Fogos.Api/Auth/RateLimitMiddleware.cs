@@ -15,7 +15,7 @@ public sealed class RateLimitMiddleware(RequestDelegate next, IOptions<RateLimit
 
     public async Task InvokeAsync(HttpContext context, IFogosCallerAccessor callerAccessor, RequestRateLimiter limiter)
     {
-        if (IsExempt(context.Request.Path))
+        if (!_options.Enabled || IsExempt(context.Request.Path))
         {
             await next(context);
             return;

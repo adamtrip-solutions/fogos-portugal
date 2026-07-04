@@ -21,7 +21,7 @@ public sealed class GraphQLCostMiddleware(RequestDelegate next, IOptions<RateLim
 
     public async Task InvokeAsync(HttpContext context, IFogosCallerAccessor callerAccessor, GraphQLCostBudget budget)
     {
-        if (!ShouldInspect(context))
+        if (!_options.Enabled || !ShouldInspect(context))
         {
             await next(context);
             return;

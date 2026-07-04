@@ -38,7 +38,7 @@ public sealed class SubscriptionSessionInterceptor(
         var caller = await ResolveAsync(session, connectionInitMessage, cancellationToken);
         var cap = _options.For(caller.Tier).Subscriptions;
 
-        if (!SubscriptionLimiter.Allowed(cap))
+        if (_options.Enabled && !SubscriptionLimiter.Allowed(cap))
             return ConnectionStatus.Reject("Subscriptions are not permitted for this credential tier.");
 
         var http = session.Connection.HttpContext;
@@ -60,7 +60,7 @@ public sealed class SubscriptionSessionInterceptor(
             return;
 
         var cap = _options.For(caller.Tier).Subscriptions;
-        if (!await limiter.TryAcquireAsync(partition, cap))
+        if (_options.Enabled && !await limiter.TryAcquireAsync(partition, cap))
         {
             // Cap exhausted — close the socket rather than silently starting an unmetered stream.
             await session.Connection.CloseAsync(
@@ -70,7 +70,8 @@ public sealed class SubscriptionSessionInterceptor(
             return;
         }
 
-        http.Items[ActiveCountKey] = (http.Items[ActiveCountKey] as int? ?? 0) + 1;
+        if (_options.Enabled)
+            http.Items[ActiveCountKey] = (http.Items[ActiveCountKey] as int? ?? 0) + 1;
         await base.OnRequestAsync(session, operationSessionId, requestBuilder, cancellationToken);
     }
 

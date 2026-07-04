@@ -36,6 +36,14 @@ public sealed class FirmsProcessorTests(ContainerFixture fixture)
         await Ctx.Hotspots.DeleteManyAsync(FilterDefinition<Hotspots>.Empty);
     }
 
+    /// <summary>Inactive fire older than the 72h backfill window — never fetched.</summary>
+    private static Incident OldInactiveFire(string id)
+    {
+        var fire = Fire(id, active: false, GeoPoint.FromLatLng(40.15, -8.6));
+        fire.OccurredAt = DateTimeOffset.UtcNow.AddDays(-5);
+        return fire;
+    }
+
     private static Incident Fire(string id, bool active, GeoPoint? coords, IncidentKind kind = IncidentKind.Fire) => new()
     {
         Id = id,
@@ -61,7 +69,7 @@ public sealed class FirmsProcessorTests(ContainerFixture fixture)
         var sources = Options.Create(new FogosSourcesOptions());
         sources.Value.Firms.Key = "test-key";
         var client = new FirmsClient(new HttpClient(handler), sources);
-        var processor = new FirmsProcessor(Ctx, client, NullLogger<FirmsProcessor>.Instance);
+        var processor = new FirmsProcessor(Ctx, client, new FogosClock(), NullLogger<FirmsProcessor>.Instance);
         return (processor, handler);
     }
 
@@ -94,7 +102,7 @@ public sealed class FirmsProcessorTests(ContainerFixture fixture)
         await Ctx.Incidents.InsertManyAsync(new[]
         {
             Fire("active-fire", active: true, GeoPoint.FromLatLng(40.15, -8.6)),
-            Fire("inactive-fire", active: false, GeoPoint.FromLatLng(40.15, -8.6)),
+            OldInactiveFire("inactive-fire-old"), // outside the 72h backfill window
             Fire("fire-no-coords", active: true, coords: null),
             Fire("active-fma", active: true, GeoPoint.FromLatLng(40.15, -8.6), IncidentKind.Fma),
         });
@@ -134,7 +142,7 @@ public sealed class FirmsProcessorTests(ContainerFixture fixture)
 
         // Processor is present but must never be reached when the key is absent.
         var client = new FirmsClient(new HttpClient(new UrlStubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK))), sources);
-        var processor = new FirmsProcessor(Ctx, client, NullLogger<FirmsProcessor>.Instance);
+        var processor = new FirmsProcessor(Ctx, client, new FogosClock(), NullLogger<FirmsProcessor>.Instance);
 
         var job = new ProcessFirmsJob(new AlwaysGrantLock(), NullLogger<ProcessFirmsJob>.Instance, processor, sources, freshness, ops);
         await job.Execute(new FakeJobContext(ProcessFirmsJob.FreshnessJob));
@@ -142,5 +150,31 @@ public sealed class FirmsProcessorTests(ContainerFixture fixture)
         Assert.Single(ops.Infos);
         Assert.Contains("FIRMS skipped", ops.Infos.Single());
         Assert.Empty(ops.Errors);
+    }
+
+    [SkippableFact]
+    public async Task Backfills_recently_closed_fires_once_with_wider_day_range()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await ResetAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        var recent = Fire("BF1", active: false, GeoPoint.FromLatLng(39.5, -8.2));
+        recent.OccurredAt = now.AddHours(-30); // closed while the worker was down → dayRange ceil(1.25)+1 = 3
+        var tooOld = Fire("BF_OLD", active: false, GeoPoint.FromLatLng(39.6, -8.3));
+        tooOld.OccurredAt = now.AddDays(-5);   // outside the 72h window → ignored
+        await Ctx.Incidents.InsertManyAsync([recent, tooOld]);
+
+        var (processor, handler) = BuildProcessor();
+        Assert.Equal(1, await processor.ProcessAsync());
+        Assert.NotEmpty(handler.Requests);
+        Assert.All(handler.Requests, u => Assert.EndsWith("/3", u));
+        Assert.NotNull(await Ctx.Hotspots.Find(Builders<Hotspots>.Filter.Eq(x => x.IncidentId, "BF1")).FirstOrDefaultAsync());
+        Assert.Null(await Ctx.Hotspots.Find(Builders<Hotspots>.Filter.Eq(x => x.IncidentId, "BF_OLD")).FirstOrDefaultAsync());
+
+        // Second run: BF1 is covered now — nothing to process, zero requests.
+        handler.Requests.Clear();
+        Assert.Equal(0, await processor.ProcessAsync());
+        Assert.Empty(handler.Requests);
     }
 }

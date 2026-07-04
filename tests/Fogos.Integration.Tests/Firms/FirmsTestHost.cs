@@ -10,10 +10,16 @@ internal sealed class UrlStubHandler(Func<string, HttpResponseMessage> responder
     private int _calls;
     public int Calls => _calls;
 
+    /// <summary>Every requested URL, in order.</summary>
+    public List<string> Requests { get; } = [];
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _calls);
-        return Task.FromResult(responder(request.RequestUri!.ToString()));
+        var url = request.RequestUri!.ToString();
+        lock (Requests)
+            Requests.Add(url);
+        return Task.FromResult(responder(url));
     }
 }
 

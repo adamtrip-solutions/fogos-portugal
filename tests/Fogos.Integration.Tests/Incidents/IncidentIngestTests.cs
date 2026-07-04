@@ -4,6 +4,7 @@ using Fogos.Domain.Incidents;
 using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
 using Fogos.Infrastructure.Queue;
+using Fogos.Worker.Handlers;
 using Fogos.Worker.Jobs.Incidents;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
@@ -74,6 +75,45 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
         // ICNF kickoff enqueued fire creations onto the icnf stream.
         var icnf = await h.Redis.GetDatabase().StreamLengthAsync(QueueKeys.Stream("icnf"));
         Assert.True(icnf > 0);
+    }
+
+    [SkippableFact]
+    public async Task New_incident_fanout_is_idempotent_across_redelivery()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+        using var h = new IncidentPipelineHarness(fixture);
+
+        await h.Mongo.Incidents.InsertOneAsync(Fire("IDEMP1", IncidentStatusCatalog.EmCurso, 10, 5, 1, h.Clock.UtcNow));
+
+        var social = new NewIncidentSocialHandler(h.Mongo, h.Clock, h.Threads, h.Twitter, h.Telegram, h.Facebook,
+            h.Renderer, h.Scheduler, h.FcmNotifier, h.PipelineOptions);
+        var notify = new NewIncidentNotificationsHandler(h.Mongo, h.Clock, h.FcmNotifier, h.Scheduler, h.Processed, h.Ops);
+
+        var evt = new IncidentCreated("IDEMP1");
+        var db = h.Redis.GetDatabase();
+
+        // First delivery: one social capture per channel, and one scheduled push per handler
+        // (new-fire from social + new-incident from notifications).
+        await social.HandleAsync(evt, CancellationToken.None);
+        await notify.HandleAsync(evt, CancellationToken.None);
+
+        Assert.Single(h.Twitter.Posts);
+        Assert.Single(h.Facebook.Posts);
+        Assert.Single(h.Telegram.Posts);
+        Assert.Equal(2, await db.SortedSetLengthAsync(QueueKeys.DelayedSet)); // new-fire + new-incident
+        var nearbySends = h.Fcm.Sends.Count;
+        Assert.True((await h.Threads.GetAsync("IDEMP1", CancellationToken.None))!.SentNewIncidentPost);
+
+        // At-least-once redelivery re-runs both handlers on the same event → no duplicates.
+        await social.HandleAsync(evt, CancellationToken.None);
+        await notify.HandleAsync(evt, CancellationToken.None);
+
+        Assert.Single(h.Twitter.Posts);
+        Assert.Single(h.Facebook.Posts);
+        Assert.Single(h.Telegram.Posts);
+        Assert.Equal(2, await db.SortedSetLengthAsync(QueueKeys.DelayedSet));
+        Assert.Equal(nearbySends, h.Fcm.Sends.Count); // nearby data push not re-sent
     }
 
     [SkippableFact]

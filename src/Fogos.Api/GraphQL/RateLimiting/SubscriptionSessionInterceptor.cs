@@ -20,6 +20,7 @@ public sealed class SubscriptionSessionInterceptor(
     JwtService jwt,
     ApiKeyResolver apiKeys,
     SubscriptionLimiter limiter,
+    ClientIpResolver ipResolver,
     IOptions<RateLimitOptions> options)
     : DefaultSocketSessionInterceptor
 {
@@ -113,7 +114,7 @@ public sealed class SubscriptionSessionInterceptor(
         IOperationMessagePayload payload,
         CancellationToken ct)
     {
-        var ip = ResolveIp(session.Connection.HttpContext);
+        var ip = ipResolver.Resolve(session.Connection.HttpContext);
 
         ConnectPayload? parsed = null;
         try { parsed = payload.As<ConnectPayload>(); }
@@ -155,18 +156,6 @@ public sealed class SubscriptionSessionInterceptor(
         }
 
         return FogosCaller.Anonymous(ip);
-    }
-
-    private static string ResolveIp(HttpContext context)
-    {
-        var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrEmpty(forwarded))
-        {
-            var first = forwarded.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrEmpty(first))
-                return first;
-        }
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
     /// <summary>Shape of the graphql-ws <c>connection_init</c> payload we understand.</summary>

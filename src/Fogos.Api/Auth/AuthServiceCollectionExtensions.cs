@@ -15,6 +15,7 @@ public static class AuthServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<JwtService>();
         services.AddSingleton<ApiKeyResolver>();
+        services.AddSingleton<ClientIpResolver>();
         services.AddSingleton<RefreshTokenStore>();
         services.AddSingleton<IFogosCallerAccessor, FogosCallerAccessor>();
 

@@ -11,9 +11,9 @@ namespace Fogos.Api.Auth;
 /// </summary>
 public sealed class AuthenticationMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, JwtService jwt, ApiKeyResolver apiKeys)
+    public async Task InvokeAsync(HttpContext context, JwtService jwt, ApiKeyResolver apiKeys, ClientIpResolver ipResolver)
     {
-        var ip = ResolveIp(context);
+        var ip = ipResolver.Resolve(context);
 
         // (1) Bearer JWT — present-but-invalid is a hard 401 (never silently downgraded to anonymous).
         var authHeader = context.Request.Headers.Authorization.ToString();
@@ -143,19 +143,6 @@ public sealed class AuthenticationMiddleware(RequestDelegate next)
         claims.AddRange(caller.Scopes.Select(s => new Claim("scope", s)));
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "Fogos"));
-    }
-
-    private static string ResolveIp(HttpContext context)
-    {
-        // Cloudflare is the edge — trust the first hop of X-Forwarded-For, else the socket address.
-        var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrEmpty(forwarded))
-        {
-            var first = forwarded.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrEmpty(first))
-                return first;
-        }
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
     private static Task WriteError(HttpContext context, int status, string code, string message)

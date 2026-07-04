@@ -34,6 +34,12 @@ public sealed class RateLimitOptions
 
     public int WindowSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// Request header carrying the trusted client IP set by the edge (Cloudflare). Preferred over
+    /// X-Forwarded-For, whose first hop is attacker-controlled. Set empty to rely on XFF's last hop.
+    /// </summary>
+    public string ClientIpHeader { get; set; } = "CF-Connecting-IP";
+
     public TierLimits Anonymous { get; set; } = new(30, 500, 0);
     public TierLimits Registered { get; set; } = new(300, 5000, 2);
     public TierLimits FirstParty { get; set; } = new(1200, 50000, 10);

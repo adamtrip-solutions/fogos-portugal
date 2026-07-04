@@ -23,6 +23,33 @@ public sealed class SocialThreadStore(MongoContext mongo, IClock clock)
     public Task SetFacebookPostIdAsync(string incidentId, string? postId, CancellationToken ct) =>
         Apply(incidentId, Builders<SocialThread>.Update.Set(x => x.FacebookPostId, postId), ct);
 
+    /// <summary>
+    /// Atomically claims the new-incident social fan-out: sets <see cref="SocialThread.SentNewIncidentPost"/>
+    /// only if it wasn't already set, returning true for the single caller that wins. Idempotency guard for
+    /// at-least-once redelivery of <c>IncidentCreated</c> — a loser must not publish.
+    /// </summary>
+    public async Task<bool> TryClaimNewIncidentPostAsync(string incidentId, CancellationToken ct)
+    {
+        var filter = Builders<SocialThread>.Filter.And(
+            ById(incidentId),
+            Builders<SocialThread>.Filter.Ne(x => x.SentNewIncidentPost, true));
+        var update = Builders<SocialThread>.Update
+            .Set(x => x.SentNewIncidentPost, true)
+            .SetOnInsert(x => x.IncidentId, incidentId)
+            .Set(x => x.UpdatedAt, clock.UtcNow);
+        try
+        {
+            await mongo.SocialThreads.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+            return true;
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // The row already exists with the flag set (filter excluded it, so upsert tried to insert a
+            // duplicate _id) — another delivery already claimed it.
+            return false;
+        }
+    }
+
     public Task MarkImportantSentAsync(string incidentId, CancellationToken ct) =>
         Apply(incidentId, Builders<SocialThread>.Update.Set(x => x.SentImportantPost, true), ct);
 

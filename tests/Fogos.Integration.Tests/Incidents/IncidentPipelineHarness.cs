@@ -72,6 +72,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
         Scheduler = new NotificationScheduler(Delayed, fcmOptions);
         Locks = new RedisSingleFlightLock(Redis);
         Threads = new SocialThreadStore(Mongo, Clock);
+        Processed = new RedisProcessedMarker(Redis, Options.Create(new QueueOptions()));
         PipelineOptions = Options.Create(new IncidentPipelineOptions { SocialLinkDomain = "fogos.pt" });
 
         Renderer = new RendererClient(
@@ -93,6 +94,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
     public NotificationScheduler Scheduler { get; }
     public ISingleFlightLock Locks { get; }
     public SocialThreadStore Threads { get; }
+    public IProcessedMarker Processed { get; }
     public RendererClient Renderer { get; }
     public LocationResolver Resolver { get; }
     public IncidentIngestService Ingest { get; }
@@ -158,7 +160,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
         var history = new IncidentHistoryHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, FcmNotifier, PipelineOptions);
         var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, Discord, Renderer, Scheduler, FcmNotifier, PipelineOptions);
         var social = new NewIncidentSocialHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, Renderer, Scheduler, FcmNotifier, PipelineOptions);
-        var notify = new NewIncidentNotificationsHandler(Mongo, Clock, FcmNotifier, Scheduler, Ops);
+        var notify = new NewIncidentNotificationsHandler(Mongo, Clock, FcmNotifier, Scheduler, Processed, Ops);
         var kickoff = new IcnfKickoffHandler(Mongo, Clock, Dispatcher);
         var icnfProcess = new ProcessIcnfFireDataHandler(Enrichment);
         var icnfSocial = new IcnfSocialHandler(Mongo, Threads, Twitter, Telegram, Facebook, Renderer, Scheduler, FcmNotifier, PipelineOptions);

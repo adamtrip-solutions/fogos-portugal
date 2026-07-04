@@ -46,6 +46,11 @@ public sealed class NewIncidentSocialHandler(
             || clock.ToLisbon(incident.OccurredAt).Year < IncidentRules.HistoryMinYear)
             return;
 
+        // Idempotency: at-least-once redelivery re-runs every handler of a pending message. Claim the
+        // fan-out atomically so only the first delivery posts (no duplicate tweets once channels are On).
+        if (!await threads.TryClaimNewIncidentPostAsync(incident.Id, ct))
+            return;
+
         // New-fire district push (NotificationTool::sendNewFireNotification, 3-min delayed).
         var nature = string.IsNullOrEmpty(incident.Natureza) ? "" : $" - {incident.Natureza}";
         await scheduler.ScheduleAsync(

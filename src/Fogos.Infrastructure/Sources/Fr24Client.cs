@@ -28,7 +28,7 @@ public sealed class Fr24CreditMeter(IConnectionMultiplexer redis, IClock clock, 
     public async Task<bool> HasBudgetAsync()
     {
         if (Options.MonthlyBudget <= 0)
-            return true; // 0 = budget disabled
+            return false; // fail closed: no configured budget means we must not spend shared credits
 
         var current = await CurrentAsync();
         return current < Options.MonthlyBudget * Options.BudgetGuardFraction;

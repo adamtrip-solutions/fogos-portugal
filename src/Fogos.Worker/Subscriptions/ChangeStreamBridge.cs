@@ -6,6 +6,7 @@ using Fogos.Infrastructure.Ops;
 using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Subscriptions;
 using HotChocolate.Subscriptions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Fogos.Worker.Subscriptions;
@@ -26,6 +27,12 @@ public sealed class ChangeStreamBridge(
 {
     private ActiveDeltaTracker _tracker = new([]);
 
+    // Resume tokens are kept in memory (per-process). A restarted Worker warms the active set from the
+    // DB and starts a fresh stream, so a durable token store buys little here; persisting one would only
+    // help bridge a full process restart, which the DB re-warm already covers for correctness.
+    private BsonDocument? _incidentResumeToken;
+    private BsonDocument? _warningResumeToken;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await WarmActiveSetAsync(stoppingToken);
@@ -45,6 +52,27 @@ public sealed class ChangeStreamBridge(
         {
             logger.LogWarning(ex, "Could not warm active-incident set; starting empty");
             _tracker = new ActiveDeltaTracker([]);
+        }
+    }
+
+    /// <summary>
+    /// After a lost resume token forces a fresh stream, reconcile the in-memory active set against the DB
+    /// so events missed in the gap don't leave it drifted, emitting deltas for the net add/remove.
+    /// </summary>
+    private async Task RewarmActiveSetAsync(CancellationToken ct)
+    {
+        try
+        {
+            var ids = (await incidentReads.ActiveAsync([], ct)).Select(i => i.Id);
+            var diff = _tracker.Rewarm(ids);
+            foreach (var id in diff.Added)
+                await PublishDeltaAsync(DeltaKind.Added, id, ct);
+            foreach (var id in diff.Removed)
+                await PublishDeltaAsync(DeltaKind.Removed, id, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not re-warm active-incident set after a resume-token loss");
         }
     }
 
@@ -83,17 +111,41 @@ public sealed class ChangeStreamBridge(
 
     private async Task HandleIncidentBatchAsync(CancellationToken ct)
     {
-        var options = new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup };
-        using var cursor = await context.Incidents.WatchAsync(options, ct);
+        using var cursor = await OpenIncidentCursorAsync(ct);
         while (await cursor.MoveNextAsync(ct))
         {
             foreach (var change in cursor.Current)
             {
+                _incidentResumeToken = change.ResumeToken; // resume just after this event on recreate
+
                 if (change.OperationType == ChangeStreamOperationType.Invalidate)
-                    return; // recreate the stream
+                    return; // recreate the stream (StartAfter the invalidate token)
 
                 await HandleIncidentChangeAsync(change, ct);
             }
+        }
+    }
+
+    private async Task<IChangeStreamCursor<ChangeStreamDocument<Incident>>> OpenIncidentCursorAsync(CancellationToken ct)
+    {
+        var options = new ChangeStreamOptions
+        {
+            FullDocument = ChangeStreamFullDocumentOption.UpdateLookup,
+            StartAfter = _incidentResumeToken,
+        };
+        try
+        {
+            return await context.Incidents.WatchAsync(options, ct);
+        }
+        catch (Exception ex) when (_incidentResumeToken is not null)
+        {
+            // The saved token is too old (oplog rolled over / history lost). Drop it, re-warm the active
+            // set from the DB so the tracker stays consistent, and start a fresh stream.
+            logger.LogWarning(ex, "Incident change-stream resume failed; falling back to a fresh stream and re-warming");
+            _incidentResumeToken = null;
+            await RewarmActiveSetAsync(ct);
+            return await context.Incidents.WatchAsync(
+                new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup }, ct);
         }
     }
 
@@ -129,18 +181,40 @@ public sealed class ChangeStreamBridge(
 
     private async Task HandleWarningBatchAsync(CancellationToken ct)
     {
-        var options = new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup };
-        using var cursor = await context.Warnings.WatchAsync(options, ct);
+        using var cursor = await OpenWarningCursorAsync(ct);
         while (await cursor.MoveNextAsync(ct))
         {
             foreach (var change in cursor.Current)
             {
+                _warningResumeToken = change.ResumeToken;
+
                 if (change.OperationType == ChangeStreamOperationType.Invalidate)
                     return;
 
                 if (change.OperationType == ChangeStreamOperationType.Insert && change.FullDocument is { } warning)
                     await sender.SendAsync(SubscriptionTopics.WarningAdded, warning.Id, ct);
             }
+        }
+    }
+
+    private async Task<IChangeStreamCursor<ChangeStreamDocument<Warning>>> OpenWarningCursorAsync(CancellationToken ct)
+    {
+        var options = new ChangeStreamOptions
+        {
+            FullDocument = ChangeStreamFullDocumentOption.UpdateLookup,
+            StartAfter = _warningResumeToken,
+        };
+        try
+        {
+            return await context.Warnings.WatchAsync(options, ct);
+        }
+        catch (Exception ex) when (_warningResumeToken is not null)
+        {
+            // Warnings carry no tracked set to re-warm — just drop the stale token and start fresh.
+            logger.LogWarning(ex, "Warning change-stream resume failed; falling back to a fresh stream");
+            _warningResumeToken = null;
+            return await context.Warnings.WatchAsync(
+                new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup }, ct);
         }
     }
 

@@ -84,6 +84,14 @@ public sealed class ProcessFr24PlanesJob(
             return;
         }
 
+        // (a2) fail closed: a key with no configured budget must never spend shared credits.
+        if (fr24Options.MonthlyBudget <= 0)
+        {
+            await freshness.NoteOnceAsync(JobName, "no-budget",
+                "FR24 key configured but no monthly budget — refusing to spend", ct);
+            return;
+        }
+
         // (b) daylight window (Lisbon)
         if (!SolarWindow.IsLisbonDaylight(clock.UtcNow))
         {

@@ -43,4 +43,29 @@ public sealed class ActiveDeltaTrackerTests
         Assert.Equal(DeltaKind.None, tracker.Delete("a"));
         Assert.Equal(DeltaKind.None, tracker.Delete("ghost"));
     }
+
+    [Fact]
+    public void Rewarm_reconciles_against_db_truth_and_reports_net_diff()
+    {
+        // In-memory set drifted during a resume-token gap: had {a,b}, DB truth is {b,c}.
+        var tracker = new ActiveDeltaTracker(["a", "b"]);
+
+        var diff = tracker.Rewarm(["b", "c"]);
+
+        Assert.Equal(["c"], diff.Added);       // appeared in the DB while we were blind
+        Assert.Equal(["a"], diff.Removed);     // went inactive while we were blind
+        Assert.Equal(new HashSet<string> { "b", "c" }, tracker.ActiveIds.ToHashSet()); // set == DB truth
+    }
+
+    [Fact]
+    public void Rewarm_to_identical_set_is_a_no_op_diff()
+    {
+        var tracker = new ActiveDeltaTracker(["a", "b"]);
+
+        var diff = tracker.Rewarm(["a", "b"]);
+
+        Assert.Empty(diff.Added);
+        Assert.Empty(diff.Removed);
+        Assert.Equal(new HashSet<string> { "a", "b" }, tracker.ActiveIds.ToHashSet());
+    }
 }

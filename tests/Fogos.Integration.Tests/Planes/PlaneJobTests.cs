@@ -179,6 +179,37 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         Assert.Equal(19, await ctx.Meter.CurrentAsync()); // untouched by the gated run
     }
 
+    [SkippableFact]
+    public async Task Fr24_with_key_but_no_budget_refuses_to_spend()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await fixture.FlushRedisAsync();
+
+        var mongo = NewMongo();
+        await SeedAerialFireAsync(mongo);
+        await SeedFleetAsync(mongo, notify: true);
+
+        await using var redis = await ConnectRedisAsync();
+        var clock = new FakeClock(LisbonMidday);
+        // Key configured (BuildFr24 always sets one) but budget unset → fail closed, no API call.
+        var ops = new RecordingOps();
+        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft), monthlyBudget: 0, ops: ops);
+
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+
+        Assert.Equal(0, ctx.Handler.Attempts);
+        Assert.Equal(0, await CountBySourceAsync(mongo, "fr24"));
+        Assert.Equal(0, await ctx.Meter.CurrentAsync());
+
+        // A single ops warning is emitted (NoteOnce), not one per run.
+        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
+        var refusal = Assert.Single(ops.Infos, m => m.Contains("refusing to spend"));
+        Assert.Contains("no monthly budget", refusal);
+
+        // HasBudgetAsync fails closed directly too.
+        Assert.False(await ctx.Meter.HasBudgetAsync());
+    }
+
     // ── ADS-B (adsb.fi / airplanes.live) ─────────────────────────────────────────────────────────
 
     [SkippableFact]
@@ -262,8 +293,9 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         IConnectionMultiplexer redis,
         FakeClock clock,
         Func<int, HttpResponseMessage> responder,
-        int monthlyBudget = 0,
-        PublisherMode fr24Channel = PublisherMode.DryRun)
+        int monthlyBudget = 100_000, // fail-closed: a real budget is required for the job to spend at all
+        PublisherMode fr24Channel = PublisherMode.DryRun,
+        RecordingOps? ops = null)
     {
         var sources = Options.Create(new FogosSourcesOptions
         {
@@ -275,7 +307,7 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         var handler = new StubHttpMessageHandler(responder);
         var fr24Client = new Fr24Client(new HttpClient(handler), sources);
         var meter = new Fr24CreditMeter(redis, clock, sources);
-        var ops = new RecordingOps();
+        ops ??= new RecordingOps();
         var freshness = new PlaneJobFreshness(redis, clock, ops);
         var twitter = new RecordingTwitter();
         var facebook = new RecordingFacebook();

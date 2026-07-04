@@ -15,6 +15,13 @@ public sealed class SocialThread
     /// <summary>Facebook post id — status transitions are appended as comments.</summary>
     public string? FacebookPostId { get; set; }
 
+    /// <summary>
+    /// The new-incident social fan-out (district push + X/Facebook/Telegram) already fired. Claimed
+    /// atomically before publishing so an at-least-once redelivery of <c>IncidentCreated</c> can't
+    /// double-post.
+    /// </summary>
+    public bool SentNewIncidentPost { get; set; }
+
     /// <summary>The "important incident" fan-out already fired for this incident.</summary>
     public bool SentImportantPost { get; set; }
 

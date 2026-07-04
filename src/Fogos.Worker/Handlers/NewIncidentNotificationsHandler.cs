@@ -20,6 +20,7 @@ public sealed class NewIncidentNotificationsHandler(
     IClock clock,
     FcmNotifier fcm,
     NotificationScheduler scheduler,
+    IProcessedMarker processed,
     IOpsNotifier ops)
     : IEventHandler<IncidentCreated>
 {
@@ -30,6 +31,11 @@ public sealed class NewIncidentNotificationsHandler(
             .FirstOrDefaultAsync(ct);
 
         if (incident is null || clock.ToLisbon(incident.OccurredAt).Year < IncidentRules.HistoryMinYear)
+            return;
+
+        // Idempotency: at-least-once redelivery re-runs this handler; claim the fan-out once so a
+        // redelivered IncidentCreated can't schedule a second push or re-send the nearby data message.
+        if (!await processed.TryMarkAsync($"newincident:{incident.Id}", ct))
             return;
 
         var isFire = incident.Kind == IncidentKind.Fire;

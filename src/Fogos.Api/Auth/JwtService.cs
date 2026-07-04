@@ -82,7 +82,8 @@ public sealed class JwtService
                 return false;
 
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (root.TryGetProperty("exp", out var exp) && exp.GetInt64() < now)
+            // exp is mandatory: a token without a (numeric) expiry would never expire — reject it.
+            if (!root.TryGetProperty("exp", out var exp) || exp.ValueKind != JsonValueKind.Number || exp.GetInt64() < now)
                 return false;
             if (root.TryGetProperty("nbf", out var nbf) && nbf.GetInt64() > now + 60)
                 return false;

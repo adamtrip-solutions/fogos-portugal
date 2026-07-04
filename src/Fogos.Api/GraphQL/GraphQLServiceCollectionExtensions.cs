@@ -66,6 +66,7 @@ public static class GraphQLServiceCollectionExtensions
                 sp.GetRequiredService<Fogos.Api.Auth.JwtService>(),
                 sp.GetRequiredService<Fogos.Api.Auth.ApiKeyResolver>(),
                 sp.GetRequiredService<Fogos.Infrastructure.RateLimiting.SubscriptionLimiter>(),
+                sp.GetRequiredService<Fogos.Api.Auth.ClientIpResolver>(),
                 sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Fogos.Infrastructure.Options.RateLimitOptions>>()))
             .AddRedisSubscriptions(sp => sp.GetRequiredService<IConnectionMultiplexer>());
 

@@ -354,3 +354,9 @@ complete and shadowing reality.
 Remaining small decisions (deferrable, flagged where they land): R2 public domain
 (`cdn.fogos.pt` repoint vs new host) — Phase 4; `flight_positions`/photo retention —
 Phase 4; FR24 dev credentials vs disabled-in-dev — Phase 3; repo/project naming — Phase 0.
+
+**Resolved during the build (2026-07-04):** naming — solution `Fogos`, projects
+`Fogos.*`; `flight_positions` retention — TTL index, 180 days by default
+(`Mongo:FlightPositionTtlDays`); photos — retained indefinitely (they are the
+product); FR24 in dev — disabled until a key is configured, production key only at
+switchover. The switchover playbook lives in `SWITCHOVER.md`.

@@ -47,4 +47,25 @@ public sealed class ActiveDeltaTracker
     }
 
     public DeltaKind Delete(string id) => _active.Remove(id) ? DeltaKind.Removed : DeltaKind.None;
+
+    /// <summary>
+    /// Reconciles the tracked set against a fresh DB snapshot of active ids — used after a change-stream
+    /// resume token expires and the stream falls back to a clean start (events lost in the gap must not
+    /// leave the set drifted). Returns the ids that appeared (in DB, not tracked) and disappeared
+    /// (tracked, no longer in DB); the caller may emit synthetic deltas from them.
+    /// </summary>
+    public ActiveSetReconciliation Rewarm(IEnumerable<string> dbActiveIds)
+    {
+        var truth = new HashSet<string>(dbActiveIds);
+        var added = truth.Where(id => !_active.Contains(id)).ToList();
+        var removed = _active.Where(id => !truth.Contains(id)).ToList();
+
+        _active.Clear();
+        _active.UnionWith(truth);
+
+        return new ActiveSetReconciliation(added, removed);
+    }
 }
+
+/// <summary>Net difference produced by <see cref="ActiveDeltaTracker.Rewarm"/>.</summary>
+public sealed record ActiveSetReconciliation(IReadOnlyList<string> Added, IReadOnlyList<string> Removed);

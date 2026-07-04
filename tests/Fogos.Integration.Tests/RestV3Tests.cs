@@ -40,6 +40,9 @@ public sealed class RestV3Tests(ContainerFixture fixture)
         var kmlText = await kml.Content.ReadAsStringAsync();
         var doc = XDocument.Parse(kmlText); // throws if not well-formed XML
         Assert.Equal("kml", doc.Root!.Name.LocalName);
+        // The declared encoding must match the UTF-8 bytes we serve (was wrongly "utf-16").
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>", kmlText);
+        Assert.DoesNotContain("utf-16", kmlText, StringComparison.OrdinalIgnoreCase);
     }
 
     [SkippableFact]

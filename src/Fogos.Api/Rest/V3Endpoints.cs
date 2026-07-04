@@ -278,14 +278,16 @@ public static class V3Endpoints
 
     private static string BuildString(Action<XmlWriter> write)
     {
+        // XmlWriter over a StringBuilder always writes UTF-16 (the in-memory string encoding), so its
+        // own declaration would read encoding="utf-16" even though we serve the bytes as UTF-8. Suppress
+        // the writer's declaration and prepend an explicit UTF-8 one that matches the response charset.
         var sb = new StringBuilder();
-        using (var w = XmlWriter.Create(sb, new XmlWriterSettings { Indent = false, OmitXmlDeclaration = false, Encoding = Encoding.UTF8 }))
+        using (var w = XmlWriter.Create(sb, new XmlWriterSettings { Indent = false, OmitXmlDeclaration = true }))
         {
-            w.WriteStartDocument();
             write(w);
-            w.WriteEndDocument();
+            w.Flush();
         }
-        return sb.ToString();
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + sb;
     }
 
     private static string Coord(GeoPoint p) =>

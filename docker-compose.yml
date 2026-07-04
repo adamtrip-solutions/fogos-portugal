@@ -93,6 +93,8 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: "3000"
+    ports:
+      - "3000:3000" # exposed so a host-run worker can use Renderer__Url=http://localhost:3000
     restart: unless-stopped
 
   mongodb:

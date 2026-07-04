@@ -5,8 +5,12 @@ public sealed class RendererOptions
 {
     public const string SectionName = "Renderer";
 
-    /// <summary>Base URL of the renderer service (compose service name in dev).</summary>
-    public string Url { get; set; } = "http://renderer:3000";
+    /// <summary>
+    /// Base URL of the renderer service. Empty = renderer disabled: captures return null quietly
+    /// and posts go out text-only. Compose sets this to the service name (http://renderer:3000);
+    /// a host-run worker can point at http://localhost:3000 when the container's port is mapped.
+    /// </summary>
+    public string Url { get; set; } = "";
 
     /// <summary>Domain the captured pages live on; the screenshot URL is <c>https://{domain}/{path}</c>.</summary>
     public string ScreenshotDomain { get; set; } = "fogos.pt";

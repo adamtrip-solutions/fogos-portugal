@@ -41,6 +41,15 @@ public sealed class RendererClient(
         CancellationToken ct = default)
     {
         var target = BuildUrl(path);
+
+        if (string.IsNullOrWhiteSpace(Options.Url))
+        {
+            // Renderer not configured (host-run dev, or deliberately off) — callers degrade to
+            // text-only posts. One debug line, not a retry storm.
+            logger.LogDebug("Renderer disabled (no Renderer:Url); skipping capture of {Target}.", target);
+            return null;
+        }
+
         var payload = new Dictionary<string, object>
         {
             ["url"] = target,

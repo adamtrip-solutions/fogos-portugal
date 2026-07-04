@@ -33,6 +33,7 @@ internal static class RiskTestHost
 
         var rendererOptions = Options.Create(new RendererOptions
         {
+            Url = "http://renderer.test", // stub factory serves every host; empty would skip capture
             Retries = 1,
             RetryBaseDelay = TimeSpan.Zero,
             MinBytes = 1,

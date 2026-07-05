@@ -1,4 +1,8 @@
-# FogosPortugal
+<p align="center">
+  <img src="assets/brand/logo.svg" alt="FogosPortugal" width="96" height="96" />
+</p>
+
+<h1 align="center">FogosPortugal</h1>
 
 A live map of wildfires in Portugal — active incidents, their status and history, weather, and
 fire-risk data, in one fast, open interface. FogosPortugal is a non-profit, ad-free, open-source

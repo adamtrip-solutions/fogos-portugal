@@ -130,18 +130,39 @@ public sealed class JwtService
 
     private static RSA LoadOrGenerate(string? pemOrPath, ILogger logger)
     {
-        var rsa = RSA.Create();
         if (string.IsNullOrWhiteSpace(pemOrPath))
         {
-            rsa.KeySize = 2048;
             logger.LogWarning(
                 "AUTH: no RSA private key configured (Auth:RsaPrivateKeyPem). Generated an EPHEMERAL key — " +
                 "tokens will not survive a restart and instances will not share keys. Configure a key for production.");
-            return rsa;
+            return GenerateEphemeral();
         }
 
-        var pem = File.Exists(pemOrPath) ? File.ReadAllText(pemOrPath) : pemOrPath;
-        rsa.ImportFromPem(pem);
+        // A configured-but-unparseable key (a host path that does not exist inside the container, or
+        // PEM with mangled newlines) previously threw from ImportFromPem — crashing every request via
+        // the auth middleware. Availability over strictness: fall back to an ephemeral key on any failure.
+        try
+        {
+            var rsa = RSA.Create();
+            var pem = File.Exists(pemOrPath) ? File.ReadAllText(pemOrPath) : pemOrPath;
+            rsa.ImportFromPem(pem);
+            return rsa;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "AUTH: RSA key is configured but could not be parsed (not valid PEM and not an existing file " +
+                "path inside the container) — falling back to an EPHEMERAL key; issued tokens will not survive " +
+                "restarts and instances will not share keys. Configure a valid key for production.");
+            return GenerateEphemeral();
+        }
+    }
+
+    private static RSA GenerateEphemeral()
+    {
+        var rsa = RSA.Create();
+        rsa.KeySize = 2048;
         return rsa;
     }
 

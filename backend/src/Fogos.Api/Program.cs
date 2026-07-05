@@ -11,11 +11,21 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Sentry only when a DSN is configured — dev runs without it.
+// Sentry only when a DSN is configured — dev runs without it. A malformed DSN must never
+// kill the process: Sentry.Dsn.Parse throws UriFormatException from the DI container, so we
+// validate the URI up front and boot without Sentry when it is invalid.
 var sentryDsn = builder.Configuration["Sentry:Dsn"];
 if (!string.IsNullOrWhiteSpace(sentryDsn))
 {
-    builder.WebHost.UseSentry(o => o.Dsn = sentryDsn);
+    if (Uri.TryCreate(sentryDsn, UriKind.Absolute, out _))
+    {
+        builder.WebHost.UseSentry(o => o.Dsn = sentryDsn);
+    }
+    else
+    {
+        Console.Error.WriteLine(
+            $"Sentry DSN is set but not a valid URI — Sentry disabled: '{sentryDsn}'");
+    }
 }
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);

@@ -25,7 +25,7 @@ import type {
 import { colorWithHash, isActiveStatus, statusBucket } from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
 import { nearestWithinRadius } from '#/lib/fogos/map-hit-test.ts'
-import type { HitCandidate } from '#/lib/fogos/map-hit-test.ts'
+import type { HitCandidate, ScreenPoint } from '#/lib/fogos/map-hit-test.ts'
 import {
   addMissingMarkerImage,
   ensureMarkerImages,
@@ -414,51 +414,51 @@ export function FireMap({
     applySelectedState()
   }, [applySelectedState])
 
+  // Don't hit-test against the symbol layer via queryRenderedFeatures (or the
+  // event.features it feeds): its result depends on MapLibre's placement/
+  // collision index, which is recomputed lazily after camera moves, so during/
+  // just after an animation (fly-to on select, radar repaints) the query can
+  // miss a badge that is plainly visible. Instead project every displayed
+  // incident to screen space ourselves and pick the nearest within a
+  // touch-friendly radius; this never touches symbol placement, so it can't
+  // go stale. Shared by click (select) and mousemove (cursor + hover ring).
+  const hitTestIncident = useCallback((point: ScreenPoint): string | null => {
+    const map = mapRef.current?.getMap()
+    if (!map) return null
+
+    const candidates: HitCandidate[] = []
+    for (const incident of incidentsRef.current) {
+      const coords = incident.coordinates
+      if (!coords) continue
+      const projected = map.project([coords.longitude, coords.latitude])
+      candidates.push({ id: incident.id, x: projected.x, y: projected.y })
+    }
+
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches
+    const radius = coarsePointer ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
+
+    return nearestWithinRadius(point, candidates, radius)
+  }, [])
+
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
-      // Don't hit-test against the symbol layer via queryRenderedFeatures: its
-      // result depends on MapLibre's placement/collision index, which is
-      // recomputed lazily after camera moves, so during/just after an animation
-      // (fly-to on select, radar repaints) the query can miss a badge that is
-      // plainly visible — the click then deselects until a manual zoom forces
-      // re-placement. Instead project every displayed incident to screen space
-      // ourselves and pick the nearest within a touch-friendly radius; this
-      // never touches symbol placement, so it can't go stale.
-      const map = mapRef.current?.getMap()
-      if (!map) {
-        onSelect(null)
-        return
-      }
-
-      const candidates: HitCandidate[] = []
-      for (const incident of incidentsRef.current) {
-        const coords = incident.coordinates
-        if (!coords) continue
-        const projected = map.project([coords.longitude, coords.latitude])
-        candidates.push({ id: incident.id, x: projected.x, y: projected.y })
-      }
-
-      const coarsePointer =
-        typeof window !== 'undefined' &&
-        typeof window.matchMedia === 'function' &&
-        window.matchMedia('(pointer: coarse)').matches
-      const radius = coarsePointer ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
-
-      onSelect(nearestWithinRadius(event.point, candidates, radius))
+      onSelect(hitTestIncident(event.point))
     },
-    [onSelect],
+    [onSelect, hitTestIncident],
   )
 
   const handleMouseMove = useCallback((event: MapLayerMouseEvent) => {
     const map = mapRef.current?.getMap()
     if (!map) return
-    const feature = event.features?.[0]
-    map.getCanvas().style.cursor = feature ? 'pointer' : ''
+    const hitId = hitTestIncident(event.point)
+    map.getCanvas().style.cursor = hitId != null ? 'pointer' : ''
 
-    const nextHover =
-      feature != null && typeof feature.id === 'number'
-        ? (feature.id as number)
-        : null
+    // Feature ids on the source are the numeric form of the incident id.
+    const numericId = hitId != null ? Number(hitId) : NaN
+    const nextHover = Number.isSafeInteger(numericId) ? numericId : null
 
     if (hoveredIdRef.current === nextHover) return
     if (hoveredIdRef.current != null) {
@@ -471,7 +471,7 @@ export function FireMap({
     if (nextHover != null) {
       map.setFeatureState({ source: SOURCE_ID, id: nextHover }, { hover: true })
     }
-  }, [])
+  }, [hitTestIncident])
 
   const handleMouseLeave = useCallback(() => {
     const map = mapRef.current?.getMap()
@@ -603,7 +603,6 @@ export function FireMap({
         fitBoundsOptions: { padding: 48 },
       }}
       attributionControl={{ compact: true }}
-      interactiveLayerIds={['fires-badge']}
       onLoad={handleLoad}
       onStyleData={handleStyleData}
       onClick={handleClick}

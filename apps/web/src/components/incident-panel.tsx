@@ -96,13 +96,18 @@ export function IncidentPanel({
       >
         <DrawerContent className="max-h-[96vh] border-black/5 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/85">
           {incident && (
-            <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+            // Native scroll container (not radix ScrollArea): vaul detects a real
+            // overflow-y ancestor to decide between scrolling the content and
+            // dragging the sheet. At the top snap point this scrolls; at scrollTop
+            // 0 a downward drag still dismisses. `overscroll-contain` stops the
+            // gesture from chaining to the page behind.
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               <PanelContent
                 incident={incident}
                 onClose={onClose}
                 onOverlaysChange={onOverlaysChange}
               />
-            </ScrollArea>
+            </div>
           )}
         </DrawerContent>
       </Drawer>

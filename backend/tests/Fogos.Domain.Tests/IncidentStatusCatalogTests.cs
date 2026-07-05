@@ -65,4 +65,16 @@ public class IncidentStatusCatalogTests
     {
         Assert.Equal("Despacho de 1º Alerta", IncidentStatusCatalog.FromCode(4).Label);
     }
+
+    [Fact]
+    public void Feed_drop_terminal_13_is_labelled_green_and_inactive()
+    {
+        var status = IncidentStatusCatalog.FromCode(IncidentStatusCatalog.EncerradaSemAtualizacao);
+        Assert.Equal(13, status.Code);
+        Assert.Equal("Encerrada (sem atualização)", status.Label);
+        Assert.Equal("6ABF59", status.Color); // same green family as Encerrada
+        Assert.False(IncidentStatusCatalog.IsActive(13));
+        Assert.DoesNotContain(13, IncidentStatusCatalog.ActiveCodes);
+        Assert.Contains(13, IncidentStatusCatalog.InactiveCodes);
+    }
 }

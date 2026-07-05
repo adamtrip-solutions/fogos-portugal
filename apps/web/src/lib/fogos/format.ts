@@ -9,7 +9,8 @@ export function isActiveStatus(code: number): boolean {
 /**
  * Still-ongoing statuses: active (3–6) plus Em Resolução (7) and
  * Vigilância (9). These show on the map regardless of age; only finished
- * fires (Conclusão, Encerrada, falso alarme/alerta) get time-windowed.
+ * fires (Conclusão, Encerrada, feed-drop close-out 13, falso alarme/alerta)
+ * get time-windowed.
  */
 export function isOngoingStatus(code: number): boolean {
   return ACTIVE_STATUS_CODES.has(code) || code === 7 || code === 9
@@ -29,9 +30,10 @@ const STATUS_GRAY = '#BDBDBD' // conclusão / falso alarme
 export function statusColorForCode(code: number): string {
   if (code === 3 || code === 4) return STATUS_ORANGE
   if (code === 5 || code === 6) return STATUS_RED
-  // Backend catalog: 7 (Em Resolução), 9 (Vigilância) and 10 (Encerrada)
-  // are green; 8 (Conclusão) and 11/12 (falso alarme/alerta) are gray.
-  if (code === 7 || code === 9 || code === 10) return STATUS_GREEN
+  // Backend catalog: 7 (Em Resolução), 9 (Vigilância), 10 (Encerrada) and
+  // 13 (Encerrada sem atualização) are green; 8 (Conclusão) and 11/12 (falso
+  // alarme/alerta) are gray.
+  if (code === 7 || code === 9 || code === 10 || code === 13) return STATUS_GREEN
   return STATUS_GRAY
 }
 
@@ -44,7 +46,9 @@ export type StatusBucket = 'dispatch' | 'ongoing' | 'resolving' | 'done'
 export function statusBucket(code: number): StatusBucket {
   if (code === 3 || code === 4) return 'dispatch' // laranja #FF6E02
   if (code === 5 || code === 6) return 'ongoing' // vermelho #B81E1F
-  if (code === 7 || code === 9 || code === 10) return 'resolving' // verde #6ABF59
+  // 13 (Encerrada sem atualização) shares Encerrada's green family; it's finished
+  // (not ongoing, so it time-windows out like 10) but reads green, not gray.
+  if (code === 7 || code === 9 || code === 10 || code === 13) return 'resolving' // verde #6ABF59
   return 'done' // cinzento #BDBDBD (8, 11, 12, unknown)
 }
 

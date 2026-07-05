@@ -122,10 +122,12 @@ public class SignalRulesTests
     [InlineData(7, 5, true)]
     [InlineData(8, 5, true)]
     [InlineData(9, 5, true)]
+    [InlineData(13, 5, true)] // feed-drop close-out that revives as Em Curso is a rekindle
     [InlineData(5, 5, false)]
     [InlineData(6, 5, false)]
     [InlineData(10, 5, false)]
     [InlineData(3, 5, false)]
+    [InlineData(13, 6, false)] // reviving to a non-EmCurso code is not a status regression
     [InlineData(7, 6, false)]
     [InlineData(8, 7, false)]
     public void Status_regression_matrix(int from, int to, bool expected) =>

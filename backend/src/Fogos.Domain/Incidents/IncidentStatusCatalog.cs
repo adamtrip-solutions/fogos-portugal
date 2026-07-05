@@ -21,6 +21,13 @@ public static class IncidentStatusCatalog
     public const int FalsoAlarme = 11;
     public const int FalsoAlerta = 12;
 
+    /// <summary>
+    /// Terminal code for an active incident closed out by the feed-drop sweep (dropped from the ANEPC
+    /// feed past the grace window). Distinct from operator-driven <see cref="Encerrada"/> so the reason
+    /// ("no further updates") stays legible; shares Encerrada's green color family.
+    /// </summary>
+    public const int EncerradaSemAtualizacao = 13;
+
     /// <summary>Display labels per code. 4 renders without the abbreviation dot ("1º"), matching the legacy display fix.</summary>
     private static readonly FrozenDictionary<int, string> Labels = new Dictionary<int, string>
     {
@@ -34,6 +41,7 @@ public static class IncidentStatusCatalog
         [Encerrada] = "Encerrada",
         [FalsoAlarme] = "Falso Alarme",
         [FalsoAlerta] = "Falso Alerta",
+        [EncerradaSemAtualizacao] = "Encerrada (sem atualização)",
     }.ToFrozenDictionary();
 
     /// <summary>
@@ -52,6 +60,7 @@ public static class IncidentStatusCatalog
         [Encerrada] = "6ABF59",
         [FalsoAlarme] = "BDBDBD",
         [FalsoAlerta] = "BDBDBD",
+        [EncerradaSemAtualizacao] = "6ABF59", // same green family as Encerrada
     }.ToFrozenDictionary();
 
     /// <summary>
@@ -79,7 +88,7 @@ public static class IncidentStatusCatalog
     /// <summary>Legacy ACTIVE_STATUS_CODES — drives the `active` flag and the active feeds.</summary>
     public static readonly IReadOnlySet<int> ActiveCodes = new HashSet<int> { 3, 4, 5, 6 };
 
-    public static readonly IReadOnlySet<int> InactiveCodes = new HashSet<int> { 7, 8, 9, 10, 11, 12 };
+    public static readonly IReadOnlySet<int> InactiveCodes = new HashSet<int> { 7, 8, 9, 10, 11, 12, 13 };
 
     /// <summary>
     /// CheckImportantFireIncident deliberately used a wider window (1–6) than ActiveCodes.

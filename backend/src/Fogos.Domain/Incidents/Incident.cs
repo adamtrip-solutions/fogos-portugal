@@ -50,6 +50,13 @@ public sealed class Incident
 
     public bool Active { get; set; }
 
+    /// <summary>
+    /// Last time this incident's id was present in an ingest sweep of the ANEPC feed. Bumped for every
+    /// seen id even when the document is otherwise unchanged. Drives the feed-drop close-out grace window
+    /// (null → fall back to <see cref="CreatedAt"/>); backfilled automatically on the next seen sweep.
+    /// </summary>
+    public DateTimeOffset? LastSeenInFeedAt { get; set; }
+
     /// <summary>Flagged by the important-incident check (assets > 15, age > 3h, status 1–6).</summary>
     public bool Important { get; set; }
 

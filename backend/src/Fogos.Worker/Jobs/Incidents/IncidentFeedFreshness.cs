@@ -24,7 +24,13 @@ public sealed class IncidentFeedFreshness(IConnectionMultiplexer redis, IOpsNoti
         return Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(joined)));
     }
 
-    public async Task TrackAsync(string currentHash, TimeSpan staleAfter, CancellationToken ct = default)
+    /// <summary>
+    /// Tracks feed freshness and returns whether the feed is fresh this sweep — <c>true</c> when the
+    /// content changed (or has changed within <paramref name="staleAfter"/>), <c>false</c> once it has
+    /// stayed unchanged past the window. The close-out sweep uses the result to avoid terminating
+    /// incidents while the feed itself is frozen.
+    /// </summary>
+    public async Task<bool> TrackAsync(string currentHash, TimeSpan staleAfter, CancellationToken ct = default)
     {
         var db = redis.GetDatabase();
         var now = clock.UtcNow.ToUnixTimeSeconds();
@@ -38,18 +44,22 @@ public sealed class IncidentFeedFreshness(IConnectionMultiplexer redis, IOpsNoti
             // If we had alerted about staleness, announce the recovery and clear the latch.
             if (await db.KeyDeleteAsync(AlertLatch))
                 await ops.InfoAsync("✅ Feed de incidentes voltou a atualizar.", ct);
-            return;
+            return true;
         }
 
         var since = await db.StringGetAsync(SinceKey);
         if (!since.HasValue)
         {
             await db.StringSetAsync(SinceKey, now);
-            return;
+            return true;
         }
 
         var age = clock.UtcNow - DateTimeOffset.FromUnixTimeSeconds((long)since);
-        if (age > staleAfter && await db.StringSetAsync(AlertLatch, "1", when: When.NotExists))
+        if (age <= staleAfter)
+            return true;
+
+        if (await db.StringSetAsync(AlertLatch, "1", when: When.NotExists))
             await ops.InfoAsync($"⏰ Feed de incidentes sem atualizar há {age.TotalMinutes:F0} min.", ct);
+        return false;
     }
 }

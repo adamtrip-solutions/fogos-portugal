@@ -192,6 +192,23 @@ dedicated **`icnf`** queue (`docker-compose.yml`).
    52–80). Updated → re-assign station if lat/lng dirty; re-run both history jobs.
 3. **`CheckIsActive`**: `active=true` incidents whose `id` is absent from the current feed
    → `active=false`.
+
+   > **.NET divergence (feed-drop close-out).** The clean pipeline deliberately drops the
+   > legacy flag-only `CheckIsActive` semantics. Flipping `active=false` on the *first* miss,
+   > leaving status/history untouched, froze incidents mid-life: the ANEPC OcorrenciasSite
+   > layer lists *current* occurrences, so a mid-fire disappearance is a feed gap, not a
+   > resolution — yet those records became invisible (`activeIncidents` filters `Active==true`)
+   > and aged out of every map view with no terminal transition ever recorded.
+   > `ProcessOcorrenciasSiteJob.CloseOutMissingAsync` replaces it: every seen id stamps
+   > `LastSeenInFeedAt`; an active incident absent past the `CloseAfterMissingFor` grace
+   > (30 min) gets a real terminal transition to status **13 — "Encerrada (sem atualização)"**
+   > (history row + `IncidentStatusChanged`, exactly like a feed-driven change). The sweep is
+   > guarded: it runs only when the feed is fresh this sweep (a frozen feed can't signal an
+   > ending) and aborts with an ops alert if candidates exceed `max(3, MaxCloseFraction × active)`
+   > (0.25) to survive a truncated feed. A closed-out id reappearing revives through the normal
+   > upsert (13 → active code), and 13→"Em Curso" counts as a status-regression rekindle.
+   > Two option names keep the two concerns honest: `FeedStaleAfter` gates the whole-feed
+   > freshness alert; `CloseAfterMissingFor` is the per-incident grace.
 4. **`CheckImportantFireIncident`** (ShouldBeUnique): active fires, statusCode 1–6,
    `sentCheckImportant=false`, `aerial+terrain > IMPORTANT_INCIDENT_TOTAL_ASSETS` (15),
    older than 3h → push + Twitter/Telegram/Bluesky/Facebook "incêndio importante" post;

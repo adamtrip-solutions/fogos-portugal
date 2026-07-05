@@ -1,0 +1,23 @@
+# Root build context (used by apps/web/Dockerfile, context = repo root).
+# Keep the transferred context small: node_modules are reinstalled, dist is rebuilt,
+# and the backend/docs/deploy trees are irrelevant to the web image.
+**/node_modules
+**/dist
+**/dist-ssr
+**/.output
+**/.nitro
+**/.tanstack
+**/.vinxi
+**/.wrangler
+.git
+.github
+.idea
+.vscode
+backend
+docs
+deploy
+**/*.log
+**/.DS_Store
+**/.env
+**/.env.*
+!**/.env.example

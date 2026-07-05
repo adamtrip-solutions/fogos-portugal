@@ -1,0 +1,21 @@
+# Fogos.Worker — build context is backend/ (the .NET solution root).
+# Background poller/publisher; no HTTP surface, so it runs on the smaller runtime base.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Restore against the project graph first for layer caching.
+COPY global.json Directory.Build.props ./
+COPY src/Fogos.Domain/Fogos.Domain.csproj src/Fogos.Domain/
+COPY src/Fogos.Infrastructure/Fogos.Infrastructure.csproj src/Fogos.Infrastructure/
+COPY src/Fogos.Worker/Fogos.Worker.csproj src/Fogos.Worker/
+RUN dotnet restore src/Fogos.Worker/Fogos.Worker.csproj
+
+COPY src/ src/
+RUN dotnet publish src/Fogos.Worker/Fogos.Worker.csproj \
+    -c Release -o /app --no-restore -p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app ./
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Fogos.Worker.dll"]

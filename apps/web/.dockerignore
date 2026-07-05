@@ -1,0 +1,14 @@
+# Belt-and-suspenders for the web image (context is the repo root, but keep the app
+# tree lean regardless of which context copies it).
+node_modules
+dist
+dist-ssr
+.output
+.tanstack
+.vinxi
+.wrangler
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example

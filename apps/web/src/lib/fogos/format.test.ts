@@ -5,6 +5,9 @@ import {
   compassBearing,
   criticalReasonLabel,
   formatDuration,
+  isOngoingStatus,
+  statusBucket,
+  statusColorForCode,
 } from './format.ts'
 
 describe('formatDuration', () => {
@@ -58,6 +61,24 @@ describe('criticalReasonLabel', () => {
 
   it('falls back to the raw key when unknown', () => {
     expect(criticalReasonLabel('SOMETHING_ELSE')).toBe('SOMETHING_ELSE')
+  })
+})
+
+describe('status code 13 (feed-drop close-out)', () => {
+  it('is finished, not ongoing, so it time-windows out like Encerrada', () => {
+    expect(isOngoingStatus(13)).toBe(false)
+    expect(isOngoingStatus(10)).toBe(false) // mirrors Encerrada
+    expect(isOngoingStatus(5)).toBe(true)
+  })
+
+  it('reads green (Encerrada family), not gray', () => {
+    expect(statusColorForCode(13)).toBe(statusColorForCode(10))
+    expect(statusColorForCode(13)).toBe('#6ABF59')
+  })
+
+  it('buckets as resolving, mirroring Encerrada', () => {
+    expect(statusBucket(13)).toBe('resolving')
+    expect(statusBucket(13)).toBe(statusBucket(10))
   })
 })
 

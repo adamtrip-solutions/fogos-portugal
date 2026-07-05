@@ -1,0 +1,32 @@
+# Local-build override: build every app image from source instead of pulling from GHCR.
+# Layer it on top of compose.yml to validate the stack on a dev machine (native arm64):
+#
+#   docker compose -f compose.yml -f compose.local.yml build
+#   docker compose -f compose.yml -f compose.local.yml up -d --wait
+#
+# Build contexts are relative to THIS file (deploy/), so they climb to backend/ and the repo root.
+
+services:
+  api:
+    image: fogos-portugal-api:local
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.api
+
+  worker:
+    image: fogos-portugal-worker:local
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.worker
+
+  renderer:
+    image: fogos-portugal-renderer:local
+    build:
+      context: ../backend/renderer
+      dockerfile: Dockerfile
+
+  web:
+    image: fogos-portugal-web:local
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile

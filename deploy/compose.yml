@@ -1,0 +1,207 @@
+# FogosPortugal — production stack (OrbStack on the home-server Mac).
+#
+#   docker compose --env-file .env --env-file versions.env up -d --wait
+#
+# Ingress is a HOST-LEVEL Cloudflare tunnel the operator runs outside this stack (shared with
+# other services) — there is no cloudflared container here. Only `web` and `api` publish host
+# ports, bound to 127.0.0.1; the tunnel maps hostnames to those ports (see README). Everything
+# else (mongo, redis, minio, worker, renderer) is reachable only on the internal network.
+#
+# Image tags come from versions.env (API_VERSION / WEB_VERSION). For a local build-from-source
+# run, layer deploy/compose.local.yml on top (it swaps the `image:` refs for `build:`).
+
+name: fogos
+
+services:
+  # ── Mongo: single-node replica set (change streams power GraphQL subscriptions) ──
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
+
+  # One-shot: initiate the replica set once (idempotent), then exit. directConnection so it
+  # can talk to the node before the set is formed. api/worker gate on this completing.
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+      - >
+        mongosh --host mongo:27017 --quiet --eval
+        "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  # One-shot: wait for MinIO, create the photo bucket + make it publicly readable, then exit.
+  # (The minio server image ships no shell/mc, so bucket setup + readiness both live here.)
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_started
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do sleep 1; done;
+        mc mb --ignore-existing local/${STORAGE_BUCKET:-incident-photos};
+        mc anonymous set download local/${STORAGE_BUCKET:-incident-photos};
+        exit 0;
+
+  api:
+    image: ghcr.io/adamtrip-solutions/fogos-portugal-api:${API_VERSION:-latest}
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      # Host-local only; the Cloudflare tunnel maps api.<domain> → this port.
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongo:27017/?replicaSet=rs0}
+      Mongo__Database: ${MONGO_DATABASE:-fogos}
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
+      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__ForcePathStyle: "true"
+      Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
+      Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
+      Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
+      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
+      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
+      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
+      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
+      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
+      Auth__RsaPrivateKeyPem: ${AUTH_RSA_PRIVATE_KEY_PEM:-}
+      Sentry__Dsn: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/adamtrip-solutions/fogos-portugal-worker:${API_VERSION:-latest}
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      renderer:
+        condition: service_started
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongo:27017/?replicaSet=rs0}
+      Mongo__Database: ${MONGO_DATABASE:-fogos}
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
+      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__ForcePathStyle: "true"
+      Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
+      Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
+      Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
+      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
+      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
+      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
+      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
+      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
+      Renderer__Url: ${RENDERER_URL:-http://renderer:3000}
+      Renderer__ScreenshotDomain: ${SCREENSHOT_DOMAIN:-fogosportugal.pt}
+      Twitter__ConsumerKey: ${TWITTER_CONSUMER_KEY:-}
+      Twitter__ConsumerSecret: ${TWITTER_CONSUMER_SECRET:-}
+      Twitter__AccessToken: ${TWITTER_ACCESS_TOKEN:-}
+      Twitter__AccessTokenSecret: ${TWITTER_ACCESS_TOKEN_SECRET:-}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__ChatId: ${TELEGRAM_CHAT_ID:-@fogospt}
+      Facebook__PageId: ${FACEBOOK_PAGE_ID:-}
+      Facebook__AccessToken: ${FACEBOOK_ACCESS_TOKEN:-}
+      DiscordPosts__WebhookUrl: ${DISCORD_POSTS_WEBHOOK:-}
+      Fcm__CredentialsPath: ${FCM_CREDENTIALS_PATH:-}
+      Fcm__ProjectId: ${FCM_PROJECT_ID:-}
+      Sources__Firms__Key: ${NASA_FIRMS_KEY:-}
+      Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
+      Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
+      Sentry__Dsn: ${SENTRY_DSN:-}
+    restart: unless-stopped
+
+  # Node/Playwright social-screenshot sidecar (internal only).
+  renderer:
+    image: ghcr.io/adamtrip-solutions/fogos-portugal-renderer:${API_VERSION:-latest}
+    environment:
+      PORT: "3000"
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/adamtrip-solutions/fogos-portugal-web:${WEB_VERSION:-latest}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      # Host-local only; the Cloudflare tunnel maps <domain> → this port.
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      # Server-side calls to the API stay on the internal network (no CORS, like dev).
+      FOGOS_API_URL: ${FOGOS_API_URL:-http://api:8080}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  minio-data:
+  redis-data:

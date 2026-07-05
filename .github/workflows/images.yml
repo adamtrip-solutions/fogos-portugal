@@ -1,24 +1,73 @@
 name: Images
 
-# Release Please publishes a GitHub Release per component:
+# Builds and pushes the component images to GHCR:
 #   api-vX.Y.Z → api + worker images     web-vX.Y.Z → web image
 # Each image is tagged with the exact version and `latest`, arm64, pushed to GHCR.
+#
+# Two entry points, both funnelled through the `resolve` job so the build jobs are identical:
+#   - release: published        (kept for humans/PATs that publish a Release directly)
+#   - workflow_dispatch(tag)     (how Release Please reaches us — GITHUB_TOKEN can't fire `release`)
+# On success we chain into Deploy via workflow_dispatch (same GITHUB_TOKEN limitation).
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (e.g. api-v1.0.0 / web-v1.0.0)
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: write
+  actions: write
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/adamtrip-solutions/fogos-portugal
 
 jobs:
+  # Normalise both triggers into { tag, component, version }. Rejects malformed tags so a
+  # bad dispatch fails fast instead of building/pushing garbage.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.r.outputs.tag }}
+      component: ${{ steps.r.outputs.component }}
+      version: ${{ steps.r.outputs.version }}
+    steps:
+      - name: Resolve tag → component + version
+        id: r
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="$DISPATCH_TAG"
+          else
+            tag="$RELEASE_TAG"
+          fi
+          case "$tag" in
+            api-v*) component=api; version="${tag#api-v}" ;;
+            web-v*) component=web; version="${tag#web-v}" ;;
+            *) echo "Unrecognized or malformed tag: '$tag' (expected api-v*/web-v*)" >&2; exit 1 ;;
+          esac
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$'; then
+            echo "Malformed version '$version' derived from tag '$tag'" >&2; exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "component=$component"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved '$tag' → $component v$version"
+
   api:
     # The `api` release train ships the backend images.
-    if: startsWith(github.event.release.tag_name, 'api-v')
+    needs: resolve
+    if: needs.resolve.outputs.component == 'api'
     runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     strategy:
       matrix:
@@ -31,10 +80,8 @@ jobs:
             dockerfile: backend/Dockerfile.worker
     steps:
       - uses: actions/checkout@v7
-
-      - name: Resolve version
-        id: v
-        run: echo "version=${GITHUB_REF_NAME#api-v}" >> "$GITHUB_OUTPUT"
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -57,18 +104,17 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           tags: |
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ needs.resolve.outputs.version }}
             ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:latest
 
   web:
-    if: startsWith(github.event.release.tag_name, 'web-v')
+    needs: resolve
+    if: needs.resolve.outputs.component == 'web'
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     steps:
       - uses: actions/checkout@v7
-
-      - name: Resolve version
-        id: v
-        run: echo "version=${GITHUB_REF_NAME#web-v}" >> "$GITHUB_OUTPUT"
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -92,5 +138,28 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
           tags: |
-            ${{ env.IMAGE_PREFIX }}-web:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}-web:${{ needs.resolve.outputs.version }}
             ${{ env.IMAGE_PREFIX }}-web:latest
+
+  # Chain into Deploy once the built component succeeded. GITHUB_TOKEN can't fire the `release`
+  # event Deploy also listens on, so dispatch it directly. Runs only when the component's build
+  # succeeded — the sibling job for the other component is skipped, not failed.
+  deploy-dispatch:
+    needs: [resolve, api, web]
+    if: >
+      always() &&
+      needs.resolve.result == 'success' &&
+      needs.api.result != 'failure' && needs.web.result != 'failure' &&
+      (needs.api.result == 'success' || needs.web.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Dispatching Deploy for ${{ needs.resolve.outputs.component }} v${{ needs.resolve.outputs.version }}"
+          gh workflow run deploy.yml \
+            -f component="${{ needs.resolve.outputs.component }}" \
+            -f version="${{ needs.resolve.outputs.version }}"

@@ -1,8 +1,12 @@
 name: Release Please
 
 # Manifest mode: one release train per component (backend→api, apps/web→web). Each merged
-# release PR cuts that component's tag (api-vX.Y.Z / web-vX.Y.Z) + GitHub Release, which the
-# Images and Deploy workflows react to.
+# release PR cuts that component's tag (api-vX.Y.Z / web-vX.Y.Z) + GitHub Release.
+#
+# Releases are created with GITHUB_TOKEN, and events raised by GITHUB_TOKEN do NOT trigger
+# `on: release` workflows. So instead of relying on the release event, we dispatch the Images
+# workflow explicitly (workflow_dispatch IS honoured for GITHUB_TOKEN) for each component that
+# was just released. Images then chains into Deploy.
 on:
   push:
     branches: [main]
@@ -11,13 +15,35 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Kick off image builds for every component that just cut a release. The `release`
+      # event these create would otherwise be swallowed (GITHUB_TOKEN), so dispatch by tag.
+      - name: Dispatch Images for released components
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.release.outputs['backend--release_created'] }}" = "true" ]; then
+            tag="${{ steps.release.outputs['backend--tag_name'] }}"
+            echo "api released → dispatching Images for $tag"
+            gh workflow run images.yml -f tag="$tag"
+          fi
+          if [ "${{ steps.release.outputs['apps/web--release_created'] }}" = "true" ]; then
+            tag="${{ steps.release.outputs['apps/web--tag_name'] }}"
+            echo "web released → dispatching Images for $tag"
+            gh workflow run images.yml -f tag="$tag"
+          fi

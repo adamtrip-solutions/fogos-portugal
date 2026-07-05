@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.2.0...web-v1.2.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **web:** light-mode active nav styling and real footer version ([#21](https://github.com/adamtrip-solutions/fogos-portugal/issues/21)) ([6f5dd58](https://github.com/adamtrip-solutions/fogos-portugal/commit/6f5dd5847efda98f9825536676258186ac459ab1))
+
+
+### Performance Improvements
+
+* **web:** throttle hover hit-test and cheapen halo pulse ([#23](https://github.com/adamtrip-solutions/fogos-portugal/issues/23)) ([84066e4](https://github.com/adamtrip-solutions/fogos-portugal/commit/84066e494041c45c54952a73d9bc142e11a18729))
+
 ## [1.2.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.1.0...web-v1.2.0) (2026-07-05)
 
 

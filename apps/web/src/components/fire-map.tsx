@@ -24,6 +24,8 @@ import type {
 } from 'react-map-gl/maplibre'
 import { colorWithHash, isActiveStatus, statusBucket } from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
+import { nearestWithinRadius } from '#/lib/fogos/map-hit-test.ts'
+import type { HitCandidate } from '#/lib/fogos/map-hit-test.ts'
 import {
   addMissingMarkerImage,
   ensureMarkerImages,
@@ -46,6 +48,11 @@ const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.js
 const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
 const SOURCE_ID = 'fires'
+
+// Click hit-test radius in CSS pixels around the badge centre. Touch pointers
+// get a larger target than a precise mouse cursor.
+const HIT_RADIUS_MOUSE = 24
+const HIT_RADIUS_TOUCH = 32
 
 interface FireFeatureProps {
   id: string
@@ -218,6 +225,13 @@ export function FireMap({
   const [mapLoaded, setMapLoaded] = useState(false)
 
   const data = useMemo(() => buildFeatureCollection(incidents), [incidents])
+
+  // Read the live incident list inside the click handler (which is stable across
+  // renders) without re-registering it on every poll refetch.
+  const incidentsRef = useRef(incidents)
+  useEffect(() => {
+    incidentsRef.current = incidents
+  }, [incidents])
 
   const weatherSource = useMemo(
     () => buildWeatherSource(weatherLayer, weatherAvailability),
@@ -402,29 +416,35 @@ export function FireMap({
 
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
-      // react-map-gl reuses the last hover-query result (`_hoveredFeatures`) for
-      // click events and only falls back to a fresh query when that cache is
-      // null — an *empty* array short-circuits it (`[] || query` === `[]`). The
-      // hover cache is only refreshed on mousemove, so after a programmatic
-      // camera move (the fly-to on select, or the initial fitBounds) the cursor
-      // can sit over a badge whose last hover query ran mid-animation and came
-      // back empty. The reused empty result then makes the badge unclickable
-      // (it deselects instead) until a manual zoom refreshes placement. Re-query
-      // fresh at the click point so selection stays reliable.
+      // Don't hit-test against the symbol layer via queryRenderedFeatures: its
+      // result depends on MapLibre's placement/collision index, which is
+      // recomputed lazily after camera moves, so during/just after an animation
+      // (fly-to on select, radar repaints) the query can miss a badge that is
+      // plainly visible — the click then deselects until a manual zoom forces
+      // re-placement. Instead project every displayed incident to screen space
+      // ourselves and pick the nearest within a touch-friendly radius; this
+      // never touches symbol placement, so it can't go stale.
       const map = mapRef.current?.getMap()
-      const features =
-        map && map.getLayer('fires-badge')
-          ? map.queryRenderedFeatures(event.point, { layers: ['fires-badge'] })
-          : (event.features ?? [])
-      const feature = features[0]
-
-      if (!feature) {
+      if (!map) {
         onSelect(null)
         return
       }
 
-      const props = feature.properties as Record<string, unknown>
-      onSelect(String(props.id))
+      const candidates: HitCandidate[] = []
+      for (const incident of incidentsRef.current) {
+        const coords = incident.coordinates
+        if (!coords) continue
+        const projected = map.project([coords.longitude, coords.latitude])
+        candidates.push({ id: incident.id, x: projected.x, y: projected.y })
+      }
+
+      const coarsePointer =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches
+      const radius = coarsePointer ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
+
+      onSelect(nearestWithinRadius(event.point, candidates, radius))
     },
     [onSelect],
   )

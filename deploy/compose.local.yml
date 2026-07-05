@@ -19,12 +19,6 @@ services:
       context: ../backend
       dockerfile: Dockerfile.worker
 
-  renderer:
-    image: fogos-portugal-renderer:local
-    build:
-      context: ../backend/renderer
-      dockerfile: Dockerfile
-
   web:
     image: fogos-portugal-web:local
     build:

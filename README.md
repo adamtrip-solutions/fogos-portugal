@@ -16,7 +16,6 @@ fogos-portugal/
 │   ├── src/            # Fogos.Domain, Infrastructure, Api, Worker, Importer, AdminCli
 │   ├── tests/          # domain, importer, and integration (Testcontainers) suites
 │   ├── dev/seed/       # demo fixtures (incidents, locations, weather stations)
-│   ├── renderer/       # Node social-screenshot sidecar
 │   └── docker-compose.yml
 ├── apps/
 │   └── web/            # TanStack Start web app (React 19, MapLibre, deck.gl)

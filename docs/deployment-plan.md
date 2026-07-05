@@ -14,10 +14,10 @@ lands), CI on GitHub Actions with Blacksmith runners, automated versioning/relea
 | Forge / repo shape | GitHub, **one monorepo** (`adamtrip-solutions/fogos-portugal`) holding backend + web + deploy stack |
 | CI runners | **Blacksmith** for everything untrusted (PR tests, builds) |
 | CD to the Mac | **Self-hosted GitHub runner on the Mac**, deploy jobs only, pull-based `docker compose up` |
-| Images | GHCR (`ghcr.io/<you>/fogosportugal-{api,worker,frontend,renderer}`), **arm64** |
+| Images | GHCR (`ghcr.io/<you>/fogosportugal-{api,worker,frontend}`), **arm64** |
 | Ingress | **Cloudflare Tunnel** (no port-forwarding, TLS + DDoS shielding for free) |
 | Versioning | **Release Please (manifest mode)** + Conventional Commits → per-component versions, changelogs, and releases (`api-vX.Y.Z`, `web-vX.Y.Z`) |
-| Runtime | One `docker compose` stack in OrbStack: mongo (1-node replica set), redis, minio, api, worker, renderer, frontend, cloudflared |
+| Runtime | One `docker compose` stack in OrbStack: mongo (1-node replica set), redis, minio, api, worker, frontend, cloudflared |
 
 ## 1. Runtime topology (what runs where)
 
@@ -27,7 +27,6 @@ Everything runs as linux/arm64 containers inside OrbStack on the Mac, one compos
 cloudflared ──► frontend (TanStack Start SSR, node)  ──► api (internal http)
             └─► api (Fogos.Api)                      ──► mongo, redis, minio
                 worker (Fogos.Worker)                ──► mongo, redis + outbound polling
-                renderer (social screenshot sidecar) ◄── worker
                 mongo  — single-node replica set (REQUIRED: change streams power GraphQL subscriptions)
                 redis  — streams (event bus) + subscriptions + rate limits
                 minio  — photo storage
@@ -84,8 +83,7 @@ else about Actions changes. **All PR/untrusted code runs on Blacksmith, never on
   Use `useblacksmith/build-push-action` (their accelerated buildkit with persistent layer cache).
 
 Dockerfiles needed (part of implementing this plan): `backend/Dockerfile.api`,
-`backend/Dockerfile.worker`, `apps/web/Dockerfile` (node SSR: `vite build` → `node .output/server`),
-plus whatever the renderer sidecar already has.
+`backend/Dockerfile.worker`, `apps/web/Dockerfile` (node SSR: `vite build` → `node .output/server`).
 
 ## 4. CD — how deploys reach the Mac
 
@@ -181,7 +179,7 @@ the dev laptop that caused the historical data gaps). Remaining items:
 - GitHub → environment `production` secrets: GHCR is automatic (`GITHUB_TOKEN`), Cloudflare tunnel
   token, anything the smoke test needs.
 - On the Mac: one `deploy/.env` (never committed) with Mongo/Redis passwords, FCM service account,
-  social API keys, JWT RSA PEM, MinIO creds. Compose injects per-service. Backup this file with the
+  JWT RSA PEM, MinIO creds. Compose injects per-service. Backup this file with the
   same offsite mechanism (it's the real disaster-recovery artifact).
 
 ## 9. Rollout order (suggested implementation sequence)

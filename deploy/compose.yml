@@ -5,7 +5,7 @@
 # Ingress is a HOST-LEVEL Cloudflare tunnel the operator runs outside this stack (shared with
 # other services) — there is no cloudflared container here. Only `web` and `api` publish host
 # ports, bound to 127.0.0.1; the tunnel maps hostnames to those ports (see README). Everything
-# else (mongo, redis, minio, worker, renderer) is reachable only on the internal network.
+# else (mongo, redis, minio, worker) is reachable only on the internal network.
 #
 # Image tags come from versions.env (API_VERSION / WEB_VERSION). For a local build-from-source
 # run, layer deploy/compose.local.yml on top (it swaps the `image:` refs for `build:`).
@@ -108,11 +108,7 @@ services:
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
-      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
-      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
       Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
       Auth__RsaPrivateKeyPem: ${AUTH_RSA_PRIVATE_KEY_PEM:-}
       Sentry__Dsn: ${SENTRY_DSN:-}
     healthcheck:
@@ -130,8 +126,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      renderer:
-        condition: service_started
     environment:
       DOTNET_ENVIRONMENT: Production
       Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongo:27017/?replicaSet=rs0}
@@ -146,35 +140,13 @@ services:
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
-      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
-      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
       Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
-      Renderer__Url: ${RENDERER_URL:-http://renderer:3000}
-      Renderer__ScreenshotDomain: ${SCREENSHOT_DOMAIN:-fogosportugal.pt}
-      Twitter__ConsumerKey: ${TWITTER_CONSUMER_KEY:-}
-      Twitter__ConsumerSecret: ${TWITTER_CONSUMER_SECRET:-}
-      Twitter__AccessToken: ${TWITTER_ACCESS_TOKEN:-}
-      Twitter__AccessTokenSecret: ${TWITTER_ACCESS_TOKEN_SECRET:-}
-      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
-      Telegram__ChatId: ${TELEGRAM_CHAT_ID:-@fogospt}
-      Facebook__PageId: ${FACEBOOK_PAGE_ID:-}
-      Facebook__AccessToken: ${FACEBOOK_ACCESS_TOKEN:-}
-      DiscordPosts__WebhookUrl: ${DISCORD_POSTS_WEBHOOK:-}
       Fcm__CredentialsPath: ${FCM_CREDENTIALS_PATH:-}
       Fcm__ProjectId: ${FCM_PROJECT_ID:-}
       Sources__Firms__Key: ${NASA_FIRMS_KEY:-}
       Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
       Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
       Sentry__Dsn: ${SENTRY_DSN:-}
-    restart: unless-stopped
-
-  # Node/Playwright social-screenshot sidecar (internal only).
-  renderer:
-    image: ghcr.io/adamtrip-solutions/fogos-portugal-renderer:${API_VERSION:-latest}
-    environment:
-      PORT: "3000"
     restart: unless-stopped
 
   web:

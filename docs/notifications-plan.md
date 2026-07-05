@@ -3,6 +3,12 @@
 Goal: evolve the current notification machinery into one coherent system that serves the web app
 today and the Expo mobile app next, with area-based push as the flagship capability.
 
+> **Update 2026-07-05 — push-only.** The anonymous in-app polling channel (the `alertEvents` query
+> and the web AlertsPopover/toasts) has been removed. `alert_events` remains as the internal
+> matcher-dedupe store (write-only, no anonymous read surface). Delivery going forward is FCM push
+> (+ webhooks for API clients); N4 web-push stays a future item. Sections below that describe the
+> poll channel are retained as historical context.
+
 ## 1. What exists today (inventory)
 
 | Piece | State |
@@ -11,7 +17,7 @@ today and the Expo mobile app next, with area-based push as the flagship capabil
 | District topics (`FcmTopics`) | Legacy broadcast model (`NewFire(dico, district)` etc.), env-prefixed |
 | Delayed dispatcher | 3-min debounce pump (Redis sorted set) used for push debouncing |
 | `alert_subscriptions` | Anonymous, Concelho or Point+radius, optional `riskThreshold`, optional `fcmToken` |
-| `alert_events` + `alertEvents` query | Poll-based in-app delivery (web uses this: 60s poll → toasts), 7-day TTL, dedupe-key unique index |
+| `alert_events` | Internal matcher-dedupe store (7-day TTL, dedupe-key unique index). The anonymous `alertEvents` poll query was **removed 2026-07-05** — write-only now |
 | Matching | `AlertMatchHandler` (NEW_INCIDENT / ESCALATION / REKINDLE), `RiskAlertHandler` (RISK) |
 | Webhooks | HMAC-signed, per-client, working |
 
@@ -21,10 +27,10 @@ maturity** (token lifecycle, collapse behavior, preferences).
 ## 2. Target architecture
 
 ```
-                         ┌── in-app poll (web today) ── alertEvents query
-events ──► matchers ──►  ├── FCM push (mobile, web later) ── via devices registry
-(created/escalating/     ├── webhooks (API clients)
- rekindle/risk/…)        └── (future) email digest
+                         ┌── FCM push (mobile, web later) ── via devices registry
+events ──► matchers ──►  ├── webhooks (API clients)
+(created/escalating/     └── (future) email digest
+ rekindle/risk/…)        (in-app poll / alertEvents query removed 2026-07-05)
 ```
 
 One subscription model, N delivery channels per subscription. The matcher/dedupe layer is already
@@ -80,7 +86,7 @@ The district-topic broadcasts (big-fire pushes to whole districts) remain for th
 and as a zero-setup default: the mobile onboarding offers "notificações para o meu distrito"
 (topic subscribe — no server subscription needed) and "alertas personalizados" (device +
 subscription model above). National tier: a `national-big` topic for fires crossing 100 assets
-(one push per incident via SocialThread-style claim).
+(one push per incident, claimed once via `IProcessedMarker`).
 
 ### 2.5 Web push (later phase)
 

@@ -9,7 +9,7 @@ hostnames onto them.
 ```
 Cloudflare tunnel (host)  ──►  127.0.0.1:${WEB_PORT}  →  web  (TanStack Start SSR)
                           └─►  127.0.0.1:${API_PORT}  →  api  (Fogos.Api)
-internal network only:    mongo (rs0) · redis · minio · worker · renderer
+internal network only:    mongo (rs0) · redis · minio · worker
 ```
 
 Images are pulled from GHCR, pinned by `deploy/versions.env`. CI/build/release lives in
@@ -39,9 +39,9 @@ cp deploy/versions.env ~/fogos-deploy/versions.env  # pinned image tags (deploy 
 
 Edit `~/fogos-deploy/.env`: set real `MINIO_ROOT_PASSWORD`, a stable `AUTH_RSA_PRIVATE_KEY_PEM`
 (generate with `dotnet run --project backend/src/Fogos.AdminCli -- keys` helpers or your own
-RSA key — leaving it empty auto-generates an ephemeral key that dies on restart), any publisher
-secrets you intend to flip to `On`, and `SENTRY_DSN`. Leave publishers at `DryRun` until the
-switchover playbook.
+RSA key — leaving it empty auto-generates an ephemeral key that dies on restart), the FCM
+credentials you intend to flip to `On`, and `SENTRY_DSN`. Leave `PUBLISH_FCM` at `DryRun` until
+the switchover playbook.
 
 Log in to GHCR once so `pull` works (a classic PAT with `read:packages`, or `gh auth token`):
 
@@ -141,7 +141,7 @@ Releases are cut by **Release Please** (manifest mode) — merging a component's
 `deploy.yml`. The deploy job pins the new tag in `versions.env` and does `compose pull` +
 `up -d --wait` + smoke checks.
 
-- `API_VERSION` → `api`, `worker`, `renderer` images (the backend release train).
+- `API_VERSION` → `api`, `worker` images (the backend release train).
 - `WEB_VERSION` → `web` image.
 
 **Manual deploy / redeploy:** Actions → *Deploy* → *Run workflow* → pick `component` + `version`.

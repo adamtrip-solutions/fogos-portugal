@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.1.0...web-v1.2.0) (2026-07-05)
+
+
+### Features
+
+* **web:** add non-official-source disclaimers ([#18](https://github.com/adamtrip-solutions/fogos-portugal/issues/18)) ([760824e](https://github.com/adamtrip-solutions/fogos-portugal/commit/760824eded4990eab2c8e99ce9e89b94cc786a22))
+
+
+### Bug Fixes
+
+* **web:** drive hover cursor and ring from the projection hit-test ([#20](https://github.com/adamtrip-solutions/fogos-portugal/issues/20)) ([e748429](https://github.com/adamtrip-solutions/fogos-portugal/commit/e7484290b9435cf54e64bd9c89980743c6252f33))
+
 ## [1.1.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.0.0...web-v1.1.0) (2026-07-05)
 
 

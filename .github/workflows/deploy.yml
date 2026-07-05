@@ -42,7 +42,7 @@ jobs:
       DEPLOY_STATE_DIR: ${{ vars.DEPLOY_STATE_DIR }}
     steps:
       - name: Checkout (for the latest compose.yml)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Resolve state dir
         run: echo "STATE_DIR=${DEPLOY_STATE_DIR:-$HOME/fogos-deploy}" >> "$GITHUB_ENV"

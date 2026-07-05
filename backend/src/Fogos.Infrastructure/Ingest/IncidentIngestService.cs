@@ -66,12 +66,19 @@ public sealed class IncidentIngestService(
 
             if (stored is null)
             {
-                await InsertAsync(mapped, ct);
+                await InsertAsync(mapped, ct); // sets LastSeenInFeedAt in the inserted doc
                 created++;
             }
-            else if (await UpdateAsync(stored, mapped, ct))
+            else
             {
-                updated++;
+                if (await UpdateAsync(stored, mapped, ct))
+                    updated++;
+                // Record presence for EVERY id seen this sweep, even when the doc is otherwise unchanged,
+                // so the feed-drop close-out grace window measures from the true last-seen time.
+                await mongo.Incidents.UpdateOneAsync(
+                    Builders<Incident>.Filter.Eq(x => x.Id, mapped.Id),
+                    Builders<Incident>.Update.Set(x => x.LastSeenInFeedAt, clock.UtcNow),
+                    cancellationToken: ct);
             }
         }
 
@@ -85,6 +92,7 @@ public sealed class IncidentIngestService(
         var now = clock.UtcNow;
         mapped.CreatedAt = now;
         mapped.UpdatedAt = now;
+        mapped.LastSeenInFeedAt = now;
         await mongo.Incidents.InsertOneAsync(mapped, cancellationToken: ct);
         await dispatcher.DispatchAsync(new IncidentCreated(mapped.Id), ct: ct);
     }
@@ -103,6 +111,7 @@ public sealed class IncidentIngestService(
         mapped.Kml = stored.Kml;
         mapped.KmlVost = stored.KmlVost;
         mapped.NearestWeatherStationId = stored.NearestWeatherStationId;
+        mapped.LastSeenInFeedAt = stored.LastSeenInFeedAt; // preserved across replace; the caller re-stamps it to now
         // DetailLocation may have been enriched by ICNF (LOCAL); keep the richer value if the feed had none.
         mapped.DetailLocation ??= stored.DetailLocation;
 

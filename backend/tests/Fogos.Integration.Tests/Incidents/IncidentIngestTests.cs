@@ -92,24 +92,150 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
-    public async Task CheckIsActive_flips_only_missing_incidents()
+    public async Task CloseOut_leaves_first_miss_within_grace_untouched()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         using var h = new IncidentPipelineHarness(fixture);
-        await h.Mongo.Incidents.InsertOneAsync(Fire("KEEP", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, active: true));
-        await h.Mongo.Incidents.InsertOneAsync(Fire("GONE", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, active: true));
+        // Seen 5 min ago; grace is 30 min → still inside the window on its first miss.
+        await h.Mongo.Incidents.InsertOneAsync(
+            Fire("FRESH_MISS", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: h.Clock.UtcNow.AddMinutes(-5)));
 
-        var job = new ProcessOcorrenciasSiteJob(h.Locks, NullLogger<ProcessOcorrenciasSiteJob>.Instance,
-            h.ArcGisSource(IncidentFixtures.FeaturePage()), h.Ingest, h.Important, new IncidentFeedFreshness(h.Redis, h.Ops, h.Clock),
-            h.Mongo, h.Ops, Options.Create(new IncidentPipelineOptions()));
+        var closed = await CloseOutJob(h).CloseOutMissingAsync(new HashSet<string>(), feedFresh: true, CancellationToken.None);
 
-        var flipped = await job.ReconcileActiveAsync(new HashSet<string> { "KEEP" }, CancellationToken.None);
+        Assert.Equal(0, closed);
+        var still = await Find(h, "FRESH_MISS");
+        Assert.True(still.Active);
+        Assert.Equal(IncidentStatusCatalog.EmCurso, still.Status.Code);
+    }
 
-        Assert.Equal(1, flipped);
-        Assert.True((await Find(h, "KEEP")).Active);
-        var gone = await Find(h, "GONE");
-        Assert.False(gone.Active);
-        Assert.Equal(IncidentStatusCatalog.EmCurso, gone.Status.Code); // status untouched
+    [SkippableFact]
+    public async Task CloseOut_terminates_absent_past_grace_with_status13_history_and_event()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await h.Mongo.Incidents.InsertOneAsync(Fire("KEEP", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: h.Clock.UtcNow));
+        // Missing and last seen 40 min ago (> 30 min grace) → closes out.
+        await h.Mongo.Incidents.InsertOneAsync(
+            Fire("STALE", IncidentStatusCatalog.ChegadaAoTeatroDeOperacoes, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: h.Clock.UtcNow.AddMinutes(-40)));
+
+        var closed = await CloseOutJob(h).CloseOutMissingAsync(new HashSet<string> { "KEEP" }, feedFresh: true, CancellationToken.None);
+
+        Assert.Equal(1, closed);
+        Assert.True((await Find(h, "KEEP")).Active); // present this sweep, untouched
+        var stale = await Find(h, "STALE");
+        Assert.False(stale.Active);
+        Assert.Equal(IncidentStatusCatalog.EncerradaSemAtualizacao, stale.Status.Code); // 13
+        Assert.Equal(h.Clock.UtcNow, stale.UpdatedAt);
+
+        // The terminal transition rides the normal status-change path: event + history row.
+        var events = await h.DrainAsync("default");
+        Assert.Contains(events.OfType<IncidentStatusChanged>(),
+            e => e.IncidentId == "STALE" && e.PreviousCode == IncidentStatusCatalog.ChegadaAoTeatroDeOperacoes
+                 && e.CurrentCode == IncidentStatusCatalog.EncerradaSemAtualizacao);
+        var row = await h.Mongo.IncidentStatusHistory
+            .Find(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, "STALE")).FirstOrDefaultAsync();
+        Assert.NotNull(row);
+        Assert.Equal(IncidentStatusCatalog.EncerradaSemAtualizacao, row!.Code);
+    }
+
+    [SkippableFact]
+    public async Task CloseOut_skips_everything_when_feed_is_stale()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await h.Mongo.Incidents.InsertOneAsync(
+            Fire("STALE", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: h.Clock.UtcNow.AddMinutes(-40)));
+
+        var closed = await CloseOutJob(h).CloseOutMissingAsync(new HashSet<string>(), feedFresh: false, CancellationToken.None);
+
+        Assert.Equal(0, closed);
+        Assert.True((await Find(h, "STALE")).Active); // a frozen feed cannot signal an ending
+    }
+
+    [SkippableFact]
+    public async Task CloseOut_aborts_and_alerts_ops_when_candidates_exceed_fraction_cap()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        // 5 active, all absent and past grace → cap = max(3, 0.25*5=1) = 3; 5 > 3 → abort.
+        for (var i = 0; i < 5; i++)
+            await h.Mongo.Incidents.InsertOneAsync(
+                Fire($"BULK{i}", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: h.Clock.UtcNow.AddMinutes(-40)));
+
+        var closed = await CloseOutJob(h).CloseOutMissingAsync(new HashSet<string>(), feedFresh: true, CancellationToken.None);
+
+        Assert.Equal(0, closed);
+        for (var i = 0; i < 5; i++)
+            Assert.True((await Find(h, $"BULK{i}")).Active); // nothing closed on a suspected truncated feed
+        Assert.Contains(h.Ops.Errors, m => m.Contains("truncado"));
+    }
+
+    [SkippableFact]
+    public async Task CloseOut_null_last_seen_falls_back_to_created_at()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        // Legacy doc: never stamped with LastSeenInFeedAt, created 40 min ago → CreatedAt fallback closes it.
+        var legacy = Fire("LEGACY", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: null);
+        legacy.CreatedAt = h.Clock.UtcNow.AddMinutes(-40);
+        await h.Mongo.Incidents.InsertOneAsync(legacy);
+        // Plus one within grace by CreatedAt → stays open.
+        var recent = Fire("RECENT", IncidentStatusCatalog.EmCurso, 5, 5, 0, h.Clock.UtcNow, lastSeenInFeedAt: null);
+        recent.CreatedAt = h.Clock.UtcNow.AddMinutes(-5);
+        await h.Mongo.Incidents.InsertOneAsync(recent);
+
+        var closed = await CloseOutJob(h).CloseOutMissingAsync(new HashSet<string>(), feedFresh: true, CancellationToken.None);
+
+        Assert.Equal(1, closed);
+        Assert.False((await Find(h, "LEGACY")).Active);
+        Assert.True((await Find(h, "RECENT")).Active);
+        await h.DrainAsync("default"); // clear dispatched events off the shared stream
+    }
+
+    [SkippableFact]
+    public async Task Revival_from_closeout_reactivates_and_emits_status_event()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await SeedGeographyAsync(h);
+        // NEW1 previously closed out (status 13, inactive); it reappears in the feed as "Em Curso".
+        await h.Mongo.Incidents.InsertOneAsync(
+            Fire("NEW1", IncidentStatusCatalog.EncerradaSemAtualizacao, 5, 5, 0, h.Clock.UtcNow, active: false,
+                lastSeenInFeedAt: h.Clock.UtcNow.AddHours(-2)));
+
+        var raws = await h.ArcGisSource(IncidentFixtures.FeaturePage()).FetchAsync();
+        await h.Ingest.IngestAsync(raws);
+
+        var revived = await Find(h, "NEW1");
+        Assert.True(revived.Active);
+        Assert.Equal(IncidentStatusCatalog.EmCurso, revived.Status.Code);
+        Assert.Equal(h.Clock.UtcNow, revived.LastSeenInFeedAt);
+
+        var events = await h.DrainAsync("default");
+        Assert.Contains(events.OfType<IncidentStatusChanged>(),
+            e => e.IncidentId == "NEW1" && e.PreviousCode == IncidentStatusCatalog.EncerradaSemAtualizacao
+                 && e.CurrentCode == IncidentStatusCatalog.EmCurso);
+    }
+
+    [SkippableFact]
+    public async Task LastSeenInFeedAt_is_bumped_for_unchanged_incidents()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await SeedGeographyAsync(h);
+
+        var raws = await h.ArcGisSource(IncidentFixtures.FeaturePage()).FetchAsync();
+        await h.Ingest.IngestAsync(raws);
+        var firstSeen = (await Find(h, "NEW1")).LastSeenInFeedAt;
+        Assert.Equal(h.Clock.UtcNow, firstSeen);
+
+        // A later, byte-identical sweep: nothing changes but presence is re-stamped.
+        h.Clock.UtcNow = h.Clock.UtcNow.AddMinutes(10);
+        var outcome = await h.Ingest.IngestAsync(raws);
+        Assert.Equal(0, outcome.Updated); // genuinely unchanged
+        Assert.Equal(0, outcome.Created);
+        Assert.Equal(h.Clock.UtcNow, (await Find(h, "NEW1")).LastSeenInFeedAt);
+        await h.DrainAsync("default"); // clear the create/change events off the shared stream
     }
 
     [SkippableFact]
@@ -178,7 +304,8 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
     private static Task<Incident> Find(IncidentPipelineHarness h, string id) =>
         h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, id)).FirstAsync();
 
-    private static Incident Fire(string id, int statusCode, int man, int terrain, int aerial, DateTimeOffset occurredAt, bool active = true, bool important = false) =>
+    private static Incident Fire(string id, int statusCode, int man, int terrain, int aerial, DateTimeOffset occurredAt,
+        bool active = true, bool important = false, DateTimeOffset? lastSeenInFeedAt = null) =>
         new()
         {
             Id = id,
@@ -198,5 +325,12 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
             Important = important,
             CreatedAt = occurredAt,
             UpdatedAt = occurredAt,
+            LastSeenInFeedAt = lastSeenInFeedAt,
         };
+
+    private static ProcessOcorrenciasSiteJob CloseOutJob(IncidentPipelineHarness h, IncidentPipelineOptions? options = null) =>
+        new(h.Locks, NullLogger<ProcessOcorrenciasSiteJob>.Instance,
+            h.ArcGisSource(IncidentFixtures.FeaturePage()), h.Ingest, h.Important,
+            new IncidentFeedFreshness(h.Redis, h.Ops, h.Clock),
+            h.Mongo, h.Ops, h.Dispatcher, h.Clock, Options.Create(options ?? new IncidentPipelineOptions()));
 }

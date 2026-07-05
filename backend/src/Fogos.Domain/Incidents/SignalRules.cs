@@ -18,9 +18,19 @@ public static class SignalRules
     /// <summary>RCM fire-risk level that raises the <see cref="RiskMaximum"/> context key.</summary>
     public const int MaximumRiskLevel = 5;
 
-    /// <summary>Status codes a fire must be leaving to count as a status-regression rekindle.</summary>
+    /// <summary>
+    /// Status codes a fire must be leaving to count as a status-regression rekindle. Includes the
+    /// feed-drop terminal (13): a fire closed out for going quiet that reappears in the feed as "Em Curso"
+    /// is a genuine revival and must register as a rekindle-by-status.
+    /// </summary>
     private static readonly IReadOnlySet<int> RegressionFromCodes =
-        new HashSet<int> { IncidentStatusCatalog.EmResolucao, IncidentStatusCatalog.Conclusao, IncidentStatusCatalog.Vigilancia };
+        new HashSet<int>
+        {
+            IncidentStatusCatalog.EmResolucao,
+            IncidentStatusCatalog.Conclusao,
+            IncidentStatusCatalog.Vigilancia,
+            IncidentStatusCatalog.EncerradaSemAtualizacao,
+        };
 
     /// <summary>Tunable escalation thresholds (defaults per spec; the job binds these from options).</summary>
     public sealed record EscalationThresholds(

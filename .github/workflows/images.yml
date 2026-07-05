@@ -1,7 +1,7 @@
 name: Images
 
 # Release Please publishes a GitHub Release per component:
-#   api-vX.Y.Z → api + worker + renderer images     web-vX.Y.Z → web image
+#   api-vX.Y.Z → api + worker images     web-vX.Y.Z → web image
 # Each image is tagged with the exact version and `latest`, arm64, pushed to GHCR.
 on:
   release:
@@ -17,7 +17,7 @@ env:
 
 jobs:
   api:
-    # The `api` release train ships the three backend images.
+    # The `api` release train ships the backend images.
     if: startsWith(github.event.release.tag_name, 'api-v')
     runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     strategy:
@@ -29,15 +29,15 @@ jobs:
           - name: worker
             context: backend
             dockerfile: backend/Dockerfile.worker
-          - name: renderer
-            context: backend/renderer
-            dockerfile: backend/renderer/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
       - name: Resolve version
         id: v
         run: echo "version=${GITHUB_REF_NAME#api-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -47,12 +47,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.name }}
-        uses: useblacksmith/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/arm64
           push: true
+          # Free GitHub Actions cache backend; per-image scope so layers don't evict each other.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           tags: |
             ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ steps.v.outputs.version }}
             ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:latest
@@ -67,6 +70,9 @@ jobs:
         id: v
         run: echo "version=${GITHUB_REF_NAME#web-v}" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -75,13 +81,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push web
-        uses: useblacksmith/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           # Web build context is the repo root (pnpm workspace-aware).
           context: .
           file: apps/web/Dockerfile
           platforms: linux/arm64
           push: true
+          # Free GitHub Actions cache backend; per-image scope so layers don't evict each other.
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
           tags: |
             ${{ env.IMAGE_PREFIX }}-web:${{ steps.v.outputs.version }}
             ${{ env.IMAGE_PREFIX }}-web:latest

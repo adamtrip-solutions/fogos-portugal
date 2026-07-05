@@ -55,6 +55,14 @@ function Home() {
   )
   const [radarPlaying, setRadarPlaying] = useState(true)
 
+  // Lock the document to the viewport while the full-screen map is mounted, and
+  // release it on unmount so the content routes (estatísticas, concelho, sobre…)
+  // scroll normally. See `body.map-locked` in styles.css.
+  useEffect(() => {
+    document.body.classList.add('map-locked')
+    return () => document.body.classList.remove('map-locked')
+  }, [])
+
   const active = useQuery(activeIncidentsQuery())
   const recent = useQuery(recentIncidentsQuery())
   const weatherAvailability = useQuery(weatherAvailabilityOptions())

@@ -94,8 +94,9 @@ jobs:
       - name: Smoke — API
         run: |
           set -euo pipefail
-          # shellcheck disable=SC1091
-          api_port="$(grep -E '^API_PORT=' "$STATE_DIR/.env" | cut -d= -f2)"; api_port="${api_port:-8080}"
+          # Tolerate quotes, trailing comments/whitespace, CRLF, and duplicate lines.
+          api_port="$(sed -n 's/^API_PORT=//p' "$STATE_DIR/.env" | tail -n1 | sed 's/[#].*//' | tr -d '[:space:]"'"'")"
+          api_port="${api_port:-8080}"
           base="http://127.0.0.1:${api_port}"
           # The API may need a minute after (re)start; retry before failing.
           for i in $(seq 1 12); do
@@ -111,7 +112,8 @@ jobs:
       - name: Smoke — Web
         run: |
           set -euo pipefail
-          web_port="$(grep -E '^WEB_PORT=' "$STATE_DIR/.env" | cut -d= -f2)"; web_port="${web_port:-3000}"
+          web_port="$(sed -n 's/^WEB_PORT=//p' "$STATE_DIR/.env" | tail -n1 | sed 's/[#].*//' | tr -d '[:space:]"'"'")"
+          web_port="${web_port:-3000}"
           for i in $(seq 1 6); do
             if curl -fsS "http://127.0.0.1:${web_port}/" >/dev/null; then break; fi
             echo "waiting for web ($i/6)…"; sleep 10

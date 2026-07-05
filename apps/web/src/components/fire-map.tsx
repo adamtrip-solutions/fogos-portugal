@@ -54,6 +54,23 @@ const SOURCE_ID = 'fires'
 const HIT_RADIUS_MOUSE = 24
 const HIT_RADIUS_TOUCH = 32
 
+// The pulsing halo is split into two circle layers with STATIC filters so the
+// rAF loop can set a constant circle-radius / circle-opacity per layer (a plain
+// uniform update) instead of a per-frame data-driven ['case', ['get',…]]
+// expression, which forces a per-feature paint recompute + GPU buffer re-upload
+// every frame. Both keep the original `active` gating; escalating fires get the
+// faster/larger cycle. Hoisted to module scope so they never re-allocate.
+const HALO_FILTER_BASE: CircleLayerSpecification['filter'] = [
+  'all',
+  ['==', ['get', 'active'], true],
+  ['!=', ['get', 'escalating'], true],
+]
+const HALO_FILTER_ESCALATING: CircleLayerSpecification['filter'] = [
+  'all',
+  ['==', ['get', 'active'], true],
+  ['==', ['get', 'escalating'], true],
+]
+
 interface FireFeatureProps {
   id: string
   color: string
@@ -224,6 +241,17 @@ export function FireMap({
   const selectedFeatureIdRef = useRef<number | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
+  // Pointer type never changes mid-session, so the coarse-pointer hit radius is
+  // resolved once (lazily, on the first client hit-test) and cached — avoids a
+  // window.matchMedia call per mousemove. null = not yet resolved.
+  const coarsePointerRef = useRef<boolean | null>(null)
+
+  // Hover hit-testing is rAF-throttled: mousemove only stores the latest point
+  // and schedules a frame; the frame runs the O(N) hit-test at most once per
+  // paint instead of at the raw pointer sample rate (60-120Hz+).
+  const pendingHoverPointRef = useRef<ScreenPoint | null>(null)
+  const hoverFrameRef = useRef<number | null>(null)
+
   const data = useMemo(() => buildFeatureCollection(incidents), [incidents])
 
   // Read the live incident list inside the click handler (which is stable across
@@ -277,8 +305,11 @@ export function FireMap({
   }, [theme])
 
   // --- Pulsing halo: one rAF loop drives radius + opacity. Escalating fires
-  // pulse on a faster, larger cycle so they read as urgent — the amplitude is
-  // selected per-feature via a data-driven `escalating` expression. -----------
+  // pulse on a faster, larger cycle so they read as urgent. Each cycle is a
+  // separate circle layer with a static filter, so we set a CONSTANT number per
+  // layer — a plain uniform update — rather than a per-frame data-driven
+  // ['case', ['get', 'escalating'], …] expression (which would recompute paint
+  // per feature and re-upload the GPU buffer every frame). --------------------
   useEffect(() => {
     let frame = 0
     const CYCLE_MS = 2200
@@ -286,7 +317,7 @@ export function FireMap({
 
     const tick = () => {
       const map = mapRef.current?.getMap()
-      if (map && map.getLayer('fires-halo') && !document.hidden) {
+      if (map && !document.hidden) {
         const now = performance.now()
         const t = (now % CYCLE_MS) / CYCLE_MS
         const s = (Math.sin(t * Math.PI * 2) + 1) / 2 // 0..1
@@ -298,24 +329,30 @@ export function FireMap({
         const radiusEsc = 18 + sf * 22 // 18..40 — larger sweep
         const opacityEsc = 0.5 * (1 - sf) // 0.5..0 — bolder
 
-        map.setPaintProperty('fires-halo', 'circle-radius', [
-          'case',
-          ['get', 'escalating'],
-          radiusEsc,
-          radius,
-        ])
-        map.setPaintProperty('fires-halo', 'circle-opacity', [
-          'case',
-          ['get', 'escalating'],
-          opacityEsc,
-          opacity,
-        ])
+        if (map.getLayer('fires-halo')) {
+          map.setPaintProperty('fires-halo', 'circle-radius', radius)
+          map.setPaintProperty('fires-halo', 'circle-opacity', opacity)
+        }
+        if (map.getLayer('fires-halo-escalating')) {
+          map.setPaintProperty('fires-halo-escalating', 'circle-radius', radiusEsc)
+          map.setPaintProperty('fires-halo-escalating', 'circle-opacity', opacityEsc)
+        }
       }
       frame = requestAnimationFrame(tick)
     }
 
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
+  }, [])
+
+  // Cancel any pending hover hit-test frame on unmount.
+  useEffect(() => {
+    return () => {
+      if (hoverFrameRef.current != null) {
+        cancelAnimationFrame(hoverFrameRef.current)
+        hoverFrameRef.current = null
+      }
+    }
   }, [])
 
   // --- Keep the selected feature-state in sync with data + selection. ------
@@ -434,11 +471,13 @@ export function FireMap({
       candidates.push({ id: incident.id, x: projected.x, y: projected.y })
     }
 
-    const coarsePointer =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(pointer: coarse)').matches
-    const radius = coarsePointer ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
+    if (coarsePointerRef.current === null) {
+      coarsePointerRef.current =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches
+    }
+    const radius = coarsePointerRef.current ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
 
     return nearestWithinRadius(point, candidates, radius)
   }, [])
@@ -450,30 +489,49 @@ export function FireMap({
     [onSelect, hitTestIncident],
   )
 
+  // rAF-throttled hover: the mousemove handler only records the latest point and
+  // schedules a frame. The frame runs the (O(N)) hit-test → cursor → hover
+  // feature-state swap once for the most recent point, so pointer bursts collapse
+  // to at most one hit-test per paint.
   const handleMouseMove = useCallback((event: MapLayerMouseEvent) => {
-    const map = mapRef.current?.getMap()
-    if (!map) return
-    const hitId = hitTestIncident(event.point)
-    map.getCanvas().style.cursor = hitId != null ? 'pointer' : ''
+    pendingHoverPointRef.current = event.point
+    if (hoverFrameRef.current != null) return
 
-    // Feature ids on the source are the numeric form of the incident id.
-    const numericId = hitId != null ? Number(hitId) : NaN
-    const nextHover = Number.isSafeInteger(numericId) ? numericId : null
+    hoverFrameRef.current = requestAnimationFrame(() => {
+      hoverFrameRef.current = null
+      const point = pendingHoverPointRef.current
+      if (!point) return
+      const map = mapRef.current?.getMap()
+      if (!map) return
 
-    if (hoveredIdRef.current === nextHover) return
-    if (hoveredIdRef.current != null) {
-      map.removeFeatureState(
-        { source: SOURCE_ID, id: hoveredIdRef.current },
-        'hover',
-      )
-    }
-    hoveredIdRef.current = nextHover
-    if (nextHover != null) {
-      map.setFeatureState({ source: SOURCE_ID, id: nextHover }, { hover: true })
-    }
+      const hitId = hitTestIncident(point)
+      map.getCanvas().style.cursor = hitId != null ? 'pointer' : ''
+
+      // Feature ids on the source are the numeric form of the incident id.
+      const numericId = hitId != null ? Number(hitId) : NaN
+      const nextHover = Number.isSafeInteger(numericId) ? numericId : null
+
+      if (hoveredIdRef.current === nextHover) return
+      if (hoveredIdRef.current != null) {
+        map.removeFeatureState(
+          { source: SOURCE_ID, id: hoveredIdRef.current },
+          'hover',
+        )
+      }
+      hoveredIdRef.current = nextHover
+      if (nextHover != null) {
+        map.setFeatureState({ source: SOURCE_ID, id: nextHover }, { hover: true })
+      }
+    })
   }, [hitTestIncident])
 
   const handleMouseLeave = useCallback(() => {
+    if (hoverFrameRef.current != null) {
+      cancelAnimationFrame(hoverFrameRef.current)
+      hoverFrameRef.current = null
+    }
+    pendingHoverPointRef.current = null
+
     const map = mapRef.current?.getMap()
     if (!map) return
     map.getCanvas().style.cursor = ''
@@ -492,10 +550,19 @@ export function FireMap({
     map.easeTo({ zoom: map.getZoom() + delta, duration: 250 })
   }
 
+  // Two halo layers, one per pulse cycle. The rAF loop overwrites circle-radius
+  // and circle-opacity every frame with constant numbers; these are just the
+  // pre-animation seeds (start of each cycle).
   const haloPaint: CircleLayerSpecification['paint'] = {
     'circle-color': ['get', 'color'],
-    'circle-radius': 14,
-    'circle-opacity': 0.2,
+    'circle-radius': 16,
+    'circle-opacity': 0.35,
+    'circle-blur': 0.25,
+  }
+  const haloPaintEscalating: CircleLayerSpecification['paint'] = {
+    'circle-color': ['get', 'color'],
+    'circle-radius': 18,
+    'circle-opacity': 0.5,
     'circle-blur': 0.25,
   }
 
@@ -614,8 +681,14 @@ export function FireMap({
         <Layer
           id="fires-halo"
           type="circle"
-          filter={['==', ['get', 'active'], true]}
+          filter={HALO_FILTER_BASE}
           paint={haloPaint}
+        />
+        <Layer
+          id="fires-halo-escalating"
+          type="circle"
+          filter={HALO_FILTER_ESCALATING}
+          paint={haloPaintEscalating}
         />
         <Layer id="fires-ring" type="circle" paint={ringPaint} />
         <Layer

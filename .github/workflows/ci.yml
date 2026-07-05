@@ -1,13 +1,45 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build-test:
-    runs-on: ubuntu-latest
+  # Path filter. The workflow always runs, so `backend`/`web` are always created as checks;
+  # when a path is untouched its job is skipped (which branch protection treats as passing).
+  changes:
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     defaults:
       run:
         working-directory: backend
@@ -19,11 +51,51 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # Blacksmith's cache backend intercepts actions/cache automatically.
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Build.props', 'backend/global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore
 
       - name: Build
         run: dotnet build --no-restore -c Release
 
+      # Integration suite uses Testcontainers (mongo/redis/minio); Blacksmith runners have Docker.
       - name: Test
         run: dotnet test --no-build -c Release
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter web...
+
+      - name: Typecheck
+        run: pnpm --filter web exec tsc --noEmit
+
+      - name: Test
+        run: pnpm --filter web run test
+
+      - name: Build
+        run: pnpm --filter web run build

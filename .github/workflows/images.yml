@@ -1,0 +1,87 @@
+name: Images
+
+# Release Please publishes a GitHub Release per component:
+#   api-vX.Y.Z → api + worker + renderer images     web-vX.Y.Z → web image
+# Each image is tagged with the exact version and `latest`, arm64, pushed to GHCR.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/adamtrip-solutions/fogos-portugal
+
+jobs:
+  api:
+    # The `api` release train ships the three backend images.
+    if: startsWith(github.event.release.tag_name, 'api-v')
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: backend
+            dockerfile: backend/Dockerfile.api
+          - name: worker
+            context: backend
+            dockerfile: backend/Dockerfile.worker
+          - name: renderer
+            context: backend/renderer
+            dockerfile: backend/renderer/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#api-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.name }}
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:latest
+
+  web:
+    if: startsWith(github.event.release.tag_name, 'web-v')
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#web-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web
+        uses: useblacksmith/build-push-action@v2
+        with:
+          # Web build context is the repo root (pnpm workspace-aware).
+          context: .
+          file: apps/web/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-web:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE_PREFIX }}-web:latest

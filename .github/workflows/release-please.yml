@@ -1,0 +1,22 @@
+name: Release Please
+
+# Manifest mode: one release train per component (backend→api, apps/web→web). Each merged
+# release PR cuts that component's tag (api-vX.Y.Z / web-vX.Y.Z) + GitHub Release, which the
+# Images and Deploy workflows react to.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

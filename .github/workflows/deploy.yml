@@ -1,0 +1,119 @@
+name: Deploy
+
+# Pull-based CD on the home-server Mac's self-hosted runner. Triggers ONLY on a published
+# release or a manual dispatch — never on pull_request. Until the runner is installed this
+# job simply stays queued; that is expected.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to deploy
+        required: true
+        type: choice
+        options: [api, web]
+      version:
+        description: Version to deploy (e.g. 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Never run on forks; on a release, only for api-v*/web-v* tags.
+    if: >
+      github.event.repository.fork == false &&
+      (github.event_name == 'workflow_dispatch' ||
+       startsWith(github.event.release.tag_name, 'api-v') ||
+       startsWith(github.event.release.tag_name, 'web-v'))
+    runs-on: [self-hosted, home]
+    environment: production
+    env:
+      # Persistent server dir holding the untracked .env (secrets) + versions.env (pinned tags)
+      # and the named docker volumes. Set the DEPLOY_STATE_DIR repo variable to override the
+      # default of $HOME/fogos-deploy. Created once during first boot (see deploy/README.md).
+      DEPLOY_STATE_DIR: ${{ vars.DEPLOY_STATE_DIR }}
+    steps:
+      - name: Checkout (for the latest compose.yml)
+        uses: actions/checkout@v4
+
+      - name: Resolve state dir
+        run: echo "STATE_DIR=${DEPLOY_STATE_DIR:-$HOME/fogos-deploy}" >> "$GITHUB_ENV"
+
+      - name: Resolve component + version
+        id: target
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            component="${{ inputs.component }}"
+            version="${{ inputs.version }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+            case "$tag" in
+              api-v*) component=api;  version="${tag#api-v}" ;;
+              web-v*) component=web;  version="${tag#web-v}" ;;
+              *) echo "Unrecognized tag: $tag" >&2; exit 1 ;;
+            esac
+          fi
+          echo "component=$component" >> "$GITHUB_OUTPUT"
+          echo "version=$version"     >> "$GITHUB_OUTPUT"
+          echo "Deploying $component v$version"
+
+      - name: Pin version in versions.env
+        run: |
+          set -euo pipefail
+          versions="$STATE_DIR/versions.env"
+          test -f "$versions" || { echo "Missing $versions (see deploy/README.md first-boot)"; exit 1; }
+          case "${{ steps.target.outputs.component }}" in
+            api) key=API_VERSION ;;
+            web) key=WEB_VERSION ;;
+          esac
+          tmp="$(mktemp)"
+          grep -v "^${key}=" "$versions" > "$tmp" || true
+          echo "${key}=${{ steps.target.outputs.version }}" >> "$tmp"
+          mv "$tmp" "$versions"
+          echo "── versions.env ──"; cat "$versions"
+
+      - name: Pull + up
+        run: |
+          set -euo pipefail
+          compose=(docker compose \
+            --env-file "$STATE_DIR/.env" \
+            --env-file "$STATE_DIR/versions.env" \
+            -f "$GITHUB_WORKSPACE/deploy/compose.yml")
+          "${compose[@]}" pull
+          "${compose[@]}" up -d --wait --wait-timeout 180
+
+      - name: Smoke — API
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          api_port="$(grep -E '^API_PORT=' "$STATE_DIR/.env" | cut -d= -f2)"; api_port="${api_port:-8080}"
+          base="http://127.0.0.1:${api_port}"
+          # The API may need a minute after (re)start; retry before failing.
+          for i in $(seq 1 12); do
+            if curl -fsS "$base/healthz/ready" >/dev/null; then break; fi
+            echo "waiting for API readiness ($i/12)…"; sleep 10
+          done
+          curl -fsS "$base/healthz/ready" >/dev/null
+          curl -fsS -X POST "$base/graphql" \
+            -H 'content-type: application/json' \
+            -d '{"query":"{ stats { activeFires } }"}' | tee /dev/stderr | grep -q '"data"'
+          curl -fsS "$base/v3/feeds/incidents.rss" | grep -qi '<rss'
+
+      - name: Smoke — Web
+        run: |
+          set -euo pipefail
+          web_port="$(grep -E '^WEB_PORT=' "$STATE_DIR/.env" | cut -d= -f2)"; web_port="${web_port:-3000}"
+          for i in $(seq 1 6); do
+            if curl -fsS "http://127.0.0.1:${web_port}/" >/dev/null; then break; fi
+            echo "waiting for web ($i/6)…"; sleep 10
+          done
+          curl -fsS "http://127.0.0.1:${web_port}/" >/dev/null

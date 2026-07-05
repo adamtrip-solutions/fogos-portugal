@@ -13,8 +13,8 @@ import type { LucideIcon } from 'lucide-react'
 
 import { Separator } from '#/components/ui/separator.tsx'
 
-/** Hardcoded release marker, surfaced at the bottom of the drawer. */
-const APP_VERSION = 'v0.1.0'
+/** Release version injected at build time from package.json (vite define). */
+const APP_VERSION = `v${__APP_VERSION__}`
 
 const NAV_LINKS = [
   { to: '/', label: 'Mapa', Icon: Map, exact: true },
@@ -27,10 +27,15 @@ const PAGE_LINKS = [
   { to: '/api', label: 'API pública', Icon: Code },
 ] as const
 
+// TanStack Router concatenates `className` with `activeProps.className`, so the
+// shared layout lives in BASE and the color variants are mutually exclusive via
+// active/inactiveProps — never both on the element, so no Tailwind conflicts.
 const ITEM_BASE =
-  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-black/5 dark:text-zinc-200 dark:hover:bg-white/10'
+  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
+const ITEM_INACTIVE =
+  'text-zinc-700 hover:bg-black/5 dark:text-zinc-200 dark:hover:bg-white/10'
 const ITEM_ACTIVE =
-  'flex items-center gap-3 rounded-xl bg-zinc-900 px-3 py-2.5 text-sm font-medium text-white shadow-sm dark:bg-white dark:text-zinc-900'
+  'bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900'
 
 interface AppDrawerProps {
   open: boolean
@@ -147,6 +152,7 @@ function DrawerLink({
       onClick={onNavigate}
       className={ITEM_BASE}
       activeProps={{ className: ITEM_ACTIVE }}
+      inactiveProps={{ className: ITEM_INACTIVE }}
     >
       <Icon className="size-4 shrink-0" aria-hidden />
       {label}

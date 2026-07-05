@@ -17,10 +17,14 @@ const GHOST_ITEM =
 const ICON_ITEM =
   'flex size-9 items-center justify-center rounded-xl text-zinc-600 transition-colors hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10'
 
+// Split base/variant because TanStack Router concatenates `className` with
+// `activeProps.className` — overlapping color utilities would conflict.
+const SEG_BASE =
+  'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors'
 const SEG_INACTIVE =
-  'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10'
+  'text-zinc-600 hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10'
 const SEG_ACTIVE =
-  'flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm dark:bg-white dark:text-zinc-900'
+  'bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900'
 
 function Divider({ className = '' }: { className?: string }) {
   return (
@@ -92,8 +96,9 @@ function NavSegment() {
           key={to}
           to={to}
           activeOptions={{ exact }}
-          className={SEG_INACTIVE}
+          className={SEG_BASE}
           activeProps={{ className: SEG_ACTIVE }}
+          inactiveProps={{ className: SEG_INACTIVE }}
         >
           <Icon className="size-4" aria-hidden />
           {label}

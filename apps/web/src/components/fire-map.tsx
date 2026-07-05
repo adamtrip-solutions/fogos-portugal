@@ -24,8 +24,6 @@ import type {
 } from 'react-map-gl/maplibre'
 import { colorWithHash, isActiveStatus, statusBucket } from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
-import { nearestWithinRadius } from '#/lib/fogos/map-hit-test.ts'
-import type { HitCandidate, ScreenPoint } from '#/lib/fogos/map-hit-test.ts'
 import {
   addMissingMarkerImage,
   ensureMarkerImages,
@@ -49,10 +47,25 @@ const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.
 
 const SOURCE_ID = 'fires'
 
-// Click hit-test radius in CSS pixels around the badge centre. Touch pointers
-// get a larger target than a precise mouse cursor.
+// Radius (CSS px) of the invisible `fires-hit` circle target around each badge
+// centre. Touch pointers get a larger target than a precise mouse cursor.
 const HIT_RADIUS_MOUSE = 24
 const HIT_RADIUS_TOUCH = 32
+
+// Pointer type never changes mid-session, so the hit radius is resolved once,
+// lazily, on first use and cached. SSR-safe: matchMedia only exists in the
+// browser, so on the server we fall back to the mouse radius (the layer paint is
+// only built client-side anyway).
+let hitRadiusCache: number | null = null
+function resolveHitRadius(): number {
+  if (hitRadiusCache != null) return hitRadiusCache
+  const coarse =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  hitRadiusCache = coarse ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
+  return hitRadiusCache
+}
 
 // The pulsing halo is split into two circle layers with STATIC filters so the
 // rAF loop can set a constant circle-radius / circle-opacity per layer (a plain
@@ -241,25 +254,15 @@ export function FireMap({
   const selectedFeatureIdRef = useRef<number | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
-  // Pointer type never changes mid-session, so the coarse-pointer hit radius is
-  // resolved once (lazily, on the first client hit-test) and cached — avoids a
-  // window.matchMedia call per mousemove. null = not yet resolved.
-  const coarsePointerRef = useRef<boolean | null>(null)
-
-  // Hover hit-testing is rAF-throttled: mousemove only stores the latest point
-  // and schedules a frame; the frame runs the O(N) hit-test at most once per
-  // paint instead of at the raw pointer sample rate (60-120Hz+).
-  const pendingHoverPointRef = useRef<ScreenPoint | null>(null)
-  const hoverFrameRef = useRef<number | null>(null)
+  // The invisible `fires-hit` circle layer's paint is built once on mount: its
+  // radius is a session-constant, so it never needs to react to renders.
+  const [hitPaint] = useState<CircleLayerSpecification['paint']>(() => ({
+    'circle-radius': resolveHitRadius(),
+    'circle-opacity': 0,
+    'circle-stroke-width': 0,
+  }))
 
   const data = useMemo(() => buildFeatureCollection(incidents), [incidents])
-
-  // Read the live incident list inside the click handler (which is stable across
-  // renders) without re-registering it on every poll refetch.
-  const incidentsRef = useRef(incidents)
-  useEffect(() => {
-    incidentsRef.current = incidents
-  }, [incidents])
 
   const weatherSource = useMemo(
     () => buildWeatherSource(weatherLayer, weatherAvailability),
@@ -343,16 +346,6 @@ export function FireMap({
 
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [])
-
-  // Cancel any pending hover hit-test frame on unmount.
-  useEffect(() => {
-    return () => {
-      if (hoverFrameRef.current != null) {
-        cancelAnimationFrame(hoverFrameRef.current)
-        hoverFrameRef.current = null
-      }
-    }
   }, [])
 
   // --- Keep the selected feature-state in sync with data + selection. ------
@@ -451,87 +444,45 @@ export function FireMap({
     applySelectedState()
   }, [applySelectedState])
 
-  // Don't hit-test against the symbol layer via queryRenderedFeatures (or the
-  // event.features it feeds): its result depends on MapLibre's placement/
-  // collision index, which is recomputed lazily after camera moves, so during/
-  // just after an animation (fly-to on select, radar repaints) the query can
-  // miss a badge that is plainly visible. Instead project every displayed
-  // incident to screen space ourselves and pick the nearest within a
-  // touch-friendly radius; this never touches symbol placement, so it can't
-  // go stale. Shared by click (select) and mousemove (cursor + hover ring).
-  const hitTestIncident = useCallback((point: ScreenPoint): string | null => {
-    const map = mapRef.current?.getMap()
-    if (!map) return null
-
-    const candidates: HitCandidate[] = []
-    for (const incident of incidentsRef.current) {
-      const coords = incident.coordinates
-      if (!coords) continue
-      const projected = map.project([coords.longitude, coords.latitude])
-      candidates.push({ id: incident.id, x: projected.x, y: projected.y })
-    }
-
-    if (coarsePointerRef.current === null) {
-      coarsePointerRef.current =
-        typeof window !== 'undefined' &&
-        typeof window.matchMedia === 'function' &&
-        window.matchMedia('(pointer: coarse)').matches
-    }
-    const radius = coarsePointerRef.current ? HIT_RADIUS_TOUCH : HIT_RADIUS_MOUSE
-
-    return nearestWithinRadius(point, candidates, radius)
-  }, [])
-
+  // Hit-testing runs natively against the invisible `fires-hit` CIRCLE layer
+  // (see interactiveLayerIds + the layer's comment). MapLibre feeds the hovered/
+  // clicked feature via event.features, so click and hover both just read
+  // event.features[0] — no screen-space projection sweep needed.
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
-      onSelect(hitTestIncident(event.point))
+      // properties.id is the incident's string id (feature.id is the numeric
+      // form used for feature-state); onSelect expects the string id.
+      const feature = event.features?.[0]
+      const id = feature?.properties?.id
+      onSelect(typeof id === 'string' ? id : null)
     },
-    [onSelect, hitTestIncident],
+    [onSelect],
   )
 
-  // rAF-throttled hover: the mousemove handler only records the latest point and
-  // schedules a frame. The frame runs the (O(N)) hit-test → cursor → hover
-  // feature-state swap once for the most recent point, so pointer bursts collapse
-  // to at most one hit-test per paint.
   const handleMouseMove = useCallback((event: MapLayerMouseEvent) => {
-    pendingHoverPointRef.current = event.point
-    if (hoverFrameRef.current != null) return
+    const map = mapRef.current?.getMap()
+    if (!map) return
 
-    hoverFrameRef.current = requestAnimationFrame(() => {
-      hoverFrameRef.current = null
-      const point = pendingHoverPointRef.current
-      if (!point) return
-      const map = mapRef.current?.getMap()
-      if (!map) return
+    const feature = event.features?.[0]
+    map.getCanvas().style.cursor = feature ? 'pointer' : ''
 
-      const hitId = hitTestIncident(point)
-      map.getCanvas().style.cursor = hitId != null ? 'pointer' : ''
+    const rawId = feature?.id
+    const nextHover = typeof rawId === 'number' ? rawId : null
 
-      // Feature ids on the source are the numeric form of the incident id.
-      const numericId = hitId != null ? Number(hitId) : NaN
-      const nextHover = Number.isSafeInteger(numericId) ? numericId : null
-
-      if (hoveredIdRef.current === nextHover) return
-      if (hoveredIdRef.current != null) {
-        map.removeFeatureState(
-          { source: SOURCE_ID, id: hoveredIdRef.current },
-          'hover',
-        )
-      }
-      hoveredIdRef.current = nextHover
-      if (nextHover != null) {
-        map.setFeatureState({ source: SOURCE_ID, id: nextHover }, { hover: true })
-      }
-    })
-  }, [hitTestIncident])
+    if (hoveredIdRef.current === nextHover) return
+    if (hoveredIdRef.current != null) {
+      map.removeFeatureState(
+        { source: SOURCE_ID, id: hoveredIdRef.current },
+        'hover',
+      )
+    }
+    hoveredIdRef.current = nextHover
+    if (nextHover != null) {
+      map.setFeatureState({ source: SOURCE_ID, id: nextHover }, { hover: true })
+    }
+  }, [])
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverFrameRef.current != null) {
-      cancelAnimationFrame(hoverFrameRef.current)
-      hoverFrameRef.current = null
-    }
-    pendingHoverPointRef.current = null
-
     const map = mapRef.current?.getMap()
     if (!map) return
     map.getCanvas().style.cursor = ''
@@ -670,6 +621,7 @@ export function FireMap({
         fitBoundsOptions: { padding: 48 },
       }}
       attributionControl={{ compact: true }}
+      interactiveLayerIds={['fires-hit']}
       onLoad={handleLoad}
       onStyleData={handleStyleData}
       onClick={handleClick}
@@ -697,6 +649,26 @@ export function FireMap({
           layout={badgeLayout}
           paint={badgePaint}
         />
+        {/*
+          Invisible CIRCLE hit-target layer — the ONLY interactive fire layer
+          (see interactiveLayerIds). Do NOT delete or fold this back into the
+          `fires-badge` symbol layer.
+
+          History: badges are a SYMBOL layer, and MapLibre's hit-testing for
+          symbols (queryRenderedFeatures, which feeds event.features) depends on
+          the placement/collision index. That index is recomputed lazily after
+          camera moves, so during/just after an animation (fly-to on select,
+          radar frame repaints) a click/hover at a plainly-visible badge could
+          miss — the fire would deselect until a manual zoom forced re-placement.
+
+          CIRCLE layers have no placement index: they are hit-tested
+          geometrically from the tile features against the current transform, so
+          they can never go stale. This transparent circle rides on the same
+          source, above the badge (so it wins hit priority), giving a touch-
+          friendly, animation-proof hit target while the badge stays purely
+          visual. Radius is a session constant (mouse vs. coarse pointer).
+        */}
+        <Layer id="fires-hit" type="circle" paint={hitPaint} />
       </Source>
 
       {/* Perimeter history (selected KML version → GeoJSON), below the fire

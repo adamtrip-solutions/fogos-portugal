@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { HeartHandshake } from 'lucide-react'
+import { HeartHandshake, TriangleAlert } from 'lucide-react'
 
 import { ContentPage, InfoCard } from '#/components/content-page.tsx'
 
@@ -31,6 +31,32 @@ function Sobre() {
           informação está lá.
         </p>
       </InfoCard>
+
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-5 sm:p-6 dark:border-amber-400/25 dark:bg-amber-400/10">
+        <div className="flex items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            <TriangleAlert className="size-5" aria-hidden />
+          </span>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold text-foreground">
+              Isto não é uma fonte oficial
+            </h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              O FogosPortugal é um projeto independente. A informação é
+              recolhida automaticamente a partir de fontes públicas — ANEPC,
+              ICNF, IPMA, entre outras — e pode chegar com atraso, estar
+              incompleta ou conter erros. Não é um registo oficial de
+              ocorrências e não deve ser a única base para decisões que
+              envolvam a sua segurança.
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Em emergência, ligue <span className="font-semibold text-foreground">112</span>.
+              Siga sempre as indicações da Proteção Civil e das autoridades
+              locais — são elas a fonte que conta.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <InfoCard title="Para quem">
         <p>

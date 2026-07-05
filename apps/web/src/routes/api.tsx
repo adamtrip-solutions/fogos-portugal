@@ -49,6 +49,17 @@ function ApiPage() {
         </p>
       </InfoCard>
 
+      <InfoCard title="Sem valor oficial">
+        <p>
+          Os dados são recolhidos e reprocessados automaticamente a partir de
+          fontes públicas e fornecidos «tal como estão», sem garantias de
+          exatidão, completude ou continuidade. Não constituem um registo
+          oficial de ocorrências — se o seu caso de uso exige dados com valor
+          oficial, consulte diretamente a ANEPC e as restantes entidades
+          competentes.
+        </p>
+      </InfoCard>
+
       <InfoCard title="O que já existe">
         <p>
           Uma parte da infraestrutura já está a servir dados. O endpoint{' '}

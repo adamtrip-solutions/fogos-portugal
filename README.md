@@ -9,6 +9,13 @@ fire-risk data, in one fast, open interface. FogosPortugal is a non-profit, ad-f
 project: a clean-room .NET backend and a TanStack Start web app, built to make Portugal's fire
 situation legible to anyone, for free.
 
+> [!WARNING]
+> **FogosPortugal is not an official source.** All data is collected automatically from public
+> sources (ANEPC, ICNF, IPMA, and others) and may be delayed, incomplete, or wrong. It is not an
+> official record of incidents and must not be treated as a source of truth or relied on for
+> safety decisions. In an emergency, call **112** and follow the instructions of Civil Protection
+> and local authorities.
+
 ## Repository structure
 
 This is a pnpm + .NET monorepo:

@@ -37,11 +37,25 @@ cp deploy/versions.env ~/fogos-deploy/versions.env  # pinned image tags (deploy 
 > It reads both files from this dir via `--env-file`, so `git pull` never clobbers your secrets
 > or fights the version pins. Override the location with the `DEPLOY_STATE_DIR` repo variable.
 
-Edit `~/fogos-deploy/.env`: set real `MINIO_ROOT_PASSWORD`, a stable `AUTH_RSA_PRIVATE_KEY_PEM`
-(generate with `dotnet run --project backend/src/Fogos.AdminCli -- keys` helpers or your own
-RSA key — leaving it empty auto-generates an ephemeral key that dies on restart), the FCM
-credentials you intend to flip to `On`, and `SENTRY_DSN`. Leave `PUBLISH_FCM` at `DryRun` until
-the switchover playbook.
+Edit `~/fogos-deploy/.env`. It is organised in three blocks — unset keys fall back to the
+defaults baked into `compose.yml`, so the stack **boots as-is** on the internal network and you
+only fill in what a real deploy needs:
+
+1. **REQUIRED** — Mongo/Redis/MinIO/ports/Auth. The defaults point at the in-stack services, so
+   the only things you *must* change before exposing the stack are `MINIO_ROOT_PASSWORD` (a real
+   secret), `STORAGE_PUBLIC_BASE_URL` (the public URL photos resolve from — your CDN/host domain),
+   and `AUTH_RSA_PRIVATE_KEY_PEM` (a stable RSA key — generate your own PEM; leaving it empty
+   auto-generates an *ephemeral* key that dies on restart, logged loudly, dev-only). `Auth`
+   issuer/audience default to `fogos.pt` / `fogos-api` and need no boot-time value.
+2. **OPTIONAL — external data sources** — `NASA_FIRMS_KEY` (free, powers satellite hotspots +
+   spread timeline) and `FR24_API_KEY` (commercial, aircraft tracking). Each is off while empty;
+   the rest of the app runs normally.
+3. **OPTIONAL — push (FCM)** — leave `PUBLISH_FCM` at `DryRun` (or `Off`) and the credentials
+   empty until the switchover playbook. With FCM absent/Off/DryRun the FirebaseApp is never
+   initialised, so **no credentials are needed to boot**; DryRun captures would-be sends to the
+   Discord dry-run webhook if one is set.
+
+`SENTRY_DSN` and the `DISCORD_*` webhooks are optional ops extras (empty = silent no-op).
 
 Log in to GHCR once so `pull` works (a classic PAT with `read:packages`, or `gh auth token`):
 

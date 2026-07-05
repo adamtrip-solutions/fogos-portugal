@@ -68,7 +68,7 @@
 ## 1. Solution layout
 
 ```
-fogosapi-dotnet/
+backend/                     # monorepo backend/ (was the fogosapi-dotnet repo root)
   src/
     Fogos.Domain/            # Pure C#: entities, enums, status & natureza mapping,
                              # wave detection (WMO 6-day rule), convex hull, hashtags,

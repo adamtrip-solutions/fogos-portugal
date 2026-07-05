@@ -1,18 +1,22 @@
 # FogosPortugal — deployment plan
 
-Target: production on a home-server MacBook running OrbStack, public at `fogosportugal.pt`,
-CI on GitHub Actions with Blacksmith runners, automated versioning/releases/changelog.
+Target: production on a home-server MacBook running OrbStack, public at `fogosportugal.pt`
+(**domain/DNS still pending** — everything that depends on the public hostname is blocked until it
+lands), CI on GitHub Actions with Blacksmith runners, automated versioning/releases/changelog.
+
+> **Status (2026-07):** the monorepo now lives at `adamtrip-solutions/fogos-portugal` (private) with
+> `backend/` + `apps/web/`. Domain, Cloudflare tunnel, and CD are still to come.
 
 ## 0. TL;DR decisions
 
 | Concern | Decision |
 |---|---|
-| Forge / repo shape | GitHub, **one monorepo** (`fogosportugal`) holding backend + frontend + deploy stack |
+| Forge / repo shape | GitHub, **one monorepo** (`adamtrip-solutions/fogos-portugal`) holding backend + web + deploy stack |
 | CI runners | **Blacksmith** for everything untrusted (PR tests, builds) |
 | CD to the Mac | **Self-hosted GitHub runner on the Mac**, deploy jobs only, pull-based `docker compose up` |
 | Images | GHCR (`ghcr.io/<you>/fogosportugal-{api,worker,frontend,renderer}`), **arm64** |
 | Ingress | **Cloudflare Tunnel** (no port-forwarding, TLS + DDoS shielding for free) |
-| Versioning | **Release Please (manifest mode)** + Conventional Commits → per-component versions, changelogs, and releases (`api-vX.Y.Z`, `frontend-vX.Y.Z`) |
+| Versioning | **Release Please (manifest mode)** + Conventional Commits → per-component versions, changelogs, and releases (`api-vX.Y.Z`, `web-vX.Y.Z`) |
 | Runtime | One `docker compose` stack in OrbStack: mongo (1-node replica set), redis, minio, api, worker, renderer, frontend, cloudflared |
 
 ## 1. Runtime topology (what runs where)
@@ -41,14 +45,20 @@ Notes:
 
 ## 2. Repo shape & branching
 
-Recommendation: **merge into one monorepo** named `fogosportugal`:
+**Done:** merged into one monorepo `adamtrip-solutions/fogos-portugal`:
 
 ```
-/backend    ← current fogosapi-dotnet (keeps its git history — this repo becomes the monorepo, renamed)
-/frontend   ← current fogos-frontend (has zero commits today, so folding it in is free)
-/deploy     ← compose file, .env.example, cloudflared config, runbook
+/backend    ← the .NET solution (kept its git history — this repo became the monorepo)
+/apps/web   ← the web app (was fogos-frontend; had one commit, folded in without history)
+/apps/mobile ← Expo app (later)
+/packages   ← shared TS (api-client, ui-tokens) — added as needed
+/deploy     ← compose file, .env.example, cloudflared config, runbook (still to be split out)
+/docs       ← plans, ADRs, runbooks (product-level, stays at root)
 /.github    ← workflows
 ```
+
+(The backend's `docker-compose.yml` currently lives in `backend/`; it moves to `/deploy` when the
+production stack is assembled.)
 
 Why monorepo: the GraphQL schema couples the two hard (this week proved it — every backend WP had a
 frontend consumer); one deploy target; one release train; atomic schema+UI changes in one PR. The
@@ -74,7 +84,7 @@ else about Actions changes. **All PR/untrusted code runs on Blacksmith, never on
   Use `useblacksmith/build-push-action` (their accelerated buildkit with persistent layer cache).
 
 Dockerfiles needed (part of implementing this plan): `backend/Dockerfile.api`,
-`backend/Dockerfile.worker`, `frontend/Dockerfile` (node SSR: `vite build` → `node .output/server`),
+`backend/Dockerfile.worker`, `apps/web/Dockerfile` (node SSR: `vite build` → `node .output/server`),
 plus whatever the renderer sidecar already has.
 
 ## 4. CD — how deploys reach the Mac
@@ -117,18 +127,18 @@ monorepo). `release-please-config.json` declares the components by path:
 {
   "packages": {
     "backend":  { "component": "api" },      // → tags api-vX.Y.Z,      backend/CHANGELOG.md
-    "frontend": { "component": "frontend" }  // → tags frontend-vX.Y.Z, frontend/CHANGELOG.md
+    "apps/web": { "component": "web" }       // → tags web-vX.Y.Z, apps/web/CHANGELOG.md
   }
 }
 ```
 
 - **Version detection is path-based**: a conventional commit touching `backend/**` bumps only the
-  api component (fix→patch, feat→minor, breaking→major); `frontend/**` bumps only frontend. A PR
+  api component (fix→patch, feat→minor, breaking→major); `apps/web/**` bumps only web. A PR
   touching both bumps both. Each component gets its own rolling release PR, its own `CHANGELOG.md`,
   its own semver, and its own tag/GitHub Release.
 - Merging a component's release PR cuts *that component's* release: tag `api-vX.Y.Z` →
   build/push `fogosportugal-api` + `-worker` images `:X.Y.Z` → deploy job restarts only those
-  services. `frontend-vX.Y.Z` does the same for the frontend container. Compose pins each service
+  services. `web-vX.Y.Z` does the same for the web (frontend) container. Compose pins each service
   to its own component version (`deploy/versions.env`).
 - Nothing deploys without an explicit release-PR merge; you can ship a frontend fix without
   touching the running API, and vice versa.
@@ -136,6 +146,10 @@ monorepo). `release-please-config.json` declares the components by path:
   PRs; merge backend's first, frontend's after — the deploy order matches the compatibility order.
 
 ## 6. Ingress, DNS, TLS — Cloudflare Tunnel
+
+> ⛔ **Blocked on domain.** This whole section is gated on securing/pointing the `fogosportugal.pt`
+> domain (DNS still pending). The tunnel container, ingress rules, and public routing can't be set
+> up until the domain is in hand. Until then the stack runs locally only.
 
 - Move `fogosportugal.pt` DNS to Cloudflare (free plan is fine).
 - `cloudflared` runs as a container in the stack with two ingress rules
@@ -173,25 +187,30 @@ the dev laptop that caused the historical data gaps). Remaining items:
 ## 9. Rollout order (suggested implementation sequence)
 
 1. Commit the current uncommitted work in both repos (it's all reviewed + green).
-2. Restructure into the monorepo (`backend/`, `frontend/`, rename repo `fogosportugal`), push to GitHub.
+2. ✅ Restructure into the monorepo (`backend/`, `apps/web/`), push to `adamtrip-solutions/fogos-portugal`.
 3. Dockerfiles + `deploy/compose.yml`; prove the full stack runs locally in OrbStack against demo data.
 4. `ci.yml` on Blacksmith (tests only) — get PRs gating.
 5. Image publish job → GHCR.
-6. Cloudflare: DNS + tunnel container; bring the site up manually once (`compose up` by hand).
+6. ⛔ **Blocked on domain** — Cloudflare: DNS + tunnel container; bring the site up manually once
+   (`compose up` by hand). Needs `fogosportugal.pt` (DNS pending).
 7. Self-hosted runner on the Mac + `deploy.yml` + environment gating; first automated deploy.
 8. Release Please (manifest mode) + conventional-commit PR check; first per-component release
-   end-to-end (`api-v*` and `frontend-v*`).
+   end-to-end (`api-v*` and `web-v*`).
 9. Hardening pass: backups + restore test, healthchecks.io, runbook in `deploy/README.md`.
 
 Each step is independently verifiable; the site is live from step 6, automation completes 7–8.
 
 ## 10. Open questions (need your input)
 
-1. GitHub org/user for the repo, and is `fogosportugal` the repo name you want?
-2. Cloudflare account for the domain — OK to move DNS there? (The tunnel approach depends on it.)
-3. Monorepo merge: OK to fold `fogos-frontend` into the backend repo as `frontend/` (it has no
-   commit history to lose) and rename that repo?
-4. Legacy `fogosapi` (Laravel): keeps running somewhere today? Does anything still point at it that
-   needs a redirect once fogosportugal.pt goes live?
+1. ✅ **Resolved.** Repo is `adamtrip-solutions/fogos-portugal` (private).
+2. ⛔ **Pending.** Cloudflare account for the domain — OK to move DNS there? (The tunnel approach,
+   and the whole public rollout, depends on it. The `fogosportugal.pt` domain/DNS is still pending.)
+3. ✅ **Resolved / done.** Folded `fogos-frontend` in as `apps/web` (no history to lose); the
+   backend repo became the monorepo.
+4. ✅ **Resolved.** FogosPortugal is a **standalone, independent project** — not a drop-in
+   replacement for the legacy platform and not fronting its traffic. There are **no redirect
+   concerns**: nothing needs to be routed away from `fogos.pt`/`fogosapi`. The relationship is
+   **credit only** (see the README credits section — FogosPT / Fogos.pt is the pioneering project
+   this builds on and is prominently credited).
 5. Blacksmith: you mentioned it for "external runners" — the plan uses it for ALL CI. Any reason to
    keep some CI on GitHub-hosted runners instead?

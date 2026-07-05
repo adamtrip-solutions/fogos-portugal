@@ -6,7 +6,7 @@ the mobile app and shared packages in the picture.
 ## 1. Layout
 
 ```
-fogosportugal/                       # renamed from fogosapi-dotnet — keeps backend git history
+fogos-portugal/                      # adamtrip-solutions/fogos-portugal — was fogosapi-dotnet, keeps backend git history
 ├── backend/                         # the .NET solution, moved intact (git mv src/tests/Fogos.sln)
 │   ├── Fogos.sln
 │   ├── src/  (Domain, Infrastructure, Api, Worker, Importer, AdminCli)
@@ -88,7 +88,7 @@ Note `packages/**` fans out to BOTH app test jobs — shared code changes must p
 
 ## 5. Migration steps (1 sitting, low risk)
 
-1. Commit current work in `fogosapi-dotnet`; rename the GitHub repo → `fogosportugal`.
+1. Commit current work in `fogosapi-dotnet`; push it to the new repo `adamtrip-solutions/fogos-portugal` (created fresh — no rename, so no automatic redirects; the source repo had no remote). ✅ done.
 2. `git mv` the .NET bits into `backend/` (history follows moves; one commit).
 3. Copy `fogos-frontend` in as `apps/web` (it has no commits); add `pnpm-workspace.yaml`; fix the
    web app's lockfile location (workspace root `pnpm-lock.yaml`).
@@ -102,8 +102,8 @@ preferred (extraction is most valuable the moment a second consumer exists).
 
 ## 6. Decision asks
 
-1. Confirm `fogosportugal` as repo name and the rename (redirects from the old name are automatic
-   on GitHub).
+1. ~~Confirm repo name and rename.~~ **Resolved:** repo is `adamtrip-solutions/fogos-portugal`
+   (private), created empty and pushed to — no rename/redirects involved.
 2. OK that packages have no independent versions (they ship inside app releases)?
 3. Extraction timing: do §2 now (clean but touches lots of web imports) or defer until the mobile
    scaffold exists (recommended — extraction with two real consumers avoids speculative API design)?

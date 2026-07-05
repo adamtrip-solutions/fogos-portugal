@@ -113,6 +113,10 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
             <p className="mt-1 text-xs leading-snug text-muted-foreground">
               Código aberto — em breve no GitHub.
             </p>
+            <p className="mt-2 text-xs leading-snug text-muted-foreground">
+              Fonte não oficial — em emergência, ligue{' '}
+              <span className="font-semibold text-zinc-900 dark:text-zinc-50">112</span>.
+            </p>
             <p className="mt-3 text-[11px] tabular-nums text-muted-foreground/70">
               {APP_VERSION}
             </p>

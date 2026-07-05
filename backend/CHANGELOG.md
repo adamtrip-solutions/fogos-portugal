@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v1.0.0...api-v2.0.0) (2026-07-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** the `fcmToken` field is removed from the `createAlertSubscription` GraphQL input (CreateAlertSubscriptionInput) and from the AlertSubscription type. Clients must stop sending it; device push delivery returns with the Expo-based N1 device registry.
+
+### Features
+
+* **api:** close out feed-dropped incidents with a real terminal transition ([#13](https://github.com/adamtrip-solutions/fogos-portugal/issues/13)) ([b040112](https://github.com/adamtrip-solutions/fogos-portugal/commit/b040112e182e52315346c78380714395013d86ac))
+* **api:** remove FCM/push stack, swap MinIO→R2, rewrite env templates ([#10](https://github.com/adamtrip-solutions/fogos-portugal/issues/10)) ([dc6c713](https://github.com/adamtrip-solutions/fogos-portugal/commit/dc6c713402947c1fba2faaacccbb614ca9c1e4f9))
+
+
+### Bug Fixes
+
+* **api:** survive invalid Sentry DSN and Auth PEM config ([#14](https://github.com/adamtrip-solutions/fogos-portugal/issues/14)) ([7500e48](https://github.com/adamtrip-solutions/fogos-portugal/commit/7500e48eb8598158e93741df315158c200394ef5))
+
 ## [1.0.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v0.1.0...api-v1.0.0) (2026-07-05)
 
 

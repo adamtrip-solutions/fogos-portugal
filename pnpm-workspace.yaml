@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Install-script (build) approval. Only these may run postinstall scripts.
+allowBuilds:
+  '@scarf/scarf': false
+  esbuild: true
+  lightningcss: true

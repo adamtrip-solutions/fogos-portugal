@@ -1,65 +1,100 @@
-# FogosPortugal API (.NET 10)
+# FogosPortugal
 
-A standalone, greenfield rebuild of the [FogosPortugal](https://fogosportugal.pt) wildfire API — the
-service behind Portugal's live map of active fires, weather, and fire-risk data. It runs on
-its own MongoDB with a clean schema and a first-class importer for the decade of historical
-data from the old PHP platform, which keeps running untouched until an owner-driven
-switchover. All outbound side effects (Twitter, Telegram, Facebook, FCM, Discord posts) stay
-in **dry-run** until that switchover.
+A live map of wildfires in Portugal — active incidents, their status and history, weather, and
+fire-risk data, in one fast, open interface. FogosPortugal is a non-profit, ad-free, open-source
+project: a clean-room .NET backend and a TanStack Start web app, built to make Portugal's fire
+situation legible to anyone, for free.
 
-See [`docs/MIGRATION-PLAN.md`](docs/MIGRATION-PLAN.md) for the plan and
-[`docs/ANALYSIS.md`](docs/ANALYSIS.md) for the functional reference.
+## Repository structure
 
-## Layout
+This is a pnpm + .NET monorepo:
 
-- `src/Fogos.Domain` — pure domain: entities, status/natureza catalogs, geo, clock, hashtags.
-- `src/Fogos.Infrastructure` — Mongo (class maps, indexes), Redis, S3-compatible storage, Discord ops.
-- `src/Fogos.Api` — ASP.NET Core host (health today; GraphQL + REST v3 in Phase 1).
-- `src/Fogos.Worker` — Quartz host (jobs land in Phase 3).
-- `src/Fogos.Importer` — console tool: dev seed today, legacy Mongo import in Phase 1.
-- `tests/` — domain unit tests, plus importer/integration placeholders.
+```
+fogos-portugal/
+├── backend/            # .NET 10 solution — the API, worker, importer, and admin CLI
+│   ├── Fogos.sln
+│   ├── src/            # Fogos.Domain, Infrastructure, Api, Worker, Importer, AdminCli
+│   ├── tests/          # domain, importer, and integration (Testcontainers) suites
+│   ├── dev/seed/       # demo fixtures (incidents, locations, weather stations)
+│   ├── renderer/       # Node social-screenshot sidecar
+│   └── docker-compose.yml
+├── apps/
+│   └── web/            # TanStack Start web app (React 19, MapLibre, deck.gl)
+├── packages/           # shared TypeScript (api-client, ui-tokens) — added as needed
+├── docs/               # product plans, migration & deployment notes, ADRs
+├── pnpm-workspace.yaml
+└── package.json        # workspace root (private)
+```
 
-## Prerequisites
+## Quickstart
+
+### Prerequisites
 
 - [.NET SDK 10.0.100+](https://dotnet.microsoft.com/download)
-- Docker + Docker Compose (for the local infra stack)
+- Docker + Docker Compose (local infra stack)
+- [Node 20+](https://nodejs.org) and [pnpm](https://pnpm.io) (`corepack enable`)
 
-## Quick start
-
-Bring up the local infrastructure (single-node Mongo replica set, Redis, MinIO):
+### Backend + demo database
 
 ```bash
+cd backend
+
+# single-node Mongo replica set (change streams need it), Redis, MinIO
 docker compose --profile dev up -d
-```
 
-Seed dev fixtures (four incidents, three IPMA stations, a few locations):
-
-```bash
+# seed the demo database (four incidents, three IPMA stations, a few locations)
 dotnet run --project src/Fogos.Importer -- seed
-```
 
-Run the API (health endpoints at `/healthz/live` and `/healthz/ready`):
-
-```bash
+# run the API (health at /healthz/live, /healthz/ready)
 dotnet run --project src/Fogos.Api
-```
 
-Run the worker:
-
-```bash
+# optional: run the worker
 dotnet run --project src/Fogos.Worker
 ```
 
-## Tests
+Full backend tests (`dotnet test`) spin up throwaway Mongo/Redis/MinIO via Testcontainers.
+
+### Web app
 
 ```bash
-dotnet test
+pnpm install                 # from the repo root — installs the whole workspace
+pnpm dev:web                 # http://localhost:3000
+
+# or from apps/web:  pnpm dev
 ```
 
-## Configuration
+The web app reads the API URL from `apps/web/.env.local` (`FOGOS_API_URL`, default
+`http://localhost:5077`). The backend has no CORS — the web app calls the API through server
+functions, so the browser never talks to it directly.
 
-Options bind from `appsettings.json` / `appsettings.Development.json` and environment
-variables (`Mongo__ConnectionString`, `ObjectStorage__Endpoint`, …). For the importer, the
-`FOGOS_`-prefixed form also works (`FOGOS_Mongo__ConnectionString`). Compose-level knobs are
-documented in [`.env.example`](.env.example) — copy it to `.env` to override. Every publisher
-defaults to `DryRun`; nothing goes live without explicit production configuration.
+Root workspace scripts: `pnpm dev:web`, `pnpm build:web`, `pnpm test:web`.
+
+## Credits — built on the shoulders of FogosPT / Fogos.pt
+
+FogosPortugal exists because of **[Fogos.pt](https://fogos.pt)** — the pioneering wildfire-map
+project by **[VOST Portugal](https://vost.pt)** (Virtual Operations Support Team). Fogos.pt has,
+for years, been *the* reference for tracking wildfires in Portugal, and it defined what a public,
+real-time fire map should be. This project stands on that work and is deeply grateful for it.
+
+FogosPortugal is an independent, standalone project — not affiliated with, and not a replacement
+for, Fogos.pt. Please support and follow the original: **https://fogos.pt**.
+
+## Data sources
+
+Fire, weather, and aviation data come from public and official feeds, including:
+
+- **ICNF** — Instituto da Conservação da Natureza e das Florestas (official occurrence records)
+- **ArcGIS / ANEPC** — civil-protection incident feeds
+- **IPMA** — weather observations and forecasts, and WMS fire-risk / radar layers
+- **NASA FIRMS** — satellite hotspot detections
+- **RainViewer** — precipitation radar tiles
+- **Open-Meteo** — wind fields (animated particle layer)
+- **Flightradar24 / adsb.fi / airplanes.live** — firefighting-aircraft tracking
+
+All sources are used under their respective terms; credit and thanks to each.
+
+## Non-profit, no ads, open source
+
+FogosPortugal is run as a public service: **no ads, no tracking-for-profit, no paywalls**. It is
+open source so anyone can inspect it, learn from it, run it, and contribute. If it is ever useful
+to you during a fire, it has done its job.

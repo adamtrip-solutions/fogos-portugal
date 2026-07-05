@@ -1,13 +1,32 @@
+# ── macOS / editors ──
+.DS_Store
+.vs/
+.idea/
+
+# ── .NET (backend/) ──
 bin/
 obj/
 *.user
-.vs/
-.idea/
-.DS_Store
 TestResults/
 artifacts/
 *.received.*
 appsettings.*.local.json
+
+# ── Node / pnpm / web (apps/*, packages/*) ──
+node_modules/
+dist/
+dist-ssr/
+.output/
+.nitro/
+.tanstack/
+.vinxi/
+.wrangler/
+__unconfig*
+todos.json
+
+# ── Env files (keep the committed *.example templates) ──
 .env
 .env.*
-!/.env.example
+*.local
+!.env.example
+!**/.env.example

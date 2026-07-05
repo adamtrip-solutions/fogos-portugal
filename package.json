@@ -1,0 +1,9 @@
+{
+  "name": "fogos-portugal",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web run dev",
+    "build:web": "pnpm --filter web run build",
+    "test:web": "pnpm --filter web run test"
+  }
+}

@@ -30,8 +30,12 @@ public sealed class RcmProcessor(
     private static readonly (RiskDay Day, int Index)[] GeoJsonHorizons =
         [(RiskDay.Today, 0), (RiskDay.Tomorrow, 1), (RiskDay.After, 2)];
 
-    /// <summary>Runs the full ingest for one page. <paramref name="page"/> is the raw JSP HTML.</summary>
-    public async Task ProcessAsync(string page, bool publishSocial, bool tomorrow, CancellationToken ct = default)
+    /// <summary>
+    /// Runs the full ingest for one page and returns the forecast date it wrote <c>rcm_daily</c> for
+    /// (so the caller can announce <c>RcmProcessed</c> for risk-alert matching). <paramref name="page"/>
+    /// is the raw JSP HTML.
+    /// </summary>
+    public async Task<DateOnly> ProcessAsync(string page, bool publishSocial, bool tomorrow, CancellationToken ct = default)
     {
         var parsed = RcmPageParser.Parse(page); // throws RcmParseException — the job classifies it.
 
@@ -43,6 +47,8 @@ public sealed class RcmProcessor(
 
         if (publishSocial)
             await PublishAsync(parsed, rows, tomorrow, ct);
+
+        return parsed.ForecastDate;
     }
 
     private async Task<List<ConcelhoRisk>> UpsertDailyAsync(RcmParseResult parsed, CancellationToken ct)

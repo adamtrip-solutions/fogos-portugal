@@ -41,6 +41,9 @@ public class IncidentMapperTests
         // Resources incl. aquatic + heli/plane breakdown.
         Assert.Equal(42, incident.Resources.Man);
         Assert.Equal(1, incident.Resources.Aquatic);
+        Assert.Equal(40, incident.Resources.ManGround);
+        Assert.Equal(5, incident.Resources.ManAerial);
+        Assert.Equal(3, incident.Resources.Entities);
         Assert.Equal(2, incident.Resources.HeliFight);
         Assert.Equal(1, incident.Resources.PlaneFight);
 
@@ -64,6 +67,23 @@ public class IncidentMapperTests
         Assert.Equal("998877", thread.FacebookPostId);
         Assert.True(thread.SentImportantPost);
         Assert.False(thread.SentBigIncidentPost);
+    }
+
+    [Fact]
+    public void Means_fields_default_to_zero_when_absent()
+    {
+        var doc = new BsonDocument
+        {
+            ["id"] = "x3",
+            ["dateTime"] = new BsonDocument("sec", 1660000000),
+            ["location"] = "X",
+            ["statusCode"] = 5,
+            ["naturezaCode"] = "3101",
+        };
+        var incident = Mapping.MappedSingle<Incident>(Mapping.MapOne(Mapper, doc));
+        Assert.Equal(0, incident.Resources.ManGround);
+        Assert.Equal(0, incident.Resources.ManAerial);
+        Assert.Equal(0, incident.Resources.Entities);
     }
 
     [Fact]

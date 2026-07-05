@@ -1,4 +1,6 @@
+using Fogos.Domain.Events;
 using Fogos.Infrastructure.Ops;
+using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Scheduling;
 using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Scheduling;
@@ -19,6 +21,7 @@ public sealed class ProcessRcmJob(
     IpmaClient ipma,
     RcmProcessor processor,
     JobFreshness freshness,
+    IEventDispatcher dispatcher,
     IOpsNotifier ops) : UniqueJob(lockService, logger)
 {
     public const string FreshnessJob = "rcm";
@@ -38,8 +41,11 @@ public sealed class ProcessRcmJob(
         try
         {
             var page = await ipma.GetRcmPageAsync(ct);
-            await processor.ProcessAsync(page, publishSocial, tomorrow, ct);
+            var forecastDate = await processor.ProcessAsync(page, publishSocial, tomorrow, ct);
             await freshness.MarkSuccessAsync(FreshnessJob, ct);
+
+            // Announce the daily-risk update so subscriptions with a risk threshold get matched.
+            await dispatcher.DispatchAsync(new RcmProcessed(forecastDate), ct: ct);
         }
         catch (RcmParseException ex)
         {

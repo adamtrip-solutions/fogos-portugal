@@ -10,6 +10,15 @@ public sealed record Resources
     /// <summary>Aquatic means (legacy meios_aquaticos).</summary>
     public int Aquatic { get; init; }
 
+    /// <summary>Ground operatives (ANEPC OperacionaisTerrestres).</summary>
+    public int ManGround { get; init; }
+
+    /// <summary>Aerial operatives (ANEPC OPAereos).</summary>
+    public int ManAerial { get; init; }
+
+    /// <summary>Number of entities involved (ANEPC QuantEntidades).</summary>
+    public int Entities { get; init; }
+
     /// <summary>Firefighting helicopters (from ANEPC POSIT detail).</summary>
     public int HeliFight { get; init; }
 

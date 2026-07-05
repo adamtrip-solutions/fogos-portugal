@@ -44,7 +44,7 @@ public sealed class SummaryJobTests(ContainerFixture fixture)
         var job = BuildHourly(ops, clock);
         await job.RunAsync(CancellationToken.None);
 
-        var expected = $"14:00 - 2 Incêndios em curso. Meios Mobilizados:\r\n{Woman} 30\r\n🚒 8\r\n🚁 3 \r\n https://fogos.pt #FogosPT #Status";
+        var expected = $"14:00 - 2 Incêndios em curso. Meios Mobilizados:\r\n{Woman} 30\r\n🚒 8\r\n🚁 3 \r\n https://fogosportugal.pt #FogosPT #Status";
         var telegram = ops.Captures.Single(c => c.Channel == "telegram").Payload;
         Assert.Equal(expected, telegram);
         Assert.False(telegram.StartsWith("[img]"), "renderer failed → post must be text-only");

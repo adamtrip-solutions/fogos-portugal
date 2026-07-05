@@ -47,7 +47,15 @@ public sealed class ArcGisOcorrenciasSource(ArcGisClient client) : IIncidentSour
             Localidade = string.Join(' ', new[] { Str(a, "Localidade"), Str(a, "Endereco") }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim(),
             Lat = Dbl(a, "Latitude"),
             Lng = Dbl(a, "Longitude"),
-            Resources = new Resources { Man = man, Terrain = terrain, Aerial = aerial },
+            Resources = new Resources
+            {
+                Man = man,
+                Terrain = terrain,
+                Aerial = aerial,
+                ManGround = Int(a, "OperacionaisTerrestres"),
+                ManAerial = Int(a, "OPAereos"),
+                Entities = Int(a, "QuantEntidades"),
+            },
             Region = NullIfEmpty(Str(a, "Regiao")),
             SubRegion = NullIfEmpty(Str(a, "SubRegiao")),
             EstadoAgrupado = NullIfEmpty(Str(a, "EstadoAgrupado")),

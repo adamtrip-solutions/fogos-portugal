@@ -29,6 +29,11 @@ public static class EventSerializer
         [nameof(PhotoSubmitted)] = typeof(PhotoSubmitted),
         [nameof(PhotoApproved)] = typeof(PhotoApproved),
         [nameof(PushNotificationRequested)] = typeof(PushNotificationRequested),
+        [nameof(IncidentEscalating)] = typeof(IncidentEscalating),
+        [nameof(RekindleDetected)] = typeof(RekindleDetected),
+        [nameof(ClusterDetected)] = typeof(ClusterDetected),
+        [nameof(RcmProcessed)] = typeof(RcmProcessed),
+        [nameof(SituationReportCreated)] = typeof(SituationReportCreated),
     };
 
     /// <summary>Discriminator string for an event instance (its runtime type's simple name).</summary>

@@ -1,11 +1,14 @@
 using Fogos.Domain.Aircraft;
+using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
+using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Stats;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
+using Fogos.Domain.Webhooks;
 using Fogos.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
@@ -95,9 +98,53 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
                 new CreateIndexOptions { Name = "sampledAt_ttl", ExpireAfter = ttl }),
         ], ct);
 
+        await context.IncidentAircraft.Indexes.CreateManyAsync(
+        [
+            Unique(Builders<IncidentAircraftLink>.IndexKeys.Ascending("incidentId").Ascending("icao"), "incidentId_icao"),
+            Model(Builders<IncidentAircraftLink>.IndexKeys.Ascending("icao").Ascending("active"), "icao_active"),
+        ], ct);
+
+        await context.IncidentKmlVersions.Indexes.CreateManyAsync(
+        [
+            Model(Builders<IncidentKmlVersion>.IndexKeys.Ascending("incidentId").Descending("capturedAt"), "incidentId_capturedAt"),
+        ], ct);
+
+        await context.IgnitionClusters.Indexes.CreateManyAsync(
+        [
+            Model(Builders<IgnitionCluster>.IndexKeys.Ascending("active").Descending("lastAt"), "active_lastAt"),
+            Model(Builders<IgnitionCluster>.IndexKeys.Ascending("incidentIds"), "incidentIds"),
+        ], ct);
+
         await context.ApiClients.Indexes.CreateManyAsync(
         [
             Unique(Builders<ApiClient>.IndexKeys.Ascending("keyHash"), "keyHash"),
+        ], ct);
+
+        // ── Alerts / Webhooks / Reports (WP4) ────────────────────────────────────
+        await context.AlertSubscriptions.Indexes.CreateManyAsync(
+        [
+            Model(Builders<AlertSubscription>.IndexKeys.Ascending("kind").Ascending("dico"), "kind_dico"),
+            Model(Builders<AlertSubscription>.IndexKeys.Ascending("createdAt"), "createdAt"),
+        ], ct);
+
+        await context.AlertEvents.Indexes.CreateManyAsync(
+        [
+            Unique(Builders<AlertEvent>.IndexKeys.Ascending("subscriptionId").Ascending("dedupeKey"), "subscriptionId_dedupeKey"),
+            Model(Builders<AlertEvent>.IndexKeys.Ascending("subscriptionId").Descending("createdAt"), "subscriptionId_createdAt"),
+            new CreateIndexModel<AlertEvent>(
+                Builders<AlertEvent>.IndexKeys.Ascending("createdAt"),
+                new CreateIndexOptions { Name = "createdAt_ttl", ExpireAfter = TimeSpan.FromDays(7) }),
+        ], ct);
+
+        await context.WebhookEndpoints.Indexes.CreateManyAsync(
+        [
+            Model(Builders<WebhookEndpoint>.IndexKeys.Ascending("clientId").Ascending("active"), "clientId_active"),
+            Model(Builders<WebhookEndpoint>.IndexKeys.Ascending("events").Ascending("active"), "events_active"),
+        ], ct);
+
+        await context.SituationReports.Indexes.CreateManyAsync(
+        [
+            Model(Builders<SituationReport>.IndexKeys.Descending("at"), "at_desc"),
         ], ct);
 
         await context.HistoryTotals.Indexes.CreateManyAsync(

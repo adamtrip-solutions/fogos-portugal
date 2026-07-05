@@ -39,6 +39,19 @@ public sealed class WeatherReads(MongoContext context)
             .ToListAsync(ct);
     }
 
+    /// <summary>IPMA awareness warnings for the given area codes still in force at <paramref name="now"/> (ends in the future).</summary>
+    public async Task<IReadOnlyList<WeatherWarning>> WarningsByAreasEndingAfterAsync(
+        IReadOnlyList<string> areaCodes, DateTimeOffset now, CancellationToken ct = default)
+    {
+        if (areaCodes.Count == 0)
+            return [];
+        var f = Builders<WeatherWarning>.Filter;
+        return await context.WeatherWarnings
+            .Find(f.In(x => x.AreaCode, areaCodes) & f.Gt(x => x.EndsAt, now))
+            .Sort(Builders<WeatherWarning>.Sort.Descending(x => x.StartsAt))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyDictionary<int, WeatherStation>> StationsByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct = default)
     {
         var items = await context.WeatherStations

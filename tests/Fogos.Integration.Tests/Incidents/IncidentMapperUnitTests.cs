@@ -84,6 +84,7 @@ public sealed class IncidentMapperUnitTests
             "Localidade": "Casal", "Endereco": "EN110", "EstadoOcorrencia": "Em Curso",
             "CodNatureza": 3101, "Natureza": "3101 - Incêndio Florestal",
             "MeiosAereos": 2, "MeiosTerrestres": 12, "Operacionais": 45,
+            "OperacionaisTerrestres": 40, "OPAereos": 5, "QuantEntidades": 3,
             "Latitude": 39.6, "Longitude": -8.4, "DataOcorrencia": 1754006400000,
             "EstadoAgrupado": "Em Curso", "FaseIncendio": "Curso", "Regiao": "Centro" } }
         """;
@@ -97,10 +98,30 @@ public sealed class IncidentMapperUnitTests
         Assert.Equal(45, raw.Resources.Man);
         Assert.Equal(12, raw.Resources.Terrain);
         Assert.Equal(2, raw.Resources.Aerial);
+        Assert.Equal(40, raw.Resources.ManGround);
+        Assert.Equal(5, raw.Resources.ManAerial);
+        Assert.Equal(3, raw.Resources.Entities);
         Assert.Equal(14, raw.Resources.TotalAssets);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1754006400000), raw.OccurredAt);
         Assert.Equal("Casal EN110", raw.Localidade);
         Assert.Equal("Centro", raw.Region);
+    }
+
+    [Fact]
+    public void ArcGis_defaults_means_fields_to_zero_when_absent()
+    {
+        var json = """
+        { "attributes": {
+            "Numero": "2026080100124", "EstadoOcorrencia": "Em Curso",
+            "CodNatureza": 3101, "Natureza": "3101 - Incêndio Florestal",
+            "MeiosAereos": 2, "MeiosTerrestres": 12, "Operacionais": 45,
+            "Latitude": 39.6, "Longitude": -8.4, "DataOcorrencia": 1754006400000 } }
+        """;
+        var raw = ArcGisOcorrenciasSource.Map(ReadAttributes(json))!;
+
+        Assert.Equal(0, raw.Resources.ManGround);
+        Assert.Equal(0, raw.Resources.ManAerial);
+        Assert.Equal(0, raw.Resources.Entities);
     }
 
     [Fact]

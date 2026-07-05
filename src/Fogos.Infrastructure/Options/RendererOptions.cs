@@ -13,7 +13,7 @@ public sealed class RendererOptions
     public string Url { get; set; } = "";
 
     /// <summary>Domain the captured pages live on; the screenshot URL is <c>https://{domain}/{path}</c>.</summary>
-    public string ScreenshotDomain { get; set; } = "fogos.pt";
+    public string ScreenshotDomain { get; set; } = "fogosportugal.pt";
 
     public int Retries { get; set; } = 3;
 

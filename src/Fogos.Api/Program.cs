@@ -48,6 +48,12 @@ app.MapAuth();
 // REST v3 format outputs (only need Mongo) are always available.
 app.MapV3();
 
+// RSS / GeoRSS feeds (incidents + warnings).
+app.MapFeeds();
+
+// Situation reports (latest, JSON).
+app.MapReports();
+
 // Citizen photo submission + public listing (anonymous upload behind the abuse gates).
 app.MapPhotos();
 

@@ -28,6 +28,10 @@ public static class GraphQLServiceCollectionExtensions
         services.AddDataLoader<LatestWeatherByStationDataLoader>();
         services.AddDataLoader<WeatherStationByIdDataLoader>();
         services.AddDataLoader<IncidentFireRiskDataLoader>();
+        services.AddDataLoader<IncidentAircraftDataLoader>();
+        services.AddDataLoader<IncidentKmlHistoryDataLoader>();
+        services.AddDataLoader<AircraftCurrentIncidentDataLoader>();
+        services.AddDataLoader<IncidentClusterDataLoader>();
 
         services
             .AddGraphQLServer()
@@ -36,8 +40,57 @@ public static class GraphQLServiceCollectionExtensions
             .AddSubscriptionType<Subscription>()
             .AddTypeExtension<IncidentExtensions>()
             .AddTypeExtension<IncidentPhotoExtensions>()
+            .AddTypeExtension<AircraftExtensions>()
             .AddTypeExtension<StatsExtensions>()
+            .AddTypeExtension<IgnitionClusterExtensions>()
             .AddType<Filters.IncidentFilterType>()
+            // Concelho profile: DICO is an ID.
+            .AddType(new ObjectType<ConcelhoProfile>(d =>
+            {
+                d.Name("ConcelhoProfile");
+                d.Field(x => x.Dico).ID();
+            }))
+            // Aircraft associated with an incident: ICAO is an ID.
+            .AddType(new ObjectType<IncidentAircraft>(d =>
+            {
+                d.Name("IncidentAircraft");
+                d.Field(x => x.Icao).ID();
+            }))
+            // KML version metadata: surrogate id is an ID.
+            .AddType(new ObjectType<KmlVersionMeta>(d =>
+            {
+                d.Name("KmlVersionMeta");
+                d.Field(x => x.Id).ID();
+            }))
+            // Incident signals: expose the domain value object directly; the prior-incident link is an ID.
+            .AddType(new ObjectType<Fogos.Domain.Incidents.IncidentSignals>(d =>
+            {
+                d.Name("IncidentSignals");
+                d.Field(x => x.RekindleOfId).ID();
+                d.Ignore(x => x.RekindleKinds); // internal per-kind claim bookkeeping
+            }))
+            // Alert subscription: id is an ID; the FCM token is never exposed.
+            .AddType(new ObjectType<Fogos.Domain.Alerts.AlertSubscription>(d =>
+            {
+                d.Name("AlertSubscription");
+                d.Field(x => x.Id).ID();
+                d.Ignore(x => x.FcmToken);
+            }))
+            // Alert event: id + references are IDs; the internal dedupe key is hidden.
+            .AddType(new ObjectType<Fogos.Domain.Alerts.AlertEvent>(d =>
+            {
+                d.Name("AlertEvent");
+                d.Field(x => x.Id).ID();
+                d.Field(x => x.SubscriptionId).ID();
+                d.Field(x => x.IncidentId).ID();
+                d.Ignore(x => x.DedupeKey);
+            }))
+            // Situation report: surrogate id is an ID.
+            .AddType(new ObjectType<Fogos.Domain.Reports.SituationReport>(d =>
+            {
+                d.Name("SituationReport");
+                d.Field(x => x.Id).ID();
+            }))
             // FlightPosition is surfaced as AircraftPosition.
             .AddType(new ObjectType<FlightPosition>(d => d.Name("AircraftPosition")))
             // GeoPoint is a value object: expose only its coordinates, not the haversine helper.

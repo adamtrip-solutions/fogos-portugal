@@ -4,7 +4,7 @@ namespace Fogos.Worker.Jobs.Summaries;
 /// Social copy for the hourly/daily summary jobs, ported verbatim (emoji, CRLF and spacing included) from
 /// the legacy <c>HourlySummary</c> / <c>DailySummary</c> jobs. Kept in one place so the exact strings stay
 /// auditable against the live platform. The woman glyph is 👩 + a zero-width joiner (U+200D), exactly as the
-/// PHP source carried it; <c>https://fogos.pt</c> is hard-coded in the hourly suffix as in legacy.
+/// PHP source carried it; <c>https://fogosportugal.pt</c> is hard-coded in the hourly suffix (the public site link).
 /// </summary>
 public static class SummaryCopy
 {
@@ -19,11 +19,11 @@ public static class SummaryCopy
 
     /// <summary>Suffix when no fires are in resolution (appended to the active block).</summary>
     public static string HourlyResolutionSuffixNone() =>
-        " https://fogos.pt #FogosPT #Status";
+        " https://fogosportugal.pt #FogosPT #Status";
 
     /// <summary>Suffix listing the in-resolution fires' mobilized means.</summary>
     public static string HourlyResolutionSuffix(int total, int man, int cars, int areal) =>
-        $"{total} {Incendio(total)} em resolução. Meios Mobilizados:\r\n{Woman} {man}\r\n🚒 {cars}\r\n🚁 {areal} \r\n https://fogos.pt #FogosPT";
+        $"{total} {Incendio(total)} em resolução. Meios Mobilizados:\r\n{Woman} {man}\r\n🚒 {cars}\r\n🚁 {areal} \r\n https://fogosportugal.pt #FogosPT";
 
     // ── Daily ─────────────────────────────────────────────────────────────────
     public static string Daily(string date, int total, int maxMan, int maxCars, int maxPlanes, long burnAreaHa) =>

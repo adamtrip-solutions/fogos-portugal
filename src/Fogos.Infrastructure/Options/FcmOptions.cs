@@ -21,8 +21,8 @@ public sealed class FcmOptions
     /// <summary>Emit the legacy <c>web-/mobile-android-/mobile-ios-</c> topic variants alongside the canonical ones.</summary>
     public bool LegacyTopicsEnabled { get; set; }
 
-    /// <summary>Prepended to every notification title (legacy prepends "Fogos.pt - ").</summary>
-    public string TitlePrefix { get; set; } = "Fogos.pt - ";
+    /// <summary>Prepended to every notification title (legacy prepended "Fogos.pt - ").</summary>
+    public string TitlePrefix { get; set; } = "FogosPortugal - ";
 
     /// <summary>Delay before a scheduled push is delivered (legacy 3-minute debounce).</summary>
     public TimeSpan PushDelay { get; set; } = TimeSpan.FromMinutes(3);

@@ -67,6 +67,13 @@ public sealed class Incident
 
     public int? NearestWeatherStationId { get; set; }
 
+    /// <summary>
+    /// Derived escalation / rekindle / critical-conditions signals. Nullable — absent means "no signals
+    /// evaluated yet"; the read side treats absence as all-false defaults. Maintained by the signals
+    /// pipeline via targeted <c>$set</c>s, never by rewriting the whole document.
+    /// </summary>
+    public IncidentSignals? Signals { get; set; }
+
     /// <summary>Extra attributes only the ArcGIS source provides.</summary>
     public ArcGisDetails? ArcGis { get; set; }
 }

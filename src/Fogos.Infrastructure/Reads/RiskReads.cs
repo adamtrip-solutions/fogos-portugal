@@ -16,6 +16,13 @@ public sealed class RiskReads(MongoContext context)
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <summary>Most recent forecast run for a concelho (by DICO), or null when none stored.</summary>
+    public async Task<ConcelhoRisk?> LatestByDicoAsync(string dico, CancellationToken ct = default) =>
+        await context.RcmDaily
+            .Find(Builders<ConcelhoRisk>.Filter.Eq(x => x.Dico, dico))
+            .Sort(Builders<ConcelhoRisk>.Sort.Descending(x => x.Date))
+            .FirstOrDefaultAsync(ct);
+
     /// <summary>Latest stored GeoJSON payload for a horizon.</summary>
     public async Task<RiskGeoJson?> GeoJsonAsync(RiskDay day, CancellationToken ct = default) =>
         await context.RcmGeoJson

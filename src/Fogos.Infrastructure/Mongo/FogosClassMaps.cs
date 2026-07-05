@@ -1,15 +1,18 @@
 using Fogos.Domain.Aircraft;
+using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
 using Fogos.Domain.Geo;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Locations;
 using Fogos.Domain.Photos;
+using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
+using Fogos.Domain.Webhooks;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -68,6 +71,19 @@ public static class FogosClassMaps
     private static void RegisterClassMaps()
     {
         // ── Incidents ─────────────────────────────────────────────────────────
+        // Operational means: legacy element names for the ANEPC "means" fields so imported
+        // real data round-trips (the Laravel app persists these exact camelCase keys).
+        BsonClassMap.RegisterClassMap<Resources>(cm =>
+        {
+            cm.AutoMap();
+            cm.GetMemberMap(r => r.ManGround).SetElementName("operacionaisTerrestres");
+            cm.GetMemberMap(r => r.ManAerial).SetElementName("operacionaisAereos");
+            cm.GetMemberMap(r => r.Entities).SetElementName("quantEntidades");
+        });
+
+        // Derived signals embedded on the incident document (escalation / rekindle / critical conditions).
+        BsonClassMap.RegisterClassMap<IncidentSignals>(cm => cm.AutoMap());
+
         // Business id (numero_sado) — plain string _id, no ObjectId duality.
         BsonClassMap.RegisterClassMap<Incident>(cm =>
         {
@@ -113,6 +129,19 @@ public static class FogosClassMaps
             cm.AutoMap();
             cm.MapIdMember(c => c.Icao); // ICAO hex as _id
         });
+        BsonClassMap.RegisterClassMap<IncidentAircraftLink>(cm => MapObjectId(cm, c => c.Id));
+
+        // Versioned KML perimeter snapshots.
+        BsonClassMap.RegisterClassMap<IncidentKmlVersion>(cm => MapObjectId(cm, c => c.Id));
+
+        // Ignition clusters (single-linkage groupings of recent fires).
+        BsonClassMap.RegisterClassMap<IgnitionCluster>(cm => MapObjectId(cm, c => c.Id));
+
+        // ── Alerts / Webhooks / Reports (WP4) ───────────────────────────────────
+        BsonClassMap.RegisterClassMap<AlertSubscription>(cm => MapObjectId(cm, c => c.Id));
+        BsonClassMap.RegisterClassMap<AlertEvent>(cm => MapObjectId(cm, c => c.Id));
+        BsonClassMap.RegisterClassMap<WebhookEndpoint>(cm => MapObjectId(cm, c => c.Id));
+        BsonClassMap.RegisterClassMap<SituationReport>(cm => MapObjectId(cm, c => c.Id));
 
         // ── Hotspots / Locations / Auth ─────────────────────────────────────────
         BsonClassMap.RegisterClassMap<Hotspots>(cm =>

@@ -70,6 +70,45 @@ public sealed class FcmNotifier(
         return true;
     }
 
+    /// <summary>
+    /// Send a notification directly to one device token (alert-subscription delivery). Honours the
+    /// publisher mode and never throws — a bad/expired token is logged and escalated, not surfaced.
+    /// </summary>
+    public async Task<bool> SendToTokenAsync(
+        string token,
+        string title,
+        string body,
+        IReadOnlyDictionary<string, string>? data = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return true;
+
+        var mode = publishing.Value.ModeFor(ChannelKey);
+        if (mode == PublisherMode.Off)
+            return true;
+
+        var fullTitle = fcmOptions.Value.TitlePrefix + title;
+
+        if (mode == PublisherMode.DryRun)
+        {
+            await ops.DryRunCaptureAsync(ChannelKey, $"[{fullTitle}] {body} :: token={token}", ct);
+            return true;
+        }
+
+        try
+        {
+            await sender.SendAsync(new FcmSend(Condition: null, Topic: null, fullTitle, body, data, DataOnly: false, Token: token), ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "FCM token send failed");
+            await ops.ErrorAsync($"FCM token send failed: {ex.Message}", ct);
+            return false;
+        }
+    }
+
     /// <summary>Send a data-only message to a single topic (the legacy "nearby" proximity path).</summary>
     public async Task<bool> SendDataOnlyAsync(
         string topic,

@@ -82,7 +82,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
 
         Resolver = new LocationResolver(Mongo, Ops);
         Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, NullLogger<IncidentIngestService>.Instance);
-        Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, NullLogger<IcnfEnrichmentService>.Instance);
+        Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, new Fogos.Infrastructure.Incidents.KmlVersionStore(Mongo, Clock), NullLogger<IcnfEnrichmentService>.Instance);
         Important = new ImportantFireChecker(Mongo, Threads, Locks, Clock, Twitter, Telegram, Facebook, Scheduler, FcmNotifier, PipelineOptions, NullLogger<ImportantFireChecker>.Instance);
 
         BuildRoutes();

@@ -22,6 +22,38 @@ public sealed class AircraftReads(MongoContext context)
             .Limit(limit)
             .ToListAsync(ct);
 
+    // ── Incident associations ──────────────────────────────────────────────────
+
+    /// <summary>All aircraft links for the given incidents (active-first, then most-recently-seen).</summary>
+    public async Task<IReadOnlyList<IncidentAircraftLink>> LinksByIncidentsAsync(IReadOnlyList<string> incidentIds, CancellationToken ct = default) =>
+        await context.IncidentAircraft
+            .Find(Builders<IncidentAircraftLink>.Filter.In(x => x.IncidentId, incidentIds))
+            .Sort(Builders<IncidentAircraftLink>.Sort.Descending(x => x.Active).Descending(x => x.LastSeenAt))
+            .ToListAsync(ct);
+
+    /// <summary>Tracked-fleet rows by ICAO (for joining registration / name / kind onto links).</summary>
+    public async Task<IReadOnlyDictionary<string, TrackedAircraft>> TrackedByIcaosAsync(IReadOnlyList<string> icaos, CancellationToken ct = default)
+    {
+        var rows = await context.TrackedAircraft
+            .Find(Builders<TrackedAircraft>.Filter.In(x => x.Icao, icaos))
+            .ToListAsync(ct);
+        return rows.ToDictionary(x => x.Icao);
+    }
+
+    /// <summary>Most recent active incident id per ICAO (for <c>aircraft.currentIncidentId</c>).</summary>
+    public async Task<IReadOnlyDictionary<string, string>> ActiveIncidentByIcaosAsync(IReadOnlyList<string> icaos, CancellationToken ct = default)
+    {
+        var rows = await context.IncidentAircraft
+            .Find(Builders<IncidentAircraftLink>.Filter.In(x => x.Icao, icaos)
+                  & Builders<IncidentAircraftLink>.Filter.Eq(x => x.Active, true))
+            .Sort(Builders<IncidentAircraftLink>.Sort.Descending(x => x.LastSeenAt))
+            .ToListAsync(ct);
+        var map = new Dictionary<string, string>();
+        foreach (var r in rows)
+            map.TryAdd(r.Icao, r.IncidentId); // sorted desc → first seen is the most recent.
+        return map;
+    }
+
     /// <summary>Latest position per ICAO via a single sort+group aggregation (no N+1).</summary>
     public async Task<IReadOnlyDictionary<string, FlightPosition>> LatestPositionsByIcaosAsync(IReadOnlyList<string> icaos, CancellationToken ct = default)
     {

@@ -135,7 +135,7 @@ public sealed class PhotoModerationTests(ContainerFixture fixture)
 
         var tweet = ops.Captures.Single(c => c.Channel == "twitter").Payload;
         Assert.Contains("Foi publicada uma nova foto no incêndio em Rua de Teste", tweet);
-        Assert.Contains("https://fogos.pt/fogo/MOD3/detalhe", tweet);
+        Assert.Contains("https://fogosportugal.pt/fogo/MOD3/detalhe", tweet);
         Assert.Contains("Tirada às", tweet);            // TakenAt extra
         Assert.Contains("km do local do incêndio", tweet); // distance extra
 

@@ -27,6 +27,8 @@ public static class ServiceCollectionExtensions
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
         services.Configure<OpsOptions>(configuration.GetSection(OpsOptions.SectionName));
         services.Configure<PublishingOptions>(configuration.GetSection(PublishingOptions.SectionName));
+        services.Configure<AlertOptions>(configuration.GetSection(AlertOptions.SectionName));
+        services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));
 
         services.AddSingleton<IMongoClient>(sp =>
         {
@@ -62,6 +64,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Reads.WarningReads>();
         services.AddSingleton<Reads.AircraftReads>();
         services.AddSingleton<Reads.StatsReads>();
+        services.AddSingleton<Reads.KmlVersionReads>();
+        services.AddSingleton<Reads.LocationReads>();
+        services.AddSingleton<Reads.IgnitionClusterReads>();
+        services.AddSingleton<Reads.AlertReads>();
+        services.AddSingleton<Reads.WebhookReads>();
+        services.AddSingleton<Reads.SituationReportReads>();
+
+        // Single write path for KML perimeter versioning (used by the attachKml mutation and ICNF ingest).
+        services.AddSingleton<Incidents.KmlVersionStore>();
+
+        // Dedup-guarded write path for alert events (used by the alert-matching worker handlers).
+        services.AddSingleton<Alerts.AlertEventStore>();
 
         return services;
     }

@@ -1,3 +1,4 @@
+using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
@@ -82,6 +83,62 @@ public sealed class WeatherStationByIdDataLoader(WeatherReads reads, IBatchSched
     protected override async Task<IReadOnlyDictionary<int, WeatherStation?>> LoadBatchAsync(IReadOnlyList<int> keys, CancellationToken ct)
     {
         var found = await reads.StationsByIdsAsync(keys, ct);
+        return keys.ToDictionary(k => k, k => found.GetValueOrDefault(k));
+    }
+}
+
+/// <summary>Groups associated aircraft by incident, joining the tracked-fleet metadata (active-first).</summary>
+public sealed class IncidentAircraftDataLoader(AircraftReads reads, IBatchScheduler batchScheduler, DataLoaderOptions? options = null)
+    : GroupedDataLoader<string, IncidentAircraft>(batchScheduler, options!)
+{
+    protected override async Task<ILookup<string, IncidentAircraft>> LoadGroupedBatchAsync(IReadOnlyList<string> keys, CancellationToken ct)
+    {
+        var links = await reads.LinksByIncidentsAsync(keys, ct);
+        var icaos = links.Select(l => l.Icao).Distinct().ToList();
+        var tracked = icaos.Count > 0
+            ? await reads.TrackedByIcaosAsync(icaos, ct)
+            : new Dictionary<string, Fogos.Domain.Aircraft.TrackedAircraft>();
+
+        return links
+            .Select(l =>
+            {
+                tracked.TryGetValue(l.Icao, out var t);
+                return (l.IncidentId, Aircraft: new IncidentAircraft(
+                    l.Icao, t?.Registration, t?.Name, t?.Kind, l.Active, l.FirstSeenAt, l.LastSeenAt, l.Samples));
+            })
+            .ToLookup(x => x.IncidentId, x => x.Aircraft);
+    }
+}
+
+/// <summary>Groups KML perimeter version metadata by incident (newest first).</summary>
+public sealed class IncidentKmlHistoryDataLoader(KmlVersionReads reads, IBatchScheduler batchScheduler, DataLoaderOptions? options = null)
+    : GroupedDataLoader<string, KmlVersionMeta>(batchScheduler, options!)
+{
+    protected override async Task<ILookup<string, KmlVersionMeta>> LoadGroupedBatchAsync(IReadOnlyList<string> keys, CancellationToken ct)
+    {
+        var rows = await reads.MetaByIncidentsAsync(keys, ct);
+        return rows.ToLookup(r => r.IncidentId, r => new KmlVersionMeta(r.Id, r.Vost, r.CapturedAt, r.SizeBytes));
+    }
+}
+
+/// <summary>Batches the current (active, most recent) incident id per ICAO for aircraft.currentIncidentId.</summary>
+public sealed class AircraftCurrentIncidentDataLoader(AircraftReads reads, IBatchScheduler batchScheduler, DataLoaderOptions? options = null)
+    : BatchDataLoader<string, string?>(batchScheduler, options!)
+{
+    protected override async Task<IReadOnlyDictionary<string, string?>> LoadBatchAsync(IReadOnlyList<string> keys, CancellationToken ct)
+    {
+        var found = await reads.ActiveIncidentByIcaosAsync(keys, ct);
+        return keys.ToDictionary(k => k, k => found.GetValueOrDefault(k));
+    }
+}
+
+/// <summary>Batches the active ignition-cluster id per incident for incident.clusterId.</summary>
+public sealed class IncidentClusterDataLoader(IgnitionClusterReads reads, IBatchScheduler batchScheduler, DataLoaderOptions? options = null)
+    : BatchDataLoader<string, string?>(batchScheduler, options!)
+{
+    protected override async Task<IReadOnlyDictionary<string, string?>> LoadBatchAsync(IReadOnlyList<string> keys, CancellationToken ct)
+    {
+        var found = await reads.ActiveClusterIdByIncidentAsync(keys, ct);
         return keys.ToDictionary(k => k, k => found.GetValueOrDefault(k));
     }
 }

@@ -1,14 +1,17 @@
 using Fogos.Domain.Aircraft;
+using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Locations;
 using Fogos.Domain.Photos;
+using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
+using Fogos.Domain.Webhooks;
 using Fogos.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
@@ -46,6 +49,16 @@ public sealed class MongoContext
 
     public IMongoCollection<FlightPosition> FlightPositions => Database.GetCollection<FlightPosition>("flight_positions");
     public IMongoCollection<TrackedAircraft> TrackedAircraft => Database.GetCollection<TrackedAircraft>("tracked_aircraft");
+    public IMongoCollection<IncidentAircraftLink> IncidentAircraft => Database.GetCollection<IncidentAircraftLink>("incident_aircraft");
+
+    public IMongoCollection<IncidentKmlVersion> IncidentKmlVersions => Database.GetCollection<IncidentKmlVersion>("incident_kml_versions");
+
+    public IMongoCollection<IgnitionCluster> IgnitionClusters => Database.GetCollection<IgnitionCluster>("ignition_clusters");
+
+    public IMongoCollection<AlertSubscription> AlertSubscriptions => Database.GetCollection<AlertSubscription>("alert_subscriptions");
+    public IMongoCollection<AlertEvent> AlertEvents => Database.GetCollection<AlertEvent>("alert_events");
+    public IMongoCollection<WebhookEndpoint> WebhookEndpoints => Database.GetCollection<WebhookEndpoint>("webhook_endpoints");
+    public IMongoCollection<SituationReport> SituationReports => Database.GetCollection<SituationReport>("situation_reports");
 
     public IMongoCollection<Hotspots> Hotspots => Database.GetCollection<Hotspots>("hotspots");
     public IMongoCollection<Location> Locations => Database.GetCollection<Location>("locations");

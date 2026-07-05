@@ -45,6 +45,15 @@ public static class PipelineServiceCollectionExtensions
         services.AddSingleton<IFacebookPublisher, FacebookPublisher>();
         services.AddSingleton<IDiscordPostPublisher, DiscordPostPublisher>();
 
+        // ── Webhooks ───────────────────────────────────────────────────────────────────────────
+        // Delivery client: a fixed per-request timeout, NO retry handler — transport failures raise the
+        // endpoint's ConsecutiveFailures instead (the spec forbids in-request retries).
+        services.AddHttpClient(Webhooks.WebhookSigner.HttpClientName, (sp, client) =>
+        {
+            var o = sp.GetRequiredService<IOptions<WebhookOptions>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+        });
+
         // ── FCM ──────────────────────────────────────────────────────────────────────────────
         services.AddSingleton<IFcmSender, FcmSender>();
         services.AddSingleton<FcmNotifier>();

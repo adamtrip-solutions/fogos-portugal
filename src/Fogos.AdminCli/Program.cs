@@ -7,6 +7,8 @@ using Microsoft.Extensions.Hosting;
 // Args are parsed by hand, so build the host without them (mirrors Fogos.Importer).
 var builder = Host.CreateApplicationBuilder();
 
+var command = args.Length > 0 ? args[0] : "";
+
 builder.Configuration.Sources.Insert(0, new MemoryConfigurationSource
 {
     InitialData = new Dictionary<string, string?>
@@ -17,15 +19,27 @@ builder.Configuration.Sources.Insert(0, new MemoryConfigurationSource
 });
 builder.Configuration.AddEnvironmentVariables("FOGOS_");
 
+// demo-seed pins its target database up-front (highest precedence) so the infrastructure binds to it and
+// never the production `fogos` db — even if FOGOS_Mongo__Database points elsewhere in the environment.
+if (command == "demo-seed")
+{
+    builder.Configuration.Sources.Add(new MemoryConfigurationSource
+    {
+        InitialData = new Dictionary<string, string?> { ["Mongo:Database"] = DemoSeedCommand.DatabaseArg(args) },
+    });
+}
+
 builder.Services.AddFogosInfrastructure(builder.Configuration);
 
 using var host = builder.Build();
 
-var command = args.Length > 0 ? args[0] : "";
 switch (command)
 {
     case "keys":
         return await KeyCommands.RunAsync(host.Services, args);
+
+    case "demo-seed":
+        return await DemoSeedCommand.RunAsync(host.Services, args);
 
     default:
         Console.Error.WriteLine("Usage: Fogos.AdminCli <command>");
@@ -36,5 +50,8 @@ switch (command)
         Console.Error.WriteLine("                 issue a new fgs_live_ API key (plaintext printed once)");
         Console.Error.WriteLine("  keys list       list issued keys (id, name, tier, scopes, publicContext, created, revoked)");
         Console.Error.WriteLine("  keys revoke <id>  revoke a key by id");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("  demo-seed [--database fogos_demo] [--drop] [--locations <path>]");
+        Console.Error.WriteLine("                 populate a demo database with deterministic, live-looking sample data");
         return 2;
 }

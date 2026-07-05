@@ -23,6 +23,7 @@ public static class RateLimitingServiceCollectionExtensions
         services.AddSingleton<GraphQLCostBudget>();
         services.AddSingleton<SubscriptionLimiter>();
         services.AddSingleton<PhotoUploadGates>();
+        services.AddSingleton<AlertSubscriptionGate>();
 
         return services;
     }

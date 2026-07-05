@@ -42,7 +42,7 @@ public sealed class FcmTests
         Assert.True(ok);
         Assert.Equal(2, sender.Sends.Count); // 7 topics → two ≤5 conditions
         Assert.All(sender.Sends, s => Assert.True(CountTopics(s.Condition!) <= FcmTopics.MaxTopicsPerCondition));
-        Assert.All(sender.Sends, s => Assert.StartsWith("Fogos.pt - ", s.Title));
+        Assert.All(sender.Sends, s => Assert.StartsWith("FogosPortugal - ", s.Title));
     }
 
     [Fact]

@@ -1,41 +1,2332 @@
 [
-  {
-    "id": "0000000000000000000000d1",
-    "level": 1,
-    "code": "09",
-    "name": "Guarda"
-  },
-  {
-    "id": "0000000000000000000000c1",
-    "level": 2,
-    "code": "0909",
-    "name": "Manteigas",
-    "dico": "0909"
-  },
-  {
-    "id": "0000000000000000000000d2",
-    "level": 1,
-    "code": "08",
-    "name": "Faro"
-  },
-  {
-    "id": "0000000000000000000000c2",
-    "level": 2,
-    "code": "0808",
-    "name": "Monchique",
-    "dico": "0808"
-  },
-  {
-    "id": "0000000000000000000000d3",
-    "level": 1,
-    "code": "15",
-    "name": "Setúbal"
-  },
-  {
-    "id": "0000000000000000000000c3",
-    "level": 2,
-    "code": "1511",
-    "name": "Setúbal",
-    "dico": "1511"
-  }
+ {
+  "id": "446f5418e004fe0a007256ad",
+  "level": 1,
+  "code": "1",
+  "name": "Aveiro"
+ },
+ {
+  "id": "1ae8397af878c149f9f3701a",
+  "level": 2,
+  "code": "101",
+  "name": "Águeda",
+  "dico": "0101"
+ },
+ {
+  "id": "48467f80e84775b9ccdf79e7",
+  "level": 2,
+  "code": "102",
+  "name": "Albergaria-a-Velha",
+  "dico": "0102"
+ },
+ {
+  "id": "398198b0f04301559c896699",
+  "level": 2,
+  "code": "103",
+  "name": "Anadia",
+  "dico": "0103"
+ },
+ {
+  "id": "4db3cfd478515e002df53fea",
+  "level": 2,
+  "code": "104",
+  "name": "Arouca",
+  "dico": "0104"
+ },
+ {
+  "id": "272453fa237b0a2142508554",
+  "level": 2,
+  "code": "105",
+  "name": "Aveiro",
+  "dico": "0105"
+ },
+ {
+  "id": "739ec20ebc691f25e559faff",
+  "level": 2,
+  "code": "106",
+  "name": "Castelo de Paiva",
+  "dico": "0106"
+ },
+ {
+  "id": "de550bc1449db7091b4d99f0",
+  "level": 2,
+  "code": "107",
+  "name": "Espinho",
+  "dico": "0107"
+ },
+ {
+  "id": "b65087252200e97410fdd285",
+  "level": 2,
+  "code": "108",
+  "name": "Estarreja",
+  "dico": "0108"
+ },
+ {
+  "id": "2a5fb60eb848b5ca527dfea5",
+  "level": 2,
+  "code": "109",
+  "name": "Santa Maria da Feira",
+  "dico": "0109"
+ },
+ {
+  "id": "320e685454620f35f6c1c681",
+  "level": 2,
+  "code": "110",
+  "name": "Ílhavo",
+  "dico": "0110"
+ },
+ {
+  "id": "7b6b310b265ff534d34449f0",
+  "level": 2,
+  "code": "111",
+  "name": "Mealhada",
+  "dico": "0111"
+ },
+ {
+  "id": "43acbf08b93a0b943b07b5da",
+  "level": 2,
+  "code": "112",
+  "name": "Murtosa",
+  "dico": "0112"
+ },
+ {
+  "id": "3393a5aa828ab91af9de5b28",
+  "level": 2,
+  "code": "113",
+  "name": "Oliveira de Azeméis",
+  "dico": "0113"
+ },
+ {
+  "id": "0d183a63995d157d7f25b997",
+  "level": 2,
+  "code": "114",
+  "name": "Oliveira do Bairro",
+  "dico": "0114"
+ },
+ {
+  "id": "a424f16cbf2659b7a049c141",
+  "level": 2,
+  "code": "115",
+  "name": "Ovar",
+  "dico": "0115"
+ },
+ {
+  "id": "be9d5af82b8fe97f52151bd3",
+  "level": 2,
+  "code": "116",
+  "name": "São João da Madeira",
+  "dico": "0116"
+ },
+ {
+  "id": "f794ded107b0dfffb5cf5d6c",
+  "level": 2,
+  "code": "117",
+  "name": "Sever do Vouga",
+  "dico": "0117"
+ },
+ {
+  "id": "85f2cfb99744e7bc852c68e8",
+  "level": 2,
+  "code": "118",
+  "name": "Vagos",
+  "dico": "0118"
+ },
+ {
+  "id": "47e8c9ae8c1decf7f9c1c1dd",
+  "level": 2,
+  "code": "119",
+  "name": "Vale de Cambra",
+  "dico": "0119"
+ },
+ {
+  "id": "ed544479c8ce12fb741dc4cf",
+  "level": 1,
+  "code": "2",
+  "name": "Beja"
+ },
+ {
+  "id": "95a77ce292576f0aa9c65258",
+  "level": 2,
+  "code": "201",
+  "name": "Aljustrel",
+  "dico": "0201"
+ },
+ {
+  "id": "7851e5d1d1a1071804c13aa6",
+  "level": 2,
+  "code": "202",
+  "name": "Almodôvar",
+  "dico": "0202"
+ },
+ {
+  "id": "c57705c47e8fbabf21147dc7",
+  "level": 2,
+  "code": "203",
+  "name": "Alvito",
+  "dico": "0203"
+ },
+ {
+  "id": "9b8d589d2b5a50c0718f0a5f",
+  "level": 2,
+  "code": "204",
+  "name": "Barrancos",
+  "dico": "0204"
+ },
+ {
+  "id": "b9960d2a1f4c698869be4bca",
+  "level": 2,
+  "code": "205",
+  "name": "Beja",
+  "dico": "0205"
+ },
+ {
+  "id": "a6ee48f504f7baef5f949df9",
+  "level": 2,
+  "code": "206",
+  "name": "Castro Verde",
+  "dico": "0206"
+ },
+ {
+  "id": "4cc0618ef2e599e707eedcb2",
+  "level": 2,
+  "code": "207",
+  "name": "Cuba",
+  "dico": "0207"
+ },
+ {
+  "id": "57e5f0ade7d275c6dd73e67b",
+  "level": 2,
+  "code": "208",
+  "name": "Ferreira do Alentejo",
+  "dico": "0208"
+ },
+ {
+  "id": "fa6ebfd2599c8218f4032164",
+  "level": 2,
+  "code": "209",
+  "name": "Mértola",
+  "dico": "0209"
+ },
+ {
+  "id": "3fa72ce3344ab14a87118c1d",
+  "level": 2,
+  "code": "210",
+  "name": "Moura",
+  "dico": "0210"
+ },
+ {
+  "id": "53518f3169692cb347b37e6d",
+  "level": 2,
+  "code": "211",
+  "name": "Odemira",
+  "dico": "0211"
+ },
+ {
+  "id": "cde69868f1e5ccec5cb5c235",
+  "level": 2,
+  "code": "212",
+  "name": "Ourique",
+  "dico": "0212"
+ },
+ {
+  "id": "42a6e318df9a778a57802597",
+  "level": 2,
+  "code": "213",
+  "name": "Serpa",
+  "dico": "0213"
+ },
+ {
+  "id": "b49bd6d48cfa35e38d1a50e3",
+  "level": 2,
+  "code": "214",
+  "name": "Vidigueira",
+  "dico": "0214"
+ },
+ {
+  "id": "afd1cc2e44ad061b39326b62",
+  "level": 1,
+  "code": "3",
+  "name": "Braga"
+ },
+ {
+  "id": "3844b6087146aa142422b4e3",
+  "level": 2,
+  "code": "301",
+  "name": "Amares",
+  "dico": "0301"
+ },
+ {
+  "id": "bd2050e953ada919a4e1aa67",
+  "level": 2,
+  "code": "302",
+  "name": "Barcelos",
+  "dico": "0302"
+ },
+ {
+  "id": "268af5384d50a9414ace5231",
+  "level": 2,
+  "code": "303",
+  "name": "Braga",
+  "dico": "0303"
+ },
+ {
+  "id": "1cb5ffe841f61a8f95f3b419",
+  "level": 2,
+  "code": "304",
+  "name": "Cabeceiras de Basto",
+  "dico": "0304"
+ },
+ {
+  "id": "5074206e0ddd5106470812ce",
+  "level": 2,
+  "code": "305",
+  "name": "Celorico de Basto",
+  "dico": "0305"
+ },
+ {
+  "id": "61fce39b4414fb8e7331e34c",
+  "level": 2,
+  "code": "306",
+  "name": "Esposende",
+  "dico": "0306"
+ },
+ {
+  "id": "b1ffbff2db688e0783ecef71",
+  "level": 2,
+  "code": "307",
+  "name": "Fafe",
+  "dico": "0307"
+ },
+ {
+  "id": "527b3d484746ce50805dd08e",
+  "level": 2,
+  "code": "308",
+  "name": "Guimarães",
+  "dico": "0308"
+ },
+ {
+  "id": "40da1d38f6f87f40dc21e239",
+  "level": 2,
+  "code": "309",
+  "name": "Póvoa de Lanhoso",
+  "dico": "0309"
+ },
+ {
+  "id": "26d04a8cb4d9a115c4562860",
+  "level": 2,
+  "code": "310",
+  "name": "Terras de Bouro",
+  "dico": "0310"
+ },
+ {
+  "id": "b86bba32dc6a72a07eac2a72",
+  "level": 2,
+  "code": "311",
+  "name": "Vieira do Minho",
+  "dico": "0311"
+ },
+ {
+  "id": "8406002ad2fdf458020f7e4d",
+  "level": 2,
+  "code": "312",
+  "name": "Vila Nova de Famalicão",
+  "dico": "0312"
+ },
+ {
+  "id": "32a9d43cf9004e863a0ccb14",
+  "level": 2,
+  "code": "313",
+  "name": "Vila Verde",
+  "dico": "0313"
+ },
+ {
+  "id": "207e7d22c0fd320e7e6a63cd",
+  "level": 2,
+  "code": "314",
+  "name": "Vizela",
+  "dico": "0314"
+ },
+ {
+  "id": "8fe814a063a7693843ec61de",
+  "level": 1,
+  "code": "4",
+  "name": "Bragança"
+ },
+ {
+  "id": "aad4da419a7ea803e5841597",
+  "level": 2,
+  "code": "401",
+  "name": "Alfândega da Fé",
+  "dico": "0401"
+ },
+ {
+  "id": "ff721ba5c6de403b97f774af",
+  "level": 2,
+  "code": "402",
+  "name": "Bragança",
+  "dico": "0402"
+ },
+ {
+  "id": "e14bddd1bffef9797e47c536",
+  "level": 2,
+  "code": "403",
+  "name": "Carrazeda de Ansiães",
+  "dico": "0403"
+ },
+ {
+  "id": "22e3db0bae6ddc85e2de1a20",
+  "level": 2,
+  "code": "404",
+  "name": "Freixo de Espada à Cinta",
+  "dico": "0404"
+ },
+ {
+  "id": "e4376f26281d8263bc026ad9",
+  "level": 2,
+  "code": "405",
+  "name": "Macedo de Cavaleiros",
+  "dico": "0405"
+ },
+ {
+  "id": "e4639976f54e7e2f6b8569ba",
+  "level": 2,
+  "code": "406",
+  "name": "Miranda do Douro",
+  "dico": "0406"
+ },
+ {
+  "id": "d42817b5f9a25b73c849ba21",
+  "level": 2,
+  "code": "407",
+  "name": "Mirandela",
+  "dico": "0407"
+ },
+ {
+  "id": "99af508918e1ab025ad6681b",
+  "level": 2,
+  "code": "408",
+  "name": "Mogadouro",
+  "dico": "0408"
+ },
+ {
+  "id": "ed7c0376ddc0a2a3a158aee2",
+  "level": 2,
+  "code": "409",
+  "name": "Torre de Moncorvo",
+  "dico": "0409"
+ },
+ {
+  "id": "5c16ccc15a2c00b8b17ecec3",
+  "level": 2,
+  "code": "410",
+  "name": "Vila Flor",
+  "dico": "0410"
+ },
+ {
+  "id": "324f041665ad68a543115503",
+  "level": 2,
+  "code": "411",
+  "name": "Vimioso",
+  "dico": "0411"
+ },
+ {
+  "id": "78ea50ca3bc474237d81d84a",
+  "level": 2,
+  "code": "412",
+  "name": "Vinhais",
+  "dico": "0412"
+ },
+ {
+  "id": "8a61fd0cb639d42116fec3cd",
+  "level": 1,
+  "code": "5",
+  "name": "Castelo Branco"
+ },
+ {
+  "id": "9e5aad5f56ed8ab45954a372",
+  "level": 2,
+  "code": "501",
+  "name": "Belmonte",
+  "dico": "0501"
+ },
+ {
+  "id": "d107439c901611df3f04bd7b",
+  "level": 2,
+  "code": "502",
+  "name": "Castelo Branco",
+  "dico": "0502"
+ },
+ {
+  "id": "d2483d0243b048ade42799b2",
+  "level": 2,
+  "code": "503",
+  "name": "Covilhã",
+  "dico": "0503"
+ },
+ {
+  "id": "f58ac8315d89722cad3ab2a3",
+  "level": 2,
+  "code": "504",
+  "name": "Fundão",
+  "dico": "0504"
+ },
+ {
+  "id": "4f065f332bc08e4aa8f24558",
+  "level": 2,
+  "code": "505",
+  "name": "Idanha-a-Nova",
+  "dico": "0505"
+ },
+ {
+  "id": "e60a0ada2b45f58477646a63",
+  "level": 2,
+  "code": "506",
+  "name": "Oleiros",
+  "dico": "0506"
+ },
+ {
+  "id": "6de541237cbd8060957bfb0c",
+  "level": 2,
+  "code": "507",
+  "name": "Penamacor",
+  "dico": "0507"
+ },
+ {
+  "id": "a4ef522b75e95a0ed3035325",
+  "level": 2,
+  "code": "508",
+  "name": "Proença-a-Nova",
+  "dico": "0508"
+ },
+ {
+  "id": "214d722b957910223e0f1dec",
+  "level": 2,
+  "code": "509",
+  "name": "Sertã",
+  "dico": "0509"
+ },
+ {
+  "id": "025c1bb68e3bb48971f6792b",
+  "level": 2,
+  "code": "510",
+  "name": "Vila de Rei",
+  "dico": "0510"
+ },
+ {
+  "id": "9c0915b76a11f7f55d74a736",
+  "level": 2,
+  "code": "511",
+  "name": "Vila Velha de Ródão",
+  "dico": "0511"
+ },
+ {
+  "id": "6038887e0abee80362762707",
+  "level": 1,
+  "code": "6",
+  "name": "Coimbra"
+ },
+ {
+  "id": "d57ee00e99e621831533cc9b",
+  "level": 2,
+  "code": "601",
+  "name": "Arganil",
+  "dico": "0601"
+ },
+ {
+  "id": "96ca4d29e544964f6405c1c3",
+  "level": 2,
+  "code": "602",
+  "name": "Cantanhede",
+  "dico": "0602"
+ },
+ {
+  "id": "31196eec98a30dfea0a2c4e7",
+  "level": 2,
+  "code": "603",
+  "name": "Coimbra",
+  "dico": "0603"
+ },
+ {
+  "id": "28d40a80b9e0af69a3051bee",
+  "level": 2,
+  "code": "604",
+  "name": "Condeixa-a-Nova",
+  "dico": "0604"
+ },
+ {
+  "id": "abe23275ca1c7cb7926cfb3f",
+  "level": 2,
+  "code": "605",
+  "name": "Figueira da Foz",
+  "dico": "0605"
+ },
+ {
+  "id": "338b70831235876ed40e91fd",
+  "level": 2,
+  "code": "606",
+  "name": "Góis",
+  "dico": "0606"
+ },
+ {
+  "id": "bd236d27d1b1ac105b44e09b",
+  "level": 2,
+  "code": "607",
+  "name": "Lousã",
+  "dico": "0607"
+ },
+ {
+  "id": "9aff87f34c66a2aa9dc83c11",
+  "level": 2,
+  "code": "608",
+  "name": "Mira",
+  "dico": "0608"
+ },
+ {
+  "id": "c2bf7cd3ed1da90ad52a5d07",
+  "level": 2,
+  "code": "609",
+  "name": "Miranda do Corvo",
+  "dico": "0609"
+ },
+ {
+  "id": "fcabd6b7b7fdd107ee46072f",
+  "level": 2,
+  "code": "610",
+  "name": "Montemor-o-Velho",
+  "dico": "0610"
+ },
+ {
+  "id": "c1f7fcbea7b0da41e09d8db2",
+  "level": 2,
+  "code": "611",
+  "name": "Oliveira do Hospital",
+  "dico": "0611"
+ },
+ {
+  "id": "9bd2de972196fa9a0ecafe29",
+  "level": 2,
+  "code": "612",
+  "name": "Pampilhosa da Serra",
+  "dico": "0612"
+ },
+ {
+  "id": "75aadb54690df936e64fa4e3",
+  "level": 2,
+  "code": "613",
+  "name": "Penacova",
+  "dico": "0613"
+ },
+ {
+  "id": "fe2ce32b4f1a095a5c9d4592",
+  "level": 2,
+  "code": "614",
+  "name": "Penela",
+  "dico": "0614"
+ },
+ {
+  "id": "7b86ba2606c30e2b38ea385e",
+  "level": 2,
+  "code": "615",
+  "name": "Soure",
+  "dico": "0615"
+ },
+ {
+  "id": "84c108de8ef3768bc9e349ab",
+  "level": 2,
+  "code": "616",
+  "name": "Tábua",
+  "dico": "0616"
+ },
+ {
+  "id": "1d0c302f3bb69723f66861a0",
+  "level": 2,
+  "code": "617",
+  "name": "Vila Nova de Poiares",
+  "dico": "0617"
+ },
+ {
+  "id": "02430aedf5ce1fb04ceabb62",
+  "level": 1,
+  "code": "7",
+  "name": "Évora"
+ },
+ {
+  "id": "6e652a083a30777b760e130c",
+  "level": 2,
+  "code": "701",
+  "name": "Alandroal",
+  "dico": "0701"
+ },
+ {
+  "id": "fed0e419dc0cafc8d680786c",
+  "level": 2,
+  "code": "702",
+  "name": "Arraiolos",
+  "dico": "0702"
+ },
+ {
+  "id": "f02e95359447a72ba5685fdc",
+  "level": 2,
+  "code": "703",
+  "name": "Borba",
+  "dico": "0703"
+ },
+ {
+  "id": "15a8c1e9d25cd17803d644dc",
+  "level": 2,
+  "code": "704",
+  "name": "Estremoz",
+  "dico": "0704"
+ },
+ {
+  "id": "e0efee00481918a6a23af0b9",
+  "level": 2,
+  "code": "705",
+  "name": "Évora",
+  "dico": "0705"
+ },
+ {
+  "id": "9bfd6782deffdb77f72573d2",
+  "level": 2,
+  "code": "706",
+  "name": "Montemor-o-Novo",
+  "dico": "0706"
+ },
+ {
+  "id": "4a32d82e07e2db59c48c7d14",
+  "level": 2,
+  "code": "707",
+  "name": "Mora",
+  "dico": "0707"
+ },
+ {
+  "id": "dd40fb91750a2126f520b249",
+  "level": 2,
+  "code": "708",
+  "name": "Mourão",
+  "dico": "0708"
+ },
+ {
+  "id": "433e8881430a1b464b124847",
+  "level": 2,
+  "code": "709",
+  "name": "Portel",
+  "dico": "0709"
+ },
+ {
+  "id": "da35f32f7ab6c986d576d399",
+  "level": 2,
+  "code": "710",
+  "name": "Redondo",
+  "dico": "0710"
+ },
+ {
+  "id": "ab6c56f2ef730f9967f80315",
+  "level": 2,
+  "code": "711",
+  "name": "Reguengos de Monsaraz",
+  "dico": "0711"
+ },
+ {
+  "id": "cf8d2bbfd0d56406662a5bda",
+  "level": 2,
+  "code": "712",
+  "name": "Vendas Novas",
+  "dico": "0712"
+ },
+ {
+  "id": "741ec996c9f67fffb079b558",
+  "level": 2,
+  "code": "713",
+  "name": "Viana do Alentejo",
+  "dico": "0713"
+ },
+ {
+  "id": "dc29d6e21f9bc88b80fa8626",
+  "level": 2,
+  "code": "714",
+  "name": "Vila Viçosa",
+  "dico": "0714"
+ },
+ {
+  "id": "78a15e01cf8dcee2dab80c39",
+  "level": 1,
+  "code": "8",
+  "name": "Faro"
+ },
+ {
+  "id": "75f900bf4d045cb4cc1ea02f",
+  "level": 2,
+  "code": "801",
+  "name": "Albufeira",
+  "dico": "0801"
+ },
+ {
+  "id": "4aae7557dd5fa1a14ff66846",
+  "level": 2,
+  "code": "802",
+  "name": "Alcoutim",
+  "dico": "0802"
+ },
+ {
+  "id": "abf96059793d3e8d78303bd3",
+  "level": 2,
+  "code": "803",
+  "name": "Aljezur",
+  "dico": "0803"
+ },
+ {
+  "id": "59436128cf7e4d386ef5198a",
+  "level": 2,
+  "code": "804",
+  "name": "Castro Marim",
+  "dico": "0804"
+ },
+ {
+  "id": "99451a0e3f96f273fe422277",
+  "level": 2,
+  "code": "805",
+  "name": "Faro",
+  "dico": "0805"
+ },
+ {
+  "id": "3e4663d793ee1995e8d85f15",
+  "level": 2,
+  "code": "806",
+  "name": "Lagoa",
+  "dico": "0806"
+ },
+ {
+  "id": "f5f5dac38496cda2ddcd9de3",
+  "level": 2,
+  "code": "807",
+  "name": "Lagos",
+  "dico": "0807"
+ },
+ {
+  "id": "82a32e16d7c5c23c09a198ff",
+  "level": 2,
+  "code": "808",
+  "name": "Loulé",
+  "dico": "0808"
+ },
+ {
+  "id": "f20544dc834382230aef9d86",
+  "level": 2,
+  "code": "809",
+  "name": "Monchique",
+  "dico": "0809"
+ },
+ {
+  "id": "cf3b97efcee7e498dae774a2",
+  "level": 2,
+  "code": "810",
+  "name": "Olhão",
+  "dico": "0810"
+ },
+ {
+  "id": "a23caf3c7bffe69ad88322e9",
+  "level": 2,
+  "code": "811",
+  "name": "Portimão",
+  "dico": "0811"
+ },
+ {
+  "id": "fcbbcfe5c611a020acffd51d",
+  "level": 2,
+  "code": "812",
+  "name": "São Brás de Alportel",
+  "dico": "0812"
+ },
+ {
+  "id": "bbde4a78c2f8f5e04acaa840",
+  "level": 2,
+  "code": "813",
+  "name": "Silves",
+  "dico": "0813"
+ },
+ {
+  "id": "0651d3a47594faaed1f40fa0",
+  "level": 2,
+  "code": "814",
+  "name": "Tavira",
+  "dico": "0814"
+ },
+ {
+  "id": "4fc9178f626bedb50384f2f4",
+  "level": 2,
+  "code": "815",
+  "name": "Vila do Bispo",
+  "dico": "0815"
+ },
+ {
+  "id": "d04512534fe54acff491463f",
+  "level": 2,
+  "code": "816",
+  "name": "Vila Real de Santo António",
+  "dico": "0816"
+ },
+ {
+  "id": "825d8bc831e6155ac55fcda3",
+  "level": 1,
+  "code": "9",
+  "name": "Guarda"
+ },
+ {
+  "id": "9602483c912a431344ffa10e",
+  "level": 2,
+  "code": "901",
+  "name": "Aguiar da Beira",
+  "dico": "0901"
+ },
+ {
+  "id": "d151e1e0dd0f2b8a00a0c9d4",
+  "level": 2,
+  "code": "902",
+  "name": "Almeida",
+  "dico": "0902"
+ },
+ {
+  "id": "989ef8fd82489e12660b49f2",
+  "level": 2,
+  "code": "903",
+  "name": "Celorico da Beira",
+  "dico": "0903"
+ },
+ {
+  "id": "b088753650c2e0fcd0449c6d",
+  "level": 2,
+  "code": "904",
+  "name": "Figueira de Castelo Rodrigo",
+  "dico": "0904"
+ },
+ {
+  "id": "325c6c3849806f21a9e6b038",
+  "level": 2,
+  "code": "905",
+  "name": "Fornos de Algodres",
+  "dico": "0905"
+ },
+ {
+  "id": "fa315de2c9710861e0c10480",
+  "level": 2,
+  "code": "906",
+  "name": "Gouveia",
+  "dico": "0906"
+ },
+ {
+  "id": "69c57402729218d708abcf3e",
+  "level": 2,
+  "code": "907",
+  "name": "Guarda",
+  "dico": "0907"
+ },
+ {
+  "id": "8433650b0b35097712bd1e2c",
+  "level": 2,
+  "code": "908",
+  "name": "Manteigas",
+  "dico": "0908"
+ },
+ {
+  "id": "4c716228aca52cfa0697aafc",
+  "level": 2,
+  "code": "909",
+  "name": "Mêda",
+  "dico": "0909"
+ },
+ {
+  "id": "eaa186d7a1b7f318d7c7ff9e",
+  "level": 2,
+  "code": "910",
+  "name": "Pinhel",
+  "dico": "0910"
+ },
+ {
+  "id": "d1f4455063f710c71f7347f6",
+  "level": 2,
+  "code": "911",
+  "name": "Sabugal",
+  "dico": "0911"
+ },
+ {
+  "id": "e883c458bcfe22e32050df2b",
+  "level": 2,
+  "code": "912",
+  "name": "Seia",
+  "dico": "0912"
+ },
+ {
+  "id": "a7dbc6d7b200f3fe133a10a0",
+  "level": 2,
+  "code": "913",
+  "name": "Trancoso",
+  "dico": "0913"
+ },
+ {
+  "id": "e0ce63d275a3a083da78d3b7",
+  "level": 2,
+  "code": "914",
+  "name": "Vila Nova de Foz Côa",
+  "dico": "0914"
+ },
+ {
+  "id": "47ee758d1406bdb8cb0331fb",
+  "level": 1,
+  "code": "10",
+  "name": "Leiria"
+ },
+ {
+  "id": "5ef67ea1e455b02a840c1daa",
+  "level": 2,
+  "code": "1001",
+  "name": "Alcobaça",
+  "dico": "1001"
+ },
+ {
+  "id": "f713f0294a1abb27dc3fd653",
+  "level": 2,
+  "code": "1002",
+  "name": "Alvaiázere",
+  "dico": "1002"
+ },
+ {
+  "id": "8c4b2699636ff95f34a54977",
+  "level": 2,
+  "code": "1003",
+  "name": "Ansião",
+  "dico": "1003"
+ },
+ {
+  "id": "55d92087f7424ed260ef4351",
+  "level": 2,
+  "code": "1004",
+  "name": "Batalha",
+  "dico": "1004"
+ },
+ {
+  "id": "987c6d88cae13681b3505e74",
+  "level": 2,
+  "code": "1005",
+  "name": "Bombarral",
+  "dico": "1005"
+ },
+ {
+  "id": "e4d2f88b26ef666276ce9a33",
+  "level": 2,
+  "code": "1006",
+  "name": "Caldas da Rainha",
+  "dico": "1006"
+ },
+ {
+  "id": "63255e58d277092d8a1ea845",
+  "level": 2,
+  "code": "1007",
+  "name": "Castanheira de Pêra",
+  "dico": "1007"
+ },
+ {
+  "id": "c17d68d3a67b4e0bd12753f9",
+  "level": 2,
+  "code": "1008",
+  "name": "Figueiró dos Vinhos",
+  "dico": "1008"
+ },
+ {
+  "id": "1d901efcb1b4943ebd3a5aa0",
+  "level": 2,
+  "code": "1009",
+  "name": "Leiria",
+  "dico": "1009"
+ },
+ {
+  "id": "2595bac06ebcfbc2e4e913f6",
+  "level": 2,
+  "code": "1010",
+  "name": "Marinha Grande",
+  "dico": "1010"
+ },
+ {
+  "id": "eec5867141e3fbce70ec98fc",
+  "level": 2,
+  "code": "1011",
+  "name": "Nazaré",
+  "dico": "1011"
+ },
+ {
+  "id": "677b05ffcc41d40e85309d3b",
+  "level": 2,
+  "code": "1012",
+  "name": "Óbidos",
+  "dico": "1012"
+ },
+ {
+  "id": "26ee250aed62ca68665b74a0",
+  "level": 2,
+  "code": "1013",
+  "name": "Pedrógão Grande",
+  "dico": "1013"
+ },
+ {
+  "id": "8937ac19e88b4203917e1e59",
+  "level": 2,
+  "code": "1014",
+  "name": "Peniche",
+  "dico": "1014"
+ },
+ {
+  "id": "792f947dafdcd37305defd9f",
+  "level": 2,
+  "code": "1015",
+  "name": "Pombal",
+  "dico": "1015"
+ },
+ {
+  "id": "6dcc47bf89d171c1f4732acf",
+  "level": 2,
+  "code": "1016",
+  "name": "Porto de Mós",
+  "dico": "1016"
+ },
+ {
+  "id": "281078f88deffefbf39e4ef1",
+  "level": 1,
+  "code": "11",
+  "name": "Lisboa"
+ },
+ {
+  "id": "c90133ebeca6318e2c85b164",
+  "level": 2,
+  "code": "1101",
+  "name": "Alenquer",
+  "dico": "1101"
+ },
+ {
+  "id": "e681511c9612e964bbe2bcaf",
+  "level": 2,
+  "code": "1102",
+  "name": "Arruda dos Vinhos",
+  "dico": "1102"
+ },
+ {
+  "id": "0cedc81e1ca49396d2f266a5",
+  "level": 2,
+  "code": "1103",
+  "name": "Azambuja",
+  "dico": "1103"
+ },
+ {
+  "id": "25db484e96ef7da84aeae174",
+  "level": 2,
+  "code": "1104",
+  "name": "Cadaval",
+  "dico": "1104"
+ },
+ {
+  "id": "a0b7bd054791a7e9cf4b574b",
+  "level": 2,
+  "code": "1105",
+  "name": "Cascais",
+  "dico": "1105"
+ },
+ {
+  "id": "20721bff94386dd2cdb52e81",
+  "level": 2,
+  "code": "1106",
+  "name": "Lisboa",
+  "dico": "1106"
+ },
+ {
+  "id": "47d9cca3f5f3699383781a70",
+  "level": 2,
+  "code": "1107",
+  "name": "Loures",
+  "dico": "1107"
+ },
+ {
+  "id": "efb38647b6beb6d030a252b1",
+  "level": 2,
+  "code": "1108",
+  "name": "Lourinhã",
+  "dico": "1108"
+ },
+ {
+  "id": "4c4ff625f59d8a35328def3b",
+  "level": 2,
+  "code": "1109",
+  "name": "Mafra",
+  "dico": "1109"
+ },
+ {
+  "id": "d8237724ce4c5cca58aa8371",
+  "level": 2,
+  "code": "1110",
+  "name": "Oeiras",
+  "dico": "1110"
+ },
+ {
+  "id": "07ee23faca8d6600275a84e2",
+  "level": 2,
+  "code": "1111",
+  "name": "Sintra",
+  "dico": "1111"
+ },
+ {
+  "id": "dcfae5d5ffe863632cdaee49",
+  "level": 2,
+  "code": "1112",
+  "name": "Sobral de Monte Agraço",
+  "dico": "1112"
+ },
+ {
+  "id": "956fee9bd6a258cf394fc688",
+  "level": 2,
+  "code": "1113",
+  "name": "Torres Vedras",
+  "dico": "1113"
+ },
+ {
+  "id": "1a8ccd0f2addc73860f3a509",
+  "level": 2,
+  "code": "1114",
+  "name": "Vila Franca de Xira",
+  "dico": "1114"
+ },
+ {
+  "id": "7e466dc9af6ed4b61813b15f",
+  "level": 2,
+  "code": "1115",
+  "name": "Amadora",
+  "dico": "1115"
+ },
+ {
+  "id": "367be83d465f76fa7094cba0",
+  "level": 2,
+  "code": "1116",
+  "name": "Odivelas",
+  "dico": "1116"
+ },
+ {
+  "id": "bb2343a8c3a1fac879e5ed12",
+  "level": 1,
+  "code": "12",
+  "name": "Portalegre"
+ },
+ {
+  "id": "207505d2e5e877e6330a4e1f",
+  "level": 2,
+  "code": "1201",
+  "name": "Alter do Chão",
+  "dico": "1201"
+ },
+ {
+  "id": "9cc74a667ef5da044adfdb01",
+  "level": 2,
+  "code": "1202",
+  "name": "Arronches",
+  "dico": "1202"
+ },
+ {
+  "id": "59a35600db6a407e44b166ae",
+  "level": 2,
+  "code": "1203",
+  "name": "Avis",
+  "dico": "1203"
+ },
+ {
+  "id": "9023253f9cb3c9fb0e89ce50",
+  "level": 2,
+  "code": "1204",
+  "name": "Campo Maior",
+  "dico": "1204"
+ },
+ {
+  "id": "385530373e5985051f0d6097",
+  "level": 2,
+  "code": "1205",
+  "name": "Castelo de Vide",
+  "dico": "1205"
+ },
+ {
+  "id": "a802314ed729137308a4158c",
+  "level": 2,
+  "code": "1206",
+  "name": "Crato",
+  "dico": "1206"
+ },
+ {
+  "id": "a5d18eb2188d6ca06d8deecb",
+  "level": 2,
+  "code": "1207",
+  "name": "Elvas",
+  "dico": "1207"
+ },
+ {
+  "id": "1ad3c5103fb612e4ac1ea534",
+  "level": 2,
+  "code": "1208",
+  "name": "Fronteira",
+  "dico": "1208"
+ },
+ {
+  "id": "24ee442fc008010206b5ec4e",
+  "level": 2,
+  "code": "1209",
+  "name": "Gavião",
+  "dico": "1209"
+ },
+ {
+  "id": "68bfec06ccae130ff6ead349",
+  "level": 2,
+  "code": "1210",
+  "name": "Marvão",
+  "dico": "1210"
+ },
+ {
+  "id": "7fad2038486c9d6705ded63d",
+  "level": 2,
+  "code": "1211",
+  "name": "Monforte",
+  "dico": "1211"
+ },
+ {
+  "id": "25d69fd67eaf5349f5055f3b",
+  "level": 2,
+  "code": "1212",
+  "name": "Nisa",
+  "dico": "1212"
+ },
+ {
+  "id": "8c451df472fbef8ce349813e",
+  "level": 2,
+  "code": "1213",
+  "name": "Ponte de Sor",
+  "dico": "1213"
+ },
+ {
+  "id": "daba4caa8a5db43423012bb9",
+  "level": 2,
+  "code": "1214",
+  "name": "Portalegre",
+  "dico": "1214"
+ },
+ {
+  "id": "f581e50910bf2929bf208381",
+  "level": 2,
+  "code": "1215",
+  "name": "Sousel",
+  "dico": "1215"
+ },
+ {
+  "id": "1da328d9e1b91261fc349ef2",
+  "level": 1,
+  "code": "13",
+  "name": "Porto"
+ },
+ {
+  "id": "e032fc613beddd06cdc2888d",
+  "level": 2,
+  "code": "1301",
+  "name": "Amarante",
+  "dico": "1301"
+ },
+ {
+  "id": "caaf77e92dde6428f76d0f9f",
+  "level": 2,
+  "code": "1302",
+  "name": "Baião",
+  "dico": "1302"
+ },
+ {
+  "id": "3af1a509cd024a034b209416",
+  "level": 2,
+  "code": "1303",
+  "name": "Felgueiras",
+  "dico": "1303"
+ },
+ {
+  "id": "a5aaca94f379bef0dfbfc161",
+  "level": 2,
+  "code": "1304",
+  "name": "Gondomar",
+  "dico": "1304"
+ },
+ {
+  "id": "17a1ed32a377599bb67bc35a",
+  "level": 2,
+  "code": "1305",
+  "name": "Lousada",
+  "dico": "1305"
+ },
+ {
+  "id": "468f85a60e2976ac180634fd",
+  "level": 2,
+  "code": "1306",
+  "name": "Maia",
+  "dico": "1306"
+ },
+ {
+  "id": "3f7adc0ad13639c3e2cd9d08",
+  "level": 2,
+  "code": "1307",
+  "name": "Marco de Canaveses",
+  "dico": "1307"
+ },
+ {
+  "id": "8a79589d940c3837c2d11dd1",
+  "level": 2,
+  "code": "1308",
+  "name": "Matosinhos",
+  "dico": "1308"
+ },
+ {
+  "id": "18101ab93741b4616226d392",
+  "level": 2,
+  "code": "1309",
+  "name": "Paços de Ferreira",
+  "dico": "1309"
+ },
+ {
+  "id": "08516ff99d2da4d6e5920ff2",
+  "level": 2,
+  "code": "1310",
+  "name": "Paredes",
+  "dico": "1310"
+ },
+ {
+  "id": "ada0f0005e463aab8b4ea3ed",
+  "level": 2,
+  "code": "1311",
+  "name": "Penafiel",
+  "dico": "1311"
+ },
+ {
+  "id": "cb0dc05c015e1ae74254352f",
+  "level": 2,
+  "code": "1312",
+  "name": "Porto",
+  "dico": "1312"
+ },
+ {
+  "id": "9599aa643ebbe950245322ae",
+  "level": 2,
+  "code": "1313",
+  "name": "Póvoa de Varzim",
+  "dico": "1313"
+ },
+ {
+  "id": "cfe978022c8b21c00d5e8fb4",
+  "level": 2,
+  "code": "1314",
+  "name": "Santo Tirso",
+  "dico": "1314"
+ },
+ {
+  "id": "65026c8252bff6eca870348a",
+  "level": 2,
+  "code": "1315",
+  "name": "Valongo",
+  "dico": "1315"
+ },
+ {
+  "id": "b21c67809b3c68b78aa4154b",
+  "level": 2,
+  "code": "1316",
+  "name": "Vila do Conde",
+  "dico": "1316"
+ },
+ {
+  "id": "6b9119dbc63e01c81de5643a",
+  "level": 2,
+  "code": "1317",
+  "name": "Vila Nova de Gaia",
+  "dico": "1317"
+ },
+ {
+  "id": "061e825fd65707a5f3405083",
+  "level": 2,
+  "code": "1318",
+  "name": "Trofa",
+  "dico": "1318"
+ },
+ {
+  "id": "4efe870ee477a15ee2cbebce",
+  "level": 1,
+  "code": "14",
+  "name": "Santarém"
+ },
+ {
+  "id": "22cd68f397d171ed399b1e8a",
+  "level": 2,
+  "code": "1401",
+  "name": "Abrantes",
+  "dico": "1401"
+ },
+ {
+  "id": "e0df5c1979194a41154e70db",
+  "level": 2,
+  "code": "1402",
+  "name": "Alcanena",
+  "dico": "1402"
+ },
+ {
+  "id": "917b24a8c3056fdfeee225af",
+  "level": 2,
+  "code": "1403",
+  "name": "Almeirim",
+  "dico": "1403"
+ },
+ {
+  "id": "e3bba09ff6a38c4566a1cd12",
+  "level": 2,
+  "code": "1404",
+  "name": "Alpiarça",
+  "dico": "1404"
+ },
+ {
+  "id": "a5a8d9bf8f7a29b3a0319a7c",
+  "level": 2,
+  "code": "1405",
+  "name": "Benavente",
+  "dico": "1405"
+ },
+ {
+  "id": "bc3227acd52fc774ce2d6f6e",
+  "level": 2,
+  "code": "1406",
+  "name": "Cartaxo",
+  "dico": "1406"
+ },
+ {
+  "id": "754ccc02d34b475b1ffc38c7",
+  "level": 2,
+  "code": "1407",
+  "name": "Chamusca",
+  "dico": "1407"
+ },
+ {
+  "id": "8c97f67f1a2c9b2a9dd23148",
+  "level": 2,
+  "code": "1408",
+  "name": "Constância",
+  "dico": "1408"
+ },
+ {
+  "id": "533428c1d9994b6e0700a248",
+  "level": 2,
+  "code": "1409",
+  "name": "Coruche",
+  "dico": "1409"
+ },
+ {
+  "id": "597dad49459be1a63355f5a1",
+  "level": 2,
+  "code": "1410",
+  "name": "Entroncamento",
+  "dico": "1410"
+ },
+ {
+  "id": "9fbb07c33c5c9fbaef3ae8c0",
+  "level": 2,
+  "code": "1411",
+  "name": "Ferreira do Zêzere",
+  "dico": "1411"
+ },
+ {
+  "id": "2a296c6873e8882170090ee1",
+  "level": 2,
+  "code": "1412",
+  "name": "Golegã",
+  "dico": "1412"
+ },
+ {
+  "id": "53211360a7f8497d2668b552",
+  "level": 2,
+  "code": "1413",
+  "name": "Mação",
+  "dico": "1413"
+ },
+ {
+  "id": "27fe4e2b471c00cca36b6916",
+  "level": 2,
+  "code": "1414",
+  "name": "Rio Maior",
+  "dico": "1414"
+ },
+ {
+  "id": "95d07b6ce5db6887bb33f58f",
+  "level": 2,
+  "code": "1415",
+  "name": "Salvaterra de Magos",
+  "dico": "1415"
+ },
+ {
+  "id": "c656e9480e38c17f7142b2ed",
+  "level": 2,
+  "code": "1416",
+  "name": "Santarém",
+  "dico": "1416"
+ },
+ {
+  "id": "51a664371f709eada82414f2",
+  "level": 2,
+  "code": "1417",
+  "name": "Sardoal",
+  "dico": "1417"
+ },
+ {
+  "id": "f6b060cb94d688f4ec0d9098",
+  "level": 2,
+  "code": "1418",
+  "name": "Tomar",
+  "dico": "1418"
+ },
+ {
+  "id": "ac6e63c8b90fae8ece3a4f18",
+  "level": 2,
+  "code": "1419",
+  "name": "Torres Novas",
+  "dico": "1419"
+ },
+ {
+  "id": "2e6a2a4199f29a4d44a97b6c",
+  "level": 2,
+  "code": "1420",
+  "name": "Vila Nova da Barquinha",
+  "dico": "1420"
+ },
+ {
+  "id": "c616b5824688d433e6862e20",
+  "level": 2,
+  "code": "1421",
+  "name": "Ourém",
+  "dico": "1421"
+ },
+ {
+  "id": "36ca23381bd1916f45f6acac",
+  "level": 1,
+  "code": "15",
+  "name": "Setúbal"
+ },
+ {
+  "id": "f47d15cba9d8358af2d52821",
+  "level": 2,
+  "code": "1501",
+  "name": "Alcácer do Sal",
+  "dico": "1501"
+ },
+ {
+  "id": "4bfdf7fa1a1e7c650e69fe0a",
+  "level": 2,
+  "code": "1502",
+  "name": "Alcochete",
+  "dico": "1502"
+ },
+ {
+  "id": "928b727cb74f10735bf38c8d",
+  "level": 2,
+  "code": "1503",
+  "name": "Almada",
+  "dico": "1503"
+ },
+ {
+  "id": "40792a1c3a42f1736c761d8e",
+  "level": 2,
+  "code": "1504",
+  "name": "Barreiro",
+  "dico": "1504"
+ },
+ {
+  "id": "997731b6966811616842b718",
+  "level": 2,
+  "code": "1505",
+  "name": "Grândola",
+  "dico": "1505"
+ },
+ {
+  "id": "b2946b5ccd61b0a5ab7a98cb",
+  "level": 2,
+  "code": "1506",
+  "name": "Moita",
+  "dico": "1506"
+ },
+ {
+  "id": "db84f88b69e95d1e012d30c1",
+  "level": 2,
+  "code": "1507",
+  "name": "Montijo",
+  "dico": "1507"
+ },
+ {
+  "id": "22cfba7f868496eb8e67c793",
+  "level": 2,
+  "code": "1508",
+  "name": "Palmela",
+  "dico": "1508"
+ },
+ {
+  "id": "a5dee4fbf299ec10bec9f87d",
+  "level": 2,
+  "code": "1509",
+  "name": "Santiago do Cacém",
+  "dico": "1509"
+ },
+ {
+  "id": "3b6dafc9283b780655ccefbd",
+  "level": 2,
+  "code": "1510",
+  "name": "Seixal",
+  "dico": "1510"
+ },
+ {
+  "id": "9f256e7dc3acd47f9463e23b",
+  "level": 2,
+  "code": "1511",
+  "name": "Sesimbra",
+  "dico": "1511"
+ },
+ {
+  "id": "e1d801f9492bee2448afcc69",
+  "level": 2,
+  "code": "1512",
+  "name": "Setúbal",
+  "dico": "1512"
+ },
+ {
+  "id": "68af8c7c81bbdbe3cb7cb00c",
+  "level": 2,
+  "code": "1513",
+  "name": "Sines",
+  "dico": "1513"
+ },
+ {
+  "id": "820bdff75b1a8120c1178736",
+  "level": 1,
+  "code": "16",
+  "name": "Viana do Castelo"
+ },
+ {
+  "id": "3df9a49a5e02c980c90d7285",
+  "level": 2,
+  "code": "1601",
+  "name": "Arcos de Valdevez",
+  "dico": "1601"
+ },
+ {
+  "id": "57687e412737822bf24d503f",
+  "level": 2,
+  "code": "1602",
+  "name": "Caminha",
+  "dico": "1602"
+ },
+ {
+  "id": "469d13f8eb9c40692a92910e",
+  "level": 2,
+  "code": "1603",
+  "name": "Melgaço",
+  "dico": "1603"
+ },
+ {
+  "id": "b6f18c9a1f2164a9561107c6",
+  "level": 2,
+  "code": "1604",
+  "name": "Monção",
+  "dico": "1604"
+ },
+ {
+  "id": "987ca27955964b938e4d0838",
+  "level": 2,
+  "code": "1605",
+  "name": "Paredes de Coura",
+  "dico": "1605"
+ },
+ {
+  "id": "cd5b40262bcec915326c7d81",
+  "level": 2,
+  "code": "1606",
+  "name": "Ponte da Barca",
+  "dico": "1606"
+ },
+ {
+  "id": "333d4dc8d6d1cd2e5b2b785c",
+  "level": 2,
+  "code": "1607",
+  "name": "Ponte de Lima",
+  "dico": "1607"
+ },
+ {
+  "id": "9fd71e368ab1c75b96f322e8",
+  "level": 2,
+  "code": "1608",
+  "name": "Valença",
+  "dico": "1608"
+ },
+ {
+  "id": "f4bf6794e0e44471e0a1737e",
+  "level": 2,
+  "code": "1609",
+  "name": "Viana do Castelo",
+  "dico": "1609"
+ },
+ {
+  "id": "275813ece51b18e24ca1ced1",
+  "level": 2,
+  "code": "1610",
+  "name": "Vila Nova de Cerveira",
+  "dico": "1610"
+ },
+ {
+  "id": "50427d1ee9cf57a14322e95b",
+  "level": 1,
+  "code": "17",
+  "name": "Vila Real"
+ },
+ {
+  "id": "0bc10575e99ec3bfce744923",
+  "level": 2,
+  "code": "1701",
+  "name": "Alijó",
+  "dico": "1701"
+ },
+ {
+  "id": "4992e596e68263aa4fc258d0",
+  "level": 2,
+  "code": "1702",
+  "name": "Boticas",
+  "dico": "1702"
+ },
+ {
+  "id": "88a7e93477fb3f0e623d4f4d",
+  "level": 2,
+  "code": "1703",
+  "name": "Chaves",
+  "dico": "1703"
+ },
+ {
+  "id": "d2abd42be181838c43c27a1a",
+  "level": 2,
+  "code": "1704",
+  "name": "Mesão Frio",
+  "dico": "1704"
+ },
+ {
+  "id": "28d531622055b2b56647f955",
+  "level": 2,
+  "code": "1705",
+  "name": "Mondim de Basto",
+  "dico": "1705"
+ },
+ {
+  "id": "e0644386836a40ee5c4d47e0",
+  "level": 2,
+  "code": "1706",
+  "name": "Montalegre",
+  "dico": "1706"
+ },
+ {
+  "id": "9c61b4ec196ebba58768ba59",
+  "level": 2,
+  "code": "1707",
+  "name": "Murça",
+  "dico": "1707"
+ },
+ {
+  "id": "e29f8be39fe4381ad6a6b979",
+  "level": 2,
+  "code": "1708",
+  "name": "Peso da Régua",
+  "dico": "1708"
+ },
+ {
+  "id": "1800567ce8f57b173af9dcc4",
+  "level": 2,
+  "code": "1709",
+  "name": "Ribeira de Pena",
+  "dico": "1709"
+ },
+ {
+  "id": "6c52ca3604a9435bae2110cc",
+  "level": 2,
+  "code": "1710",
+  "name": "Sabrosa",
+  "dico": "1710"
+ },
+ {
+  "id": "9b04e99ad2f8134198a5f13b",
+  "level": 2,
+  "code": "1711",
+  "name": "Santa Marta de Penaguião",
+  "dico": "1711"
+ },
+ {
+  "id": "6304f37a5584e592ac7b44e0",
+  "level": 2,
+  "code": "1712",
+  "name": "Valpaços",
+  "dico": "1712"
+ },
+ {
+  "id": "bf12508b389697766a2d7699",
+  "level": 2,
+  "code": "1713",
+  "name": "Vila Pouca de Aguiar",
+  "dico": "1713"
+ },
+ {
+  "id": "a73038ce3c47752152b1f174",
+  "level": 2,
+  "code": "1714",
+  "name": "Vila Real",
+  "dico": "1714"
+ },
+ {
+  "id": "b279ff0d33abc959dc0059ae",
+  "level": 1,
+  "code": "18",
+  "name": "Viseu"
+ },
+ {
+  "id": "90ab3f8800bdcfe248ecb314",
+  "level": 2,
+  "code": "1801",
+  "name": "Armamar",
+  "dico": "1801"
+ },
+ {
+  "id": "1eeef135381fa3fea437e8b8",
+  "level": 2,
+  "code": "1802",
+  "name": "Carregal do Sal",
+  "dico": "1802"
+ },
+ {
+  "id": "775c8e8f3a7d4a414f9de4db",
+  "level": 2,
+  "code": "1803",
+  "name": "Castro Daire",
+  "dico": "1803"
+ },
+ {
+  "id": "671b6b8547f3a9dc90943dec",
+  "level": 2,
+  "code": "1804",
+  "name": "Cinfães",
+  "dico": "1804"
+ },
+ {
+  "id": "c309068e9274dd9fe6500522",
+  "level": 2,
+  "code": "1805",
+  "name": "Lamego",
+  "dico": "1805"
+ },
+ {
+  "id": "3994152f433d7009190b2e5a",
+  "level": 2,
+  "code": "1806",
+  "name": "Mangualde",
+  "dico": "1806"
+ },
+ {
+  "id": "91ed1a354ecf61f490355512",
+  "level": 2,
+  "code": "1807",
+  "name": "Moimenta da Beira",
+  "dico": "1807"
+ },
+ {
+  "id": "84b07d52eff468ccbf3a0ebb",
+  "level": 2,
+  "code": "1808",
+  "name": "Mortágua",
+  "dico": "1808"
+ },
+ {
+  "id": "391e54a16aa19bec7298db98",
+  "level": 2,
+  "code": "1809",
+  "name": "Nelas",
+  "dico": "1809"
+ },
+ {
+  "id": "6561ccd3973ac78574c43d4e",
+  "level": 2,
+  "code": "1810",
+  "name": "Oliveira de Frades",
+  "dico": "1810"
+ },
+ {
+  "id": "b0becbedbff697c4a22d276a",
+  "level": 2,
+  "code": "1811",
+  "name": "Penalva do Castelo",
+  "dico": "1811"
+ },
+ {
+  "id": "a6c42e9048de88154809df97",
+  "level": 2,
+  "code": "1812",
+  "name": "Penedono",
+  "dico": "1812"
+ },
+ {
+  "id": "b8743b4148f6afbf87f19399",
+  "level": 2,
+  "code": "1813",
+  "name": "Resende",
+  "dico": "1813"
+ },
+ {
+  "id": "2e8e97ca9b4d142d46cebaf2",
+  "level": 2,
+  "code": "1814",
+  "name": "Santa Comba Dão",
+  "dico": "1814"
+ },
+ {
+  "id": "427c6e539e9d20386e23a257",
+  "level": 2,
+  "code": "1815",
+  "name": "São João da Pesqueira",
+  "dico": "1815"
+ },
+ {
+  "id": "e1225ef3baf571182fc7fedb",
+  "level": 2,
+  "code": "1816",
+  "name": "São Pedro do Sul",
+  "dico": "1816"
+ },
+ {
+  "id": "ab2d000abea68391fb715231",
+  "level": 2,
+  "code": "1817",
+  "name": "Sátão",
+  "dico": "1817"
+ },
+ {
+  "id": "7982c5f2bab7e9b952f3264b",
+  "level": 2,
+  "code": "1818",
+  "name": "Sernancelhe",
+  "dico": "1818"
+ },
+ {
+  "id": "beb8dc0a238a1ee6bc5da4c0",
+  "level": 2,
+  "code": "1819",
+  "name": "Tabuaço",
+  "dico": "1819"
+ },
+ {
+  "id": "3a81900d5f61ebefc757fceb",
+  "level": 2,
+  "code": "1820",
+  "name": "Tarouca",
+  "dico": "1820"
+ },
+ {
+  "id": "19ac9734600353da211b785d",
+  "level": 2,
+  "code": "1821",
+  "name": "Tondela",
+  "dico": "1821"
+ },
+ {
+  "id": "9a58e29d17ce8ed1a008ec75",
+  "level": 2,
+  "code": "1822",
+  "name": "Vila Nova de Paiva",
+  "dico": "1822"
+ },
+ {
+  "id": "6e75925388d153ea6e7f6192",
+  "level": 2,
+  "code": "1823",
+  "name": "Viseu",
+  "dico": "1823"
+ },
+ {
+  "id": "131f6d16dafff54e7fddd6f5",
+  "level": 2,
+  "code": "1824",
+  "name": "Vouzela",
+  "dico": "1824"
+ },
+ {
+  "id": "60f74e7764758bd4af02439c",
+  "level": 1,
+  "code": "31",
+  "name": "Ilha da Madeira"
+ },
+ {
+  "id": "035b1209396fdf87b89d3b0e",
+  "level": 2,
+  "code": "3101",
+  "name": "Calheta",
+  "dico": "3101"
+ },
+ {
+  "id": "8fb79f66b7c27fff2036ef2b",
+  "level": 2,
+  "code": "3102",
+  "name": "Câmara de Lobos",
+  "dico": "3102"
+ },
+ {
+  "id": "f1d7e66edfffe0fec98cd94d",
+  "level": 2,
+  "code": "3103",
+  "name": "Funchal",
+  "dico": "3103"
+ },
+ {
+  "id": "9148b2b527e4648ac710d7cf",
+  "level": 2,
+  "code": "3104",
+  "name": "Machico",
+  "dico": "3104"
+ },
+ {
+  "id": "ccb1d732be640e7649b48e6d",
+  "level": 2,
+  "code": "3105",
+  "name": "Ponta do Sol",
+  "dico": "3105"
+ },
+ {
+  "id": "d5a084a3a6f58bf796b33fdb",
+  "level": 2,
+  "code": "3106",
+  "name": "Porto Moniz",
+  "dico": "3106"
+ },
+ {
+  "id": "410fc587f7fca348239ffe1d",
+  "level": 2,
+  "code": "3107",
+  "name": "Ribeira Brava",
+  "dico": "3107"
+ },
+ {
+  "id": "70e337ec982dd24b47f87c50",
+  "level": 2,
+  "code": "3108",
+  "name": "Santa Cruz",
+  "dico": "3108"
+ },
+ {
+  "id": "3f7653f41b5afcd87d51bb72",
+  "level": 2,
+  "code": "3109",
+  "name": "Santana",
+  "dico": "3109"
+ },
+ {
+  "id": "988e97658d12e27d44fbd509",
+  "level": 2,
+  "code": "3110",
+  "name": "São Vicente",
+  "dico": "3110"
+ },
+ {
+  "id": "7e1cb7f3e589f9dbfcb1007b",
+  "level": 1,
+  "code": "32",
+  "name": "Ilha de Porto Santo"
+ },
+ {
+  "id": "5c269f5effd390a4d6f3b2b6",
+  "level": 2,
+  "code": "3201",
+  "name": "Porto Santo",
+  "dico": "3201"
+ },
+ {
+  "id": "91be4eccc8e71231c48dcc1c",
+  "level": 1,
+  "code": "41",
+  "name": "Ilha de Santa Maria"
+ },
+ {
+  "id": "8211f12be1296cd1f9c4557c",
+  "level": 2,
+  "code": "4101",
+  "name": "Vila do Porto",
+  "dico": "4101"
+ },
+ {
+  "id": "c26954623dcfc725182a8a79",
+  "level": 1,
+  "code": "42",
+  "name": "Ilha de São Miguel"
+ },
+ {
+  "id": "d94cd6c3679e426350c6b4ee",
+  "level": 2,
+  "code": "4201",
+  "name": "Lagoa",
+  "dico": "4201"
+ },
+ {
+  "id": "2539bda0f1026e7e6eead40a",
+  "level": 2,
+  "code": "4202",
+  "name": "Nordeste",
+  "dico": "4202"
+ },
+ {
+  "id": "2fb6a022b34de8d3e3f5db63",
+  "level": 2,
+  "code": "4203",
+  "name": "Ponta Delgada",
+  "dico": "4203"
+ },
+ {
+  "id": "a86f6a7896fd71386c1864f0",
+  "level": 2,
+  "code": "4204",
+  "name": "Povoação",
+  "dico": "4204"
+ },
+ {
+  "id": "6437407fe1e4a7037ece956d",
+  "level": 2,
+  "code": "4205",
+  "name": "Ribeira Grande",
+  "dico": "4205"
+ },
+ {
+  "id": "16f9bcfd8aa874f94ab694a0",
+  "level": 2,
+  "code": "4206",
+  "name": "Vila Franca do Campo",
+  "dico": "4206"
+ },
+ {
+  "id": "a224c98c85b194ee86b1d64f",
+  "level": 1,
+  "code": "43",
+  "name": "Ilha Terceira"
+ },
+ {
+  "id": "28a1078b102278b415d19b17",
+  "level": 2,
+  "code": "4301",
+  "name": "Angra do Heroísmo",
+  "dico": "4301"
+ },
+ {
+  "id": "619ed2805430e22079091b13",
+  "level": 2,
+  "code": "4302",
+  "name": "Vila da Praia da Vitória",
+  "dico": "4302"
+ },
+ {
+  "id": "ca9689f894781e4ff2da7905",
+  "level": 1,
+  "code": "44",
+  "name": "Ilha Graciosa"
+ },
+ {
+  "id": "5bcbaa4057043251b9d4a2fc",
+  "level": 2,
+  "code": "4401",
+  "name": "Santa Cruz da Graciosa",
+  "dico": "4401"
+ },
+ {
+  "id": "7d31ec16dc4c0693a09188af",
+  "level": 1,
+  "code": "45",
+  "name": "Ilha de São Jorge"
+ },
+ {
+  "id": "d9589ad01ab512534e7d523a",
+  "level": 2,
+  "code": "4501",
+  "name": "Calheta",
+  "dico": "4501"
+ },
+ {
+  "id": "54b01c9ae9956ab1e00d37ca",
+  "level": 2,
+  "code": "4502",
+  "name": "Velas",
+  "dico": "4502"
+ },
+ {
+  "id": "35016ac52b41e649f2167833",
+  "level": 1,
+  "code": "46",
+  "name": "Ilha do Pico"
+ },
+ {
+  "id": "1263245b7e0f5e7ce22be09b",
+  "level": 2,
+  "code": "4601",
+  "name": "Lajes do Pico",
+  "dico": "4601"
+ },
+ {
+  "id": "03837dcb3229e90696d21d97",
+  "level": 2,
+  "code": "4602",
+  "name": "Madalena",
+  "dico": "4602"
+ },
+ {
+  "id": "33525dab7a917d88fc4539a6",
+  "level": 2,
+  "code": "4603",
+  "name": "São Roque do Pico",
+  "dico": "4603"
+ },
+ {
+  "id": "ac89d7ff84b0c249dac2d1bf",
+  "level": 1,
+  "code": "47",
+  "name": "Ilha do Faial"
+ },
+ {
+  "id": "91ed85e277ace26d427166d3",
+  "level": 2,
+  "code": "4701",
+  "name": "Horta",
+  "dico": "4701"
+ },
+ {
+  "id": "fed465e872d1d52277f97476",
+  "level": 1,
+  "code": "48",
+  "name": "Ilha das Flores"
+ },
+ {
+  "id": "4dae8d9ec375f70b63eb9c38",
+  "level": 2,
+  "code": "4801",
+  "name": "Lajes das Flores",
+  "dico": "4801"
+ },
+ {
+  "id": "16adaeb91487cb8cd813b0b4",
+  "level": 2,
+  "code": "4802",
+  "name": "Santa Cruz das Flores",
+  "dico": "4802"
+ },
+ {
+  "id": "d4d481db12a3e7f621f13f78",
+  "level": 1,
+  "code": "49",
+  "name": "Ilha do Corvo"
+ },
+ {
+  "id": "a8ac1f6000738e87cde37527",
+  "level": 2,
+  "code": "4901",
+  "name": "Corvo",
+  "dico": "4901"
+ }
 ]

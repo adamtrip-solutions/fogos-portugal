@@ -1,17 +1,26 @@
 using System.Xml.Linq;
 using Fogos.Api.Auth;
+using Fogos.Api.GraphQL.Types;
+using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
 using Fogos.Domain.Events;
+using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
 using Fogos.Domain.Time;
 using Fogos.Domain.Warnings;
+using Fogos.Domain.Webhooks;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Queue;
+using Fogos.Infrastructure.RateLimiting;
+using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Storage;
+using Fogos.Infrastructure.Webhooks;
 using HotChocolate;
 using HotChocolate.Authorization;
 using HotChocolate.Types;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace Fogos.Api.GraphQL.Mutations;
@@ -156,6 +165,7 @@ public sealed class Mutation
         MongoContext mongo,
         IEventDispatcher dispatcher,
         IClock clock,
+        Fogos.Infrastructure.Incidents.KmlVersionStore kmlVersions,
         CancellationToken ct,
         bool? vost = null)
     {
@@ -178,6 +188,9 @@ public sealed class Mutation
             update,
             new FindOneAndUpdateOptions<Incident> { ReturnDocument = ReturnDocument.After },
             ct) ?? incident;
+
+        // Version the perimeter (dedup by SHA-256 per incident+slot) before announcing.
+        await kmlVersions.AppendIfChangedAsync(updated.Id, isVost, kml, ct);
 
         await dispatcher.DispatchAsync(new KmlAttached(updated.Id, isVost), ct: ct);
         return updated;
@@ -218,6 +231,147 @@ public sealed class Mutation
         return warning;
     }
 
+    /// <summary>
+    /// Registers an anonymous alert subscription (Concelho by DICO, or Point + radius). Rate-limited per
+    /// caller IP like the photo-upload gate. Validates: Concelho ⇒ DICO exists in <c>locations</c>;
+    /// Point ⇒ radius 1–50 km and the point inside the Portugal bounding box; risk threshold ∈ {4,5}.
+    /// </summary>
+    public async Task<AlertSubscription> CreateAlertSubscription(
+        CreateAlertSubscriptionInput input,
+        MongoContext mongo,
+        LocationReads locations,
+        AlertSubscriptionGate gate,
+        IClock clock,
+        IFogosCallerAccessor callerAccessor,
+        IOptions<AlertOptions> options,
+        CancellationToken ct)
+    {
+        if (!await gate.TryAcquireAsync(callerAccessor.Caller.RemoteIp, ct))
+            throw Fail("Demasiados pedidos de subscrição. Tente novamente dentro de momentos.", "RATE_LIMITED");
+
+        var o = options.Value;
+        var subscription = new AlertSubscription
+        {
+            Kind = input.Kind,
+            FcmToken = string.IsNullOrWhiteSpace(input.FcmToken) ? null : input.FcmToken,
+            CreatedAt = clock.UtcNow,
+        };
+
+        if (input.Kind == AlertSubscriptionKind.Concelho)
+        {
+            if (string.IsNullOrWhiteSpace(input.Dico))
+                throw Fail("O concelho (dico) é obrigatório para subscrições de concelho.", "ALERT_DICO_REQUIRED");
+            if (await locations.ByDicoAsync(input.Dico, ct) is null)
+                throw Fail("Concelho desconhecido.", "ALERT_DICO_UNKNOWN");
+            subscription.Dico = input.Dico;
+
+            if (input.RiskThreshold is int rt && rt is not (4 or 5))
+                throw Fail("O limiar de risco tem de ser 4 ou 5.", "ALERT_RISK_THRESHOLD");
+            subscription.RiskThreshold = input.RiskThreshold;
+        }
+        else // Point
+        {
+            // Risk is a per-concelho signal; it has no meaning for a point subscription.
+            if (input.RiskThreshold is not null)
+                throw Fail("O limiar de risco só se aplica a subscrições por concelho.", "ALERT_RISK_THRESHOLD_SCOPE");
+            if (input.Latitude is not double lat || input.Longitude is not double lng)
+                throw Fail("A latitude e a longitude são obrigatórias para subscrições por ponto.", "ALERT_POINT_REQUIRED");
+            if (input.RadiusKm is not double radius)
+                throw Fail("O raio é obrigatório para subscrições por ponto.", "ALERT_RADIUS_REQUIRED");
+            if (radius < 1 || radius > o.MaxRadiusKm)
+                throw Fail($"O raio tem de estar entre 1 e {o.MaxRadiusKm:0} km.", "ALERT_RADIUS_RANGE");
+            if (!o.InPortugal(lat, lng))
+                throw Fail("O ponto está fora de Portugal.", "ALERT_POINT_OUT_OF_BOUNDS");
+
+            subscription.Point = GeoPoint.FromLatLng(lat, lng);
+            subscription.RadiusKm = radius;
+        }
+
+        await mongo.AlertSubscriptions.InsertOneAsync(subscription, cancellationToken: ct);
+        return subscription;
+    }
+
+    /// <summary>Deletes an alert subscription by id. Returns false when the id is unknown/malformed.</summary>
+    public async Task<bool> DeleteAlertSubscription([ID] string id, MongoContext mongo, CancellationToken ct)
+    {
+        try
+        {
+            var result = await mongo.AlertSubscriptions.DeleteOneAsync(
+                Builders<AlertSubscription>.Filter.Eq(x => x.Id, id), ct);
+            return result.DeletedCount > 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Registers an outbound webhook for the authenticated API client. HTTPS-only URL, valid event names,
+    /// max 3 per client. The response carries the signing secret once — it is never exposed again.
+    /// </summary>
+    public async Task<Webhook> RegisterWebhook(
+        string url,
+        IReadOnlyList<string> events,
+        MongoContext mongo,
+        WebhookReads webhooks,
+        IClock clock,
+        IFogosCallerAccessor callerAccessor,
+        IOptions<WebhookOptions> options,
+        CancellationToken ct)
+    {
+        var clientId = RequireClient(callerAccessor);
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            throw Fail("O URL do webhook tem de usar HTTPS.", "WEBHOOK_URL_INVALID");
+
+        var chosen = events.Distinct().ToList();
+        if (chosen.Count == 0 || chosen.Any(e => !WebhookEvents.All.Contains(e)))
+            throw Fail("Lista de eventos inválida.", "WEBHOOK_EVENTS_INVALID");
+
+        if (await webhooks.CountByClientAsync(clientId, ct) >= options.Value.MaxEndpointsPerClient)
+            throw Fail($"Máximo de {options.Value.MaxEndpointsPerClient} webhooks por cliente atingido.", "WEBHOOK_LIMIT");
+
+        var endpoint = new WebhookEndpoint
+        {
+            ClientId = clientId,
+            Url = url,
+            Secret = WebhookSigner.NewSecret(),
+            Events = chosen,
+            Active = true,
+            CreatedAt = clock.UtcNow,
+        };
+        await mongo.WebhookEndpoints.InsertOneAsync(endpoint, cancellationToken: ct);
+
+        return Webhook.WithSecret(endpoint);
+    }
+
+    /// <summary>Deletes one of the caller's own webhooks. Returns false when unknown or not owned.</summary>
+    public async Task<bool> DeleteWebhook(
+        [ID] string id, MongoContext mongo, IFogosCallerAccessor callerAccessor, CancellationToken ct)
+    {
+        var clientId = RequireClient(callerAccessor);
+        try
+        {
+            var result = await mongo.WebhookEndpoints.DeleteOneAsync(
+                Builders<WebhookEndpoint>.Filter.Eq(x => x.Id, id) & Builders<WebhookEndpoint>.Filter.Eq(x => x.ClientId, clientId), ct);
+            return result.DeletedCount > 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Resolves the authenticated client id, or throws when the caller is anonymous.</summary>
+    private static string RequireClient(IFogosCallerAccessor accessor)
+    {
+        var caller = accessor.Caller;
+        if (caller.IsAnonymous || string.IsNullOrEmpty(caller.ClientId))
+            throw Fail("É necessária autenticação de cliente.", "UNAUTHENTICATED");
+        return caller.ClientId;
+    }
+
     private static string? ComposePositNarrative(PositInput input)
     {
         var parts = new List<string>(3);
@@ -243,6 +397,9 @@ public sealed class Mutation
     }
 
     private static GraphQLException NotFound(string message, string code) =>
+        new(ErrorBuilder.New().SetMessage(message).SetCode(code).Build());
+
+    private static GraphQLException Fail(string message, string code) =>
         new(ErrorBuilder.New().SetMessage(message).SetCode(code).Build());
 
     private static async Task<Incident?> FindIncidentAsync(MongoContext mongo, string incidentId, CancellationToken ct) =>

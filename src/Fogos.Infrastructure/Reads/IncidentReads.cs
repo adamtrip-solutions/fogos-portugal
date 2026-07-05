@@ -44,6 +44,29 @@ public sealed class IncidentReads(MongoContext context)
         return await context.Incidents.Find(filter).Sort(StandardSort).ToListAsync(ct);
     }
 
+    /// <summary>All active incidents (any kind) within a concelho, newest occurrence first.</summary>
+    public async Task<IReadOnlyList<Incident>> ActiveByDicoAsync(string dico, CancellationToken ct = default)
+    {
+        var f = Builders<Incident>.Filter;
+        return await context.Incidents
+            .Find(f.Eq(x => x.Active, true) & f.Eq(x => x.Dico, dico))
+            .Sort(StandardSort)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// Fires for the RSS feed: every active fire plus any fire concluded (no longer active) whose record
+    /// was last touched since <paramref name="concludedSince"/>. Newest occurrence first, capped at <paramref name="limit"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<Incident>> ActiveOrRecentlyConcludedFiresAsync(DateTimeOffset concludedSince, int limit, CancellationToken ct = default)
+    {
+        var f = Builders<Incident>.Filter;
+        var filter = f.Eq(x => x.Kind, IncidentKind.Fire) & f.Or(
+            f.Eq(x => x.Active, true),
+            f.And(f.Eq(x => x.Active, false), f.Gte(x => x.UpdatedAt, concludedSince)));
+        return await context.Incidents.Find(filter).Sort(StandardSort).Limit(limit).ToListAsync(ct);
+    }
+
     // ── Per-incident satellites (batched for DataLoaders) ──────────────────────
 
     public async Task<List<IncidentHistorySnapshot>> HistoryByIncidentsAsync(IReadOnlyList<string> incidentIds, CancellationToken ct = default) =>

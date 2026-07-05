@@ -1,6 +1,6 @@
-# fogos.pt API (.NET 10)
+# FogosPortugal API (.NET 10)
 
-A standalone, greenfield rebuild of the [fogos.pt](https://fogos.pt) wildfire API — the
+A standalone, greenfield rebuild of the [FogosPortugal](https://fogosportugal.pt) wildfire API — the
 service behind Portugal's live map of active fires, weather, and fire-risk data. It runs on
 its own MongoDB with a clean schema and a first-class importer for the decade of historical
 data from the old PHP platform, which keeps running untouched until an owner-driven

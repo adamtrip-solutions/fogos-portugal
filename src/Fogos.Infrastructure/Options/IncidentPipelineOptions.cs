@@ -9,7 +9,7 @@ public sealed class IncidentPipelineOptions
     public string Source { get; set; } = "arcgis";
 
     /// <summary>Link domain used in social copy (legacy <c>SOCIAL_LINK_DOMAIN</c>).</summary>
-    public string SocialLinkDomain { get; set; } = "fogos.pt";
+    public string SocialLinkDomain { get; set; } = "fogosportugal.pt";
 
     /// <summary>The ArcGIS feed is considered stale after this long unchanged (legacy history.json idea).</summary>
     public TimeSpan FeedStaleAfter { get; set; } = TimeSpan.FromMinutes(30);

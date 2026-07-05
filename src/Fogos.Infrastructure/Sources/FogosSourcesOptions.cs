@@ -24,7 +24,7 @@ public sealed class ArcGisOptions
 {
     /// <summary>FeatureServer layer 0 base (the <c>/query</c> suffix is appended by the client).</summary>
     public string FeatureServerUrl { get; set; } =
-        "https://services-eu1.arcgis.com/Rht1MzM8Mw3kR6nk/arcgis/rest/services/OcorrenciasSite/FeatureServer/0";
+        "https://services-eu1.arcgis.com/VlrHb7fn5ewYhX6y/arcgis/rest/services/OcorrenciasSite/FeatureServer/0";
 
     /// <summary>Records per page (legacy paged 1000/page via <c>resultOffset</c>).</summary>
     public int PageSize { get; set; } = 1000;

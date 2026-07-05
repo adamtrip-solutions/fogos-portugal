@@ -22,6 +22,7 @@ public sealed class IcnfEnrichmentService(
     MongoContext mongo,
     IEventDispatcher dispatcher,
     IClock clock,
+    Fogos.Infrastructure.Incidents.KmlVersionStore kmlVersions,
     ILogger<IcnfEnrichmentService> logger)
 {
     public async Task<IcnfEnriched?> EnrichAsync(string incidentId, string? icnfId, CancellationToken ct = default)
@@ -100,6 +101,10 @@ public sealed class IcnfEnrichmentService(
             update = update.Set(x => x.Kml, kml);
 
         await mongo.Incidents.UpdateOneAsync(Builders<Incident>.Filter.Eq(x => x.Id, incidentId), update, cancellationToken: ct);
+
+        // Version the downloaded perimeter (dedup by SHA-256; ICNF only ever writes the non-VOST slot).
+        if (kml is not null)
+            await kmlVersions.AppendIfChangedAsync(incidentId, vost: false, kml, ct);
 
         if (!firstCause && !firstKml && !firstBurnArea)
             return null;

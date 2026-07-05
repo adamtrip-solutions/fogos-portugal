@@ -27,6 +27,39 @@ public sealed record ResourceTotals(int Man, int Terrain, int Aerial, int Total,
 /// <summary>One hour of the ignition histogram.</summary>
 public sealed record HourBucket(int Hour, int Count);
 
+/// <summary>One calendar day and its fire-ignition count (season analytics; gaps filled with 0).</summary>
+public sealed record DayCount(DateOnly Date, int Count);
+
+/// <summary>One calendar day and the cumulative accounted burn area (ha) up to and including it.</summary>
+public sealed record DayArea(DateOnly Date, double TotalHa);
+
+/// <summary>Ignition count and accounted burn area for one ICNF cause family in a season.</summary>
+public sealed record CauseCount(string CauseFamily, int Count, double BurnAreaHa);
+
+/// <summary>Per-district false-alarm counters and rate for a season.</summary>
+public sealed record DistrictFalseAlarms(string District, int Total, int FalseAlarms, double Rate);
+
+/// <summary>Median first-transition response times for a season (nullable medians when no sample).</summary>
+public sealed record ResponseTimeStats(int Count, int? MedianDispatchToArrivalSeconds, int? MedianArrivalToControlSeconds);
+
+/// <summary>One risk horizon in a concelho profile (a forecast date + its 1–5 level and PT label).</summary>
+public sealed record ConcelhoRiskDay(DateOnly Date, int Level, string Label);
+
+/// <summary>
+/// Everything the concelho page needs: identity, the risk strip, active incidents, in-force IPMA
+/// warnings mapped to the district, and year-over-year ignition / burn-area counters.
+/// </summary>
+public sealed record ConcelhoProfile(
+    string Dico,
+    string Name,
+    string District,
+    IReadOnlyList<ConcelhoRiskDay> Risk,
+    IReadOnlyList<Fogos.Domain.Incidents.Incident> ActiveIncidents,
+    IReadOnlyList<Fogos.Domain.Weather.WeatherWarning> WeatherWarnings,
+    int YearIgnitions,
+    int PreviousYearIgnitions,
+    double YearBurnAreaHa);
+
 /// <summary>Marker for the <c>stats</c> field; all data is computed by <c>StatsExtensions</c>.</summary>
 public sealed class Stats;
 
@@ -51,6 +84,44 @@ public sealed record Aircraft(
     TrackedAircraft Tracked,
     FlightPosition? Position,
     bool Active);
+
+/// <summary>An aircraft associated with an incident (link joined to the tracked-fleet metadata).</summary>
+public sealed record IncidentAircraft(
+    string Icao,
+    string? Registration,
+    string? Name,
+    string? Kind,
+    bool Active,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt,
+    int Samples);
+
+/// <summary>
+/// A registered webhook as seen by its owner. <see cref="Secret"/> is populated only on the creation
+/// response (<c>registerWebhook</c>); the <c>webhooks</c> query always returns it null.
+/// </summary>
+public sealed record Webhook(
+    [property: ID] string Id,
+    string Url,
+    IReadOnlyList<string> Events,
+    bool Active,
+    int ConsecutiveFailures,
+    DateTimeOffset CreatedAt,
+    string? Secret)
+{
+    public static Webhook WithSecret(Fogos.Domain.Webhooks.WebhookEndpoint e) =>
+        new(e.Id, e.Url, e.Events, e.Active, e.ConsecutiveFailures, e.CreatedAt, e.Secret);
+
+    public static Webhook WithoutSecret(Fogos.Domain.Webhooks.WebhookEndpoint e) =>
+        new(e.Id, e.Url, e.Events, e.Active, e.ConsecutiveFailures, e.CreatedAt, null);
+}
+
+/// <summary>Metadata of a stored KML perimeter version (the raw KML is reached only via REST by id).</summary>
+public sealed record KmlVersionMeta(
+    string Id,
+    bool Vost,
+    DateTimeOffset CapturedAt,
+    int SizeBytes);
 
 /// <summary>
 /// A photo awaiting moderation, with a short-lived presigned GET URL (pending photos are not public,

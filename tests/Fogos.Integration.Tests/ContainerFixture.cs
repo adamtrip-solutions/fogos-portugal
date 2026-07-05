@@ -69,6 +69,9 @@ public sealed class ContainerFixture : IAsyncLifetime
         ["PhotoGate:PerIncidentPerIpPerHour"] = "100000",
         ["PhotoGate:PerIncidentPerHour"] = "100000",
         ["PhotoGate:PendingPerIncident"] = "100000",
+        // Alert-subscription creation gate defaults high (all TestServer requests share one IP).
+        ["Alerts:CreatePerIpPerMinute"] = "100000",
+        ["Alerts:CreatePerIpPerDay"] = "100000",
     };
 
     public async Task InitializeAsync()

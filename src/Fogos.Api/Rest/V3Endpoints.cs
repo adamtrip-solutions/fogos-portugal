@@ -17,6 +17,8 @@ namespace Fogos.Api.Rest;
 public static class V3Endpoints
 {
     private const string ActiveCacheControl = "public, max-age=15, s-maxage=30, stale-while-revalidate=30";
+    private const string KmlVersionsListCacheControl = "public, max-age=60";
+    private const string KmlVersionImmutableCacheControl = "public, max-age=86400, immutable";
     private const string KmlContentType = "application/vnd.google-earth.kml+xml";
 
     private static readonly IReadOnlyList<IncidentKind> ActiveKinds = [IncidentKind.Fire];
@@ -31,6 +33,35 @@ public static class V3Endpoints
         group.MapGet("/incidents/{id}/kml", (string id, IncidentReads reads, CancellationToken ct) => StoredKmlAsync(id, reads, ct, vost: false));
         group.MapGet("/incidents/{id}/kml-vost", (string id, IncidentReads reads, CancellationToken ct) => StoredKmlAsync(id, reads, ct, vost: true));
         group.MapGet("/incidents/{id}/kml-firms", FirmsKmlAsync);
+        group.MapGet("/incidents/{id}/kml-versions", KmlVersionsAsync);
+        group.MapGet("/incidents/{id}/kml-versions/{versionId}", KmlVersionAsync);
+    }
+
+    // ── {id}/kml-versions (perimeter history metadata) ─────────────────────────
+    private static async Task<IResult> KmlVersionsAsync(string id, HttpContext http, KmlVersionReads reads, CancellationToken ct)
+    {
+        var versions = await reads.MetaByIncidentAsync(id, ct);
+        var payload = versions.Select(v => new
+        {
+            id = v.Id,
+            vost = v.Vost,
+            capturedAt = v.CapturedAt,
+            sizeBytes = v.SizeBytes,
+        });
+        http.Response.Headers.CacheControl = KmlVersionsListCacheControl;
+        return Results.Json(payload);
+    }
+
+    // ── {id}/kml-versions/{versionId} (immutable perimeter snapshot) ───────────
+    private static async Task<IResult> KmlVersionAsync(string id, string versionId, HttpContext http, KmlVersionReads reads, CancellationToken ct)
+    {
+        var version = await reads.GetVersionAsync(id, versionId, ct);
+        if (version is null || string.IsNullOrEmpty(version.Kml))
+            return Results.NotFound();
+
+        http.Response.Headers.CacheControl = KmlVersionImmutableCacheControl;
+        var bytes = Encoding.UTF8.GetBytes(version.Kml);
+        return Results.File(bytes, KmlContentType, fileDownloadName: $"{id}-{versionId}.kml");
     }
 
     // ── active.geojson ─────────────────────────────────────────────────────────
@@ -54,6 +85,9 @@ public static class V3Endpoints
                         man = i.Resources.Man,
                         terrain = i.Resources.Terrain,
                         aerial = i.Resources.Aerial,
+                        manGround = i.Resources.ManGround,
+                        manAerial = i.Resources.ManAerial,
+                        entities = i.Resources.Entities,
                         location = i.Location,
                         concelho = i.Concelho,
                         district = i.District,
@@ -76,7 +110,7 @@ public static class V3Endpoints
         await using (var writer = new StreamWriter(buffer, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true), leaveOpen: true))
         await using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = ";" }))
         {
-            foreach (var h in new[] { "id", "occurredAt", "district", "concelho", "freguesia", "location", "lat", "lng", "status", "kind", "man", "terrain", "aerial" })
+            foreach (var h in new[] { "id", "occurredAt", "district", "concelho", "freguesia", "location", "lat", "lng", "status", "kind", "man", "terrain", "aerial", "manGround", "manAerial", "entities" })
                 csv.WriteField(h);
             await csv.NextRecordAsync();
 
@@ -95,6 +129,9 @@ public static class V3Endpoints
                 csv.WriteField(i.Resources.Man);
                 csv.WriteField(i.Resources.Terrain);
                 csv.WriteField(i.Resources.Aerial);
+                csv.WriteField(i.Resources.ManGround);
+                csv.WriteField(i.Resources.ManAerial);
+                csv.WriteField(i.Resources.Entities);
                 await csv.NextRecordAsync();
             }
         }

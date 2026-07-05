@@ -24,6 +24,56 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("fireRisk(day: RiskDay!", sdl);
         Assert.Contains("aircraftTrack(icao: String!", sdl);
 
+        // Incident resolver fields.
+        Assert.Contains("statusChangedAt: DateTime", sdl);
+        Assert.Contains("signals: IncidentSignals!", sdl);
+        Assert.Contains("responseTimes: ResponseTimes", sdl);
+
+        // Signals / response-time output types.
+        Assert.Contains("type IncidentSignals", sdl);
+        Assert.Contains("criticalReasons: [String!]!", sdl);
+        Assert.Contains("rekindleOfId: ID", sdl);
+        Assert.Contains("type ResponseTimes", sdl);
+        Assert.Contains("dispatchToArrivalSeconds: Int", sdl);
+
+        // WP2 — aircraft association + KML versioning.
+        Assert.Contains("aircraft: [IncidentAircraft!]!", sdl);
+        Assert.Contains("kmlHistory: [KmlVersionMeta!]!", sdl);
+        Assert.Contains("type IncidentAircraft", sdl);
+        Assert.Contains("icao: ID!", sdl);
+        Assert.Contains("type KmlVersionMeta", sdl);
+        Assert.Contains("currentIncidentId: ID", sdl);
+
+        // WP3 — season analytics, concelho profile, ignition clustering.
+        Assert.Contains("ignitionsByDay(year: Int!): [DayCount!]!", sdl);
+        Assert.Contains("burnAreaCumulative(year: Int!): [DayArea!]!", sdl);
+        Assert.Contains("causeBreakdown(year: Int!): [CauseCount!]!", sdl);
+        Assert.Contains("falseAlarmStats(year: Int!): [DistrictFalseAlarms!]!", sdl);
+        Assert.Contains("responseTimeStats(year: Int! district: String): ResponseTimeStats", sdl);
+        Assert.Contains("concelhoProfile(dico: String!): ConcelhoProfile", sdl);
+        Assert.Contains("ignitionClusters(activeOnly: Boolean! = true): [IgnitionCluster!]!", sdl);
+        Assert.Contains("clusterId: ID", sdl);
+        Assert.Contains("type ConcelhoProfile", sdl);
+        Assert.Contains("type ConcelhoRiskDay", sdl);
+        Assert.Contains("type IgnitionCluster", sdl);
+        Assert.Contains("type DayCount", sdl);
+        Assert.Contains("type ResponseTimeStats", sdl);
+
+        // WP4 — alert subscriptions, webhooks, situation reports.
+        Assert.Contains("createAlertSubscription(input: CreateAlertSubscriptionInput!): AlertSubscription!", sdl);
+        Assert.Contains("deleteAlertSubscription(id: ID!): Boolean!", sdl);
+        Assert.Contains("registerWebhook(url: String! events: [String!]!): Webhook!", sdl);
+        Assert.Contains("deleteWebhook(id: ID!): Boolean!", sdl);
+        Assert.Contains("alertEvents(subscriptionId: ID! after: DateTime): [AlertEvent!]!", sdl);
+        Assert.Contains("situationReports(first: Int! = 7): [SituationReport!]!", sdl);
+        Assert.Contains("webhooks: [Webhook!]!", sdl);
+        Assert.Contains("type AlertSubscription", sdl);
+        Assert.Contains("type AlertEvent", sdl);
+        Assert.Contains("type Webhook", sdl);
+        Assert.Contains("type SituationReport", sdl);
+        Assert.Contains("input CreateAlertSubscriptionInput", sdl);
+        Assert.Contains("enum AlertSubscriptionKind", sdl);
+
         // Input + key types.
         Assert.Contains("input IncidentFilter", sdl);
         Assert.Contains("type GeoPoint", sdl);

@@ -27,6 +27,7 @@ public sealed class FcmSender(IOptions<FcmOptions> options, ILogger<FcmSender> l
         {
             Condition = message.Condition,
             Topic = message.Topic,
+            Token = message.Token,
             Data = message.Data is null ? null : new Dictionary<string, string>(message.Data),
             Notification = message.DataOnly
                 ? null

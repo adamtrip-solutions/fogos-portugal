@@ -1,4 +1,22 @@
+using Fogos.Domain.Alerts;
+
 namespace Fogos.Api.GraphQL.Mutations;
+
+/// <summary>
+/// Create an alert subscription. A Concelho subscription needs a <see cref="Dico"/>; a Point subscription
+/// needs <see cref="Latitude"/>/<see cref="Longitude"/> + a <see cref="RadiusKm"/> (1–50). A risk alert is
+/// requested by setting <see cref="RiskThreshold"/> (4 or 5). <see cref="FcmToken"/> enables direct push.
+/// </summary>
+public sealed record CreateAlertSubscriptionInput
+{
+    public required AlertSubscriptionKind Kind { get; init; }
+    public string? Dico { get; init; }
+    public double? Latitude { get; init; }
+    public double? Longitude { get; init; }
+    public double? RadiusKm { get; init; }
+    public int? RiskThreshold { get; init; }
+    public string? FcmToken { get; init; }
+}
 
 /// <summary>
 /// Operator POSIT ("ponto de situação") input. The resource counts overwrite the incident's committed

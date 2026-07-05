@@ -29,10 +29,12 @@ builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete
 // Ingestion jobs are registered by the next waves — each agent edits only its own marker line:
 builder.Services.AddWeatherJobs(); // [jobs:weather] registered in wave 2
 Fogos.Worker.Jobs.Risk.RiskFirmsJobRegistration.AddRiskAndFirmsJobs(builder.Services, builder.Configuration); // [jobs:risk]
-builder.Services.AddPlaneJobs(); // [jobs:planes] registered in wave 2
+builder.Services.AddPlaneJobs(builder.Configuration); // [jobs:planes] registered in wave 2
 Fogos.Worker.Jobs.Incidents.IncidentJobsRegistration.AddIncidentJobs(builder.Services, builder.Configuration); // [jobs:incidents]
 Fogos.Worker.Jobs.Photos.PhotoJobsRegistration.AddPhotoJobs(builder.Services); // [jobs:photos] Phase 4
 builder.Services.AddSummaryJobs(); // [jobs:summaries] Phase 5
+Fogos.Worker.Jobs.Signals.SignalsJobsRegistration.AddSignalsJobs(builder.Services, builder.Configuration); // [jobs:signals] WP1
+Fogos.Worker.Jobs.Alerts.AlertsJobsRegistration.AddAlertJobs(builder.Services); // [jobs:alerts] WP4
 
 // Change-stream → subscriptions bridge (publisher side of the SAME Redis provider the Api
 // subscribes to). Only when Redis is configured; a plain run without Redis stays a no-op.

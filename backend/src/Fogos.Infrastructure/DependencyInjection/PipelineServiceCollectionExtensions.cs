@@ -1,4 +1,3 @@
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Sources;
@@ -9,8 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Fogos.Infrastructure.DependencyInjection;
 
 /// <summary>
-/// Registers the ingestion-pipeline services: the Redis Streams queue (dispatchers + idempotency),
-/// FCM, and the external-source HTTP clients. The Api only needs
+/// Registers the ingestion-pipeline services: the Redis Streams queue (dispatchers + idempotency)
+/// and the external-source HTTP clients. The Api only needs
 /// <see cref="ServiceCollectionExtensions.AddFogosInfrastructure"/>; the Worker adds this on top.
 /// </summary>
 public static class PipelineServiceCollectionExtensions
@@ -19,12 +18,10 @@ public static class PipelineServiceCollectionExtensions
     {
         // ── Options ──────────────────────────────────────────────────────────────────────────
         services.Configure<QueueOptions>(configuration.GetSection(QueueOptions.SectionName));
-        services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
         services.Configure<FogosSourcesOptions>(configuration.GetSection(FogosSourcesOptions.SectionName));
 
         // ── Queue ────────────────────────────────────────────────────────────────────────────
         services.AddSingleton<IEventDispatcher, RedisEventDispatcher>();
-        services.AddSingleton<IDelayedDispatcher, RedisDelayedDispatcher>();
         services.AddSingleton<IProcessedMarker, RedisProcessedMarker>();
 
         // ── Webhooks ───────────────────────────────────────────────────────────────────────────
@@ -35,11 +32,6 @@ public static class PipelineServiceCollectionExtensions
             var o = sp.GetRequiredService<IOptions<WebhookOptions>>().Value;
             client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
         });
-
-        // ── FCM ──────────────────────────────────────────────────────────────────────────────
-        services.AddSingleton<IFcmSender, FcmSender>();
-        services.AddSingleton<FcmNotifier>();
-        services.AddSingleton<NotificationScheduler>();
 
         // ── External sources (typed clients, standard resilience: 3 retries + backoff) ─────────
         services.AddHttpClient<ArcGisClient>().AddStandardResilienceHandler();

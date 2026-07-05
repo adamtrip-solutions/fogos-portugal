@@ -10,9 +10,9 @@ public enum AlertSubscriptionKind
 }
 
 /// <summary>
-/// An anonymous alert subscription (push delivery). A device registers a concelho or a point+radius
-/// watch; matched incidents/risk land in <c>alert_events</c> (internal dedupe) and, when an FCM token is
-/// present, a direct push is sent. Purged after 90 days of no <see cref="LastSeenAt"/> activity.
+/// An anonymous alert subscription. A device registers a concelho or a point+radius watch; matched
+/// incidents/risk land in <c>alert_events</c> (internal dedupe store). Purged after 90 days of no
+/// <see cref="LastSeenAt"/> activity.
 /// </summary>
 public sealed class AlertSubscription
 {
@@ -32,9 +32,6 @@ public sealed class AlertSubscription
 
     /// <summary>Notify when the concelho risk reaches this level (4 or 5); null = no risk alerts.</summary>
     public int? RiskThreshold { get; set; }
-
-    /// <summary>Optional FCM device token for direct push delivery.</summary>
-    public string? FcmToken { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

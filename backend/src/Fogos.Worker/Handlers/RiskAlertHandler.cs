@@ -3,7 +3,6 @@ using Fogos.Domain.Events;
 using Fogos.Domain.Risk;
 using Fogos.Infrastructure.Alerts;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Reads;
 using MongoDB.Driver;
@@ -11,16 +10,15 @@ using MongoDB.Driver;
 namespace Fogos.Worker.Handlers;
 
 /// <summary>
-/// On <see cref="RcmProcessed"/>, emits a RISK alert (once per day per subscription, via the
+/// On <see cref="RcmProcessed"/>, records a RISK alert event (once per day per subscription, via the
 /// <c>risk:{dico}:{yyyy-MM-dd}</c> dedupe key) for every concelho subscription whose configured threshold
-/// is met by today's <c>rcm_daily</c> level, and pushes to token-bearing subscriptions. Idempotent — the
-/// hourly RCM run redispatches, but the dedupe insert keeps it to one event per day.
+/// is met by today's <c>rcm_daily</c> level. Idempotent — the hourly RCM run redispatches, but the dedupe
+/// insert keeps it to one event per day.
 /// </summary>
 public sealed class RiskAlertHandler(
     MongoContext mongo,
     AlertReads alerts,
-    AlertEventStore events,
-    FcmNotifier fcm)
+    AlertEventStore events)
     : IEventHandler<RcmProcessed>
 {
     public async Task HandleAsync(RcmProcessed evt, CancellationToken ct)
@@ -49,10 +47,7 @@ public sealed class RiskAlertHandler(
 
             var message = AlertCopy.Risk(risk.Concelho, RiskLevels.Label(level));
             var dedupe = $"risk:{sub.Dico}:{day:yyyy-MM-dd}";
-            var recorded = await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct);
-            if (recorded && !string.IsNullOrEmpty(sub.FcmToken))
-                await fcm.SendToTokenAsync(sub.FcmToken!, AlertCopy.RiskTitle(risk.Concelho), message,
-                    new Dictionary<string, string> { ["kind"] = "alert", ["alertKind"] = AlertEventKind.Risk, ["dico"] = sub.Dico! }, ct);
+            await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct);
         }
     }
 }

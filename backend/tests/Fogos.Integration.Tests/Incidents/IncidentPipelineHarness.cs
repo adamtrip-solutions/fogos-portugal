@@ -6,9 +6,7 @@ using Fogos.Domain.Time;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Ingest;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Scheduling;
 using Fogos.Infrastructure.Sources;
@@ -23,9 +21,9 @@ using StackExchange.Redis;
 namespace Fogos.Integration.Tests.Incidents;
 
 /// <summary>
-/// Wires the incident cluster against the shared Testcontainers Mongo/Redis with a recording FCM double.
-/// Provides ingest + handler routing so a fixture can flow through the real pipeline (upsert → events on
-/// the stream → handler side effects) deterministically.
+/// Wires the incident cluster against the shared Testcontainers Mongo/Redis. Provides ingest + handler
+/// routing so a fixture can flow through the real pipeline (upsert → events on the stream → handler side
+/// effects) deterministically.
 /// </summary>
 internal sealed class IncidentPipelineHarness : IDisposable
 {
@@ -33,8 +31,6 @@ internal sealed class IncidentPipelineHarness : IDisposable
     public IConnectionMultiplexer Redis { get; }
     public RecordingOps Ops { get; } = new();
     public TestClock Clock { get; } = new() { UtcNow = new DateTimeOffset(2026, 8, 1, 15, 0, 0, TimeSpan.Zero) };
-
-    public RecordingFcmSender Fcm { get; } = new();
 
     public RedisEventDispatcher Dispatcher { get; }
     public IcnfClientStub Icnf { get; } = new();
@@ -56,30 +52,18 @@ internal sealed class IncidentPipelineHarness : IDisposable
 
         Dispatcher = new RedisEventDispatcher(Redis, Clock);
 
-        var publishing = Options.Create(new PublishingOptions
-        {
-            Channels = new(StringComparer.OrdinalIgnoreCase) { ["fcm"] = PublisherMode.On },
-        });
-        var fcmOptions = Options.Create(new FcmOptions());
-        FcmNotifier = new FcmNotifier(Fcm, publishing, fcmOptions, Ops,
-            new FakeHostEnvironment("Development"), NullLogger<FcmNotifier>.Instance);
-        Delayed = new RedisDelayedDispatcher(Redis, Clock);
-        Scheduler = new NotificationScheduler(Delayed, fcmOptions);
         Locks = new RedisSingleFlightLock(Redis);
         Processed = new RedisProcessedMarker(Redis, Options.Create(new QueueOptions()));
 
         Resolver = new LocationResolver(Mongo, Ops);
         Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, NullLogger<IncidentIngestService>.Instance);
         Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, new Fogos.Infrastructure.Incidents.KmlVersionStore(Mongo, Clock), NullLogger<IcnfEnrichmentService>.Instance);
-        Important = new ImportantFireChecker(Mongo, Locks, Clock, Scheduler, FcmNotifier, NullLogger<ImportantFireChecker>.Instance);
+        Important = new ImportantFireChecker(Mongo, Locks, Clock, NullLogger<ImportantFireChecker>.Instance);
 
         BuildRoutes();
         EnsureIndexesAsync().GetAwaiter().GetResult();
     }
 
-    public FcmNotifier FcmNotifier { get; }
-    public RedisDelayedDispatcher Delayed { get; }
-    public NotificationScheduler Scheduler { get; }
     public ISingleFlightLock Locks { get; }
     public IProcessedMarker Processed { get; }
     public LocationResolver Resolver { get; }
@@ -142,15 +126,15 @@ internal sealed class IncidentPipelineHarness : IDisposable
     private void BuildRoutes()
     {
         var nearest = new AssignNearestWeatherStationHandler(Mongo);
-        var history = new IncidentHistoryHandler(Mongo, Clock, FcmNotifier, Processed);
-        var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock, Scheduler, FcmNotifier);
-        var notify = new NewIncidentNotificationsHandler(Mongo, Clock, FcmNotifier, Scheduler, Processed, Ops);
+        var history = new IncidentHistoryHandler(Mongo, Clock);
+        var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock);
+        var aeroMedical = new AeroMedicalOpsHandler(Mongo, Clock, Processed, Ops);
         var kickoff = new IcnfKickoffHandler(Mongo, Clock, Dispatcher);
         var icnfProcess = new ProcessIcnfFireDataHandler(Enrichment);
 
         Add<IncidentCreated>((e, ct) => nearest.HandleAsync(e, ct));
         Add<IncidentCreated>((e, ct) => history.HandleAsync(e, ct));
-        Add<IncidentCreated>((e, ct) => notify.HandleAsync(e, ct));
+        Add<IncidentCreated>((e, ct) => aeroMedical.HandleAsync(e, ct));
         Add<IncidentCreated>((e, ct) => kickoff.HandleAsync(e, ct));
         Add<IncidentResourcesChanged>((e, ct) => history.HandleAsync(e, ct));
         Add<IncidentStatusChanged>((e, ct) => statusHistory.HandleAsync(e, ct));

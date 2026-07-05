@@ -1,0 +1,19 @@
+FogosPortugal
+Copyright 2026 FogosPortugal contributors
+https://fogosportugal.pt
+
+This product is a re-implementation that builds on the pioneering work of
+the Fogos.pt project by VOST Portugal:
+
+    FogosPT/fogosapi (https://github.com/FogosPT/fogosapi)
+    Copyright 2021 Fogos.pt
+    Licensed under the Apache License, Version 2.0
+
+Fogos.pt (https://fogos.pt) created and proved the model of open,
+community-driven wildfire information in Portugal. FogosPortugal exists
+because of that work and gratefully credits it.
+
+Data displayed by this product comes from ANEPC / Proteção Civil, ICNF,
+IPMA, NASA FIRMS, RainViewer, Open-Meteo, and CARTO / OpenStreetMap
+contributors. Attribution requirements of those sources apply to reuse of
+their data.

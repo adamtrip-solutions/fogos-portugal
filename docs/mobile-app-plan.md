@@ -14,7 +14,7 @@ integration.
 | Shared code | `@fogos/api-client` + `@fogos/ui-tokens` workspace packages | GraphQL documents, TS types, status colors/buckets, PT labels, formatters — logic only, never UI components (DOM ≠ RN) |
 | Incident panel | `@gorhom/bottom-sheet` | The web app's mobile drawer UX, native-grade |
 | Charts | `victory-native` (XL) | Resource history + stats charts on RN |
-| Push | `expo-notifications` + FCM (Android) / APNs via FCM (iOS) | Pairs with the device registry in the notifications plan |
+| Push | `expo-notifications` + **Expo Push service** (backend batches up to 100 msgs/request, receipts-based pruning) | Pairs with the device registry in the notifications plan; FCM/APNs credentials live in EAS, backend never touches Firebase |
 | Builds | EAS Build (dev/preview/production profiles) | No local Xcode/AndroidStudio ceremony; CI-triggerable |
 | OTA | EAS Update, channel per environment | JS-only fixes ship in minutes without store review |
 
@@ -84,8 +84,9 @@ endpoint was built for exactly this; the web can't do it well). Share sheet on i
 
 ## 6. Open questions
 
-1. Apple Developer + Google Play accounts (who owns them / are they created?).
-2. Firebase project reuse (see notifications plan Q1) and who can mint the APNs key.
+1. ~~Apple Developer + Google Play accounts~~ **Resolved**: both exist and are linked via Expo/EAS.
+2. ~~Firebase project / APNs key~~ **Resolved by the Expo Push decision**: transport credentials
+   live in the EAS account; the backend has no Firebase dependency.
 3. Background location for "fires near my current location" alerts — v1 says NO (privacy + battery
    + store-review friction); chosen-areas only. Revisit post-launch if users ask.
 4. Minimum OS targets (proposal: iOS 16+, Android 8+ — MapLibre RN and Expo defaults).

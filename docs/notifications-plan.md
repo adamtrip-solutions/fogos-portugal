@@ -5,9 +5,15 @@ today and the Expo mobile app next, with area-based push as the flagship capabil
 
 > **Update 2026-07-05 — push-only.** The anonymous in-app polling channel (the `alertEvents` query
 > and the web AlertsPopover/toasts) has been removed. `alert_events` remains as the internal
-> matcher-dedupe store (write-only, no anonymous read surface). Delivery going forward is FCM push
+> matcher-dedupe store (write-only, no anonymous read surface). Delivery going forward is push
 > (+ webhooks for API clients); N4 web-push stays a future item. Sections below that describe the
 > poll channel are retained as historical context.
+>
+> **Update 2026-07-05 (2) — Expo Push is the delivery layer.** The mobile app will be Expo-based,
+> so the backend sends through the **Expo Push service** (batched HTTP API) instead of talking to
+> FCM/APNs directly. Firebase disappears from the backend entirely — the FCM server key and APNs
+> key live in the user's EAS account as Expo's transport credentials. The FCM-specific details
+> below (`FcmNotifier`, topics, collapse keys) describe the current legacy code, which N1 replaces.
 
 ## 1. What exists today (inventory)
 
@@ -38,29 +44,33 @@ channel-agnostic — keep it that way.
 
 ### 2.1 Device registry (the key new piece)
 
-Problem: FCM tokens rotate; storing a raw token on each subscription (today's model) breaks
-silently on rotation and can't be pruned on FCM "unregistered" errors.
+Problem: push tokens rotate; storing a raw token on each subscription (today's model) breaks
+silently on rotation and can't be pruned on delivery errors.
 
-New collection `devices`:
+New collection `devices` (token = **Expo push token**, `ExponentPushToken[…]`, obtained in the app
+via `expo-notifications`):
 ```
-{ _id, platform: ios|android|web, fcmToken, locale, appVersion,
+{ _id, platform: ios|android, expoPushToken, locale, appVersion,
   createdAt, lastSeenAt, disabled: bool, failureCount }
 ```
-- GraphQL: `registerDevice(platform, fcmToken, locale, appVersion): Device!` (returns deviceId the
-  app persists), `refreshDeviceToken(deviceId, fcmToken)`, `deleteDevice(deviceId)`. Anonymous +
-  rate-limited like `createAlertSubscription`.
-- `alert_subscriptions` gains `DeviceId?` (the `FcmToken` field is deprecated in place: matcher
-  resolves device → token at send time). Token rotation = one `refreshDeviceToken` call, every
-  subscription follows automatically.
-- Pruning: FCM `UNREGISTERED`/`INVALID_ARGUMENT` responses increment `failureCount`; disable the
-  device at N=5; a weekly job purges devices disabled or unseen for 120 days (cascade-delete their
-  subscriptions).
+- GraphQL: `registerDevice(platform, expoPushToken, locale, appVersion): Device!` (returns deviceId
+  the app persists), `refreshDeviceToken(deviceId, expoPushToken)`, `deleteDevice(deviceId)`.
+  Anonymous + rate-limited like `createAlertSubscription`.
+- `alert_subscriptions` gains `DeviceId?` (the legacy `FcmToken` field is removed with N1; nothing
+  ships against it). Matcher resolves device → token at send time; token rotation = one
+  `refreshDeviceToken` call, every subscription follows automatically.
+- Delivery: a single `ExpoPushClient` (typed HttpClient) POSTs to the Expo push API in **batches of
+  up to 100 messages per request** (Expo's native batching). Sends return tickets; a follow-up job
+  polls the **receipts endpoint** (~30 min later) and handles errors: `DeviceNotRegistered` →
+  increment `failureCount`, disable the device at N=3; a weekly job purges devices disabled or
+  unseen for 120 days (cascade-delete their subscriptions).
 
 ### 2.2 Delivery semantics
 
-- **Collapse per incident**: pushes about the same incident use FCM `collapse_key` (Android) /
-  `apns-collapse-id` (iOS) = incidentId, so a phone shows one evolving notification per fire, not a
-  stack. Payload carries the latest state.
+- **No collapse ids**: the Expo push API does not expose FCM `collapse_key`/`apns-collapse-id`, so
+  "one evolving notification per fire" isn't available. Mitigation is debounce-first (below) so
+  phones don't stack notifications; Android grouping via `channelId` per alert kind is still
+  available client-side.
 - **Debounce**: reuse the delayed dispatcher for ESCALATION (means change often) — one push per
   incident per 10 min max. NEW_INCIDENT and REKINDLE send immediately.
 - **Dedupe**: existing `alert_events` DedupeKey scheme stays the source of truth for "was this
@@ -80,38 +90,40 @@ Add to `alert_subscriptions`:
 - (later) `QuietHours: {start,end}?` — suppress non-ESCALATION pushes overnight; ESCALATION in the
   subscriber's area always goes through.
 
-### 2.4 Broadcast tier (keep, refit)
+### 2.4 Broadcast tier (refit — no topics)
 
-The district-topic broadcasts (big-fire pushes to whole districts) remain for the legacy audience
-and as a zero-setup default: the mobile onboarding offers "notificações para o meu distrito"
-(topic subscribe — no server subscription needed) and "alertas personalizados" (device +
-subscription model above). National tier: a `national-big` topic for fires crossing 100 assets
-(one push per incident, claimed once via `IProcessedMarker`).
+Expo push has no topic concept, so broadcast tiers become subscription kinds handled by the SAME
+matcher as concelho/point (one matching path, no parallel system):
+- `District` kind — the mobile onboarding's zero-friction "notificações para o meu distrito".
+- `National` kind — big fires only (≥100 assets), one push per incident (claimed once via
+  `IProcessedMarker`).
+The legacy FCM district-topic code is retired in N1 (no app tokens exist yet, so nothing is lost).
 
 ### 2.5 Web push (later phase)
 
-The web app's polling works but only while open. Once mobile ships, reuse the same device registry
-with `platform: web` (FCM web SDK + VAPID key). The AlertsPopover upgrades from "polling only" to
-"polling + optional browser push". No server model changes needed — that's the payoff of the
-device registry.
+Expo push tokens cover native apps only — browsers are out of scope for the Expo path. If/when web
+push happens (N4), it's standard Web Push (VAPID) with `platform: web` devices holding a Web Push
+subscription instead of an Expo token. Independent of the mobile work.
 
 ## 3. Backend work packages (when implementation starts)
 
-1. **N1 — device registry**: collection, class map, indexes, 3 mutations, matcher resolves
-   DeviceId→token, failure-count pruning + purge job. (Existing FcmToken subscriptions keep working
-   through a compatibility read until migrated.)
-2. **N2 — delivery semantics**: collapse keys, ESCALATION debounce via delayed dispatcher, deep-link
-   payload fields, per-kind/minAssets preference filtering in matchers.
-3. **N3 — broadcast refit**: onboarding topics, national tier, DryRun soak against demo data.
-4. **N4 — web push**: VAPID/Firebase web config, AlertsPopover upgrade.
+1. **N1 — device registry + Expo delivery**: `devices` collection/class map/indexes, 3 mutations,
+   `ExpoPushClient` (100-message batches) + receipts-polling job + pruning/purge, matcher resolves
+   DeviceId→token. Retires `FcmSender`/`FcmNotifier`/`FcmTopics` and the subscription `FcmToken`
+   field (nothing ships against them).
+2. **N2 — delivery semantics**: ESCALATION debounce via delayed dispatcher, deep-link payload
+   fields, per-kind/minAssets preference filtering in matchers, Android channelIds per alert kind.
+3. **N3 — broadcast kinds**: District + National subscription kinds, DryRun soak against demo data.
+4. **N4 — web push** (far future): standard Web Push/VAPID, `platform: web` devices.
 
 Each package follows the established conventions (options POCOs, EventSerializer registration for
 any new events, integration tests against the harness, PT copy).
 
 ## 4. Open questions
 
-1. Firebase project: reuse the existing one (the FCM config already in place) for the mobile app's
-   iOS/Android senders? (Simplest: yes — one project, three app registrations.)
-2. iOS: Apple Developer account availability (needed for APNs key + store).
+1. ~~Firebase project reuse~~ **Resolved by the Expo decision**: the backend never talks to
+   Firebase; FCM/APNs credentials are uploaded to the user's EAS account (already linked) as Expo's
+   transport. No Firebase SDK/config in this repo.
+2. ~~Apple Developer account~~ **Resolved**: exists, linked via Expo/EAS.
 3. Do we want risk-level daily digests (one morning push "risco máximo hoje no seu concelho") as
    part of N2, or keep RISK event-driven only?

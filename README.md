@@ -97,3 +97,9 @@ All sources are used under their respective terms; credit and thanks to each.
 FogosPortugal is run as a public service: **no ads, no tracking-for-profit, no paywalls**. It is
 open source so anyone can inspect it, learn from it, run it, and contribute. If it is ever useful
 to you during a fire, it has done its job.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE) — the same license as the original
+[FogosPT/fogosapi](https://github.com/FogosPT/fogosapi) project this work builds on.
+See [NOTICE](NOTICE) for attribution.

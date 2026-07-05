@@ -12,7 +12,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);
 
-// Pipeline infrastructure: Redis Streams dispatchers, social publishers, FCM, renderer, sources.
+// Pipeline infrastructure: Redis Streams dispatchers, FCM, external sources.
 builder.Services.AddFogosPipeline(builder.Configuration);
 
 // Redis Streams consumers (default + icnf) + the delayed-dispatch pump (FCM 3-min delay mechanism).

@@ -6,9 +6,8 @@ namespace Fogos.Worker.Jobs.Summaries;
 
 /// <summary>
 /// Registration entry point for the summary jobs (the <c>[jobs:summaries]</c> marker in Program.cs):
-/// the hourly active-fire summary (minute 0), the daily 09:30 recap, and the twice-daily situation
-/// report (09:00 + 20:00) — all Lisbon-local and single-flight. Cadences ported from bootstrap/app.php
-/// (<c>hourly</c> and <c>dailyAt 09:30</c>); the situation report is new in WP4.
+/// the twice-daily situation report (09:00 + 20:00) — Lisbon-local and single-flight. It persists the
+/// report and dispatches <c>SituationReportCreated</c> for webhook delivery.
 /// </summary>
 public static class SummaryJobsRegistration
 {
@@ -16,9 +15,6 @@ public static class SummaryJobsRegistration
     {
         services.AddQuartz(quartz =>
         {
-            quartz.AddCronJob<HourlySummaryJob>("0 0 * * * ?");   // top of every hour
-            quartz.AddCronJob<DailySummaryJob>("0 30 9 * * ?");   // daily 09:30
-
             // Situation report: one job, two Lisbon-local cron triggers (the job derives its slot from the hour).
             var sitrepKey = new JobKey(nameof(SituationReportJob));
             quartz.AddJob<SituationReportJob>(o => o.WithIdentity(sitrepKey));

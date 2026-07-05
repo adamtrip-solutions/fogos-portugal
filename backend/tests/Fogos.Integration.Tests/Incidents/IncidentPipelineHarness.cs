@@ -10,7 +10,6 @@ using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Queue;
-using Fogos.Infrastructure.Rendering;
 using Fogos.Infrastructure.Scheduling;
 using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Handlers;
@@ -24,9 +23,9 @@ using StackExchange.Redis;
 namespace Fogos.Integration.Tests.Incidents;
 
 /// <summary>
-/// Wires the incident cluster against the shared Testcontainers Mongo/Redis with recording social/FCM
-/// doubles and a fail-fast renderer stub. Provides ingest + handler routing so a fixture can flow through
-/// the real pipeline (upsert → events on the stream → handler side effects) deterministically.
+/// Wires the incident cluster against the shared Testcontainers Mongo/Redis with a recording FCM double.
+/// Provides ingest + handler routing so a fixture can flow through the real pipeline (upsert → events on
+/// the stream → handler side effects) deterministically.
 /// </summary>
 internal sealed class IncidentPipelineHarness : IDisposable
 {
@@ -35,10 +34,6 @@ internal sealed class IncidentPipelineHarness : IDisposable
     public RecordingOps Ops { get; } = new();
     public TestClock Clock { get; } = new() { UtcNow = new DateTimeOffset(2026, 8, 1, 15, 0, 0, TimeSpan.Zero) };
 
-    public RecordingTwitter Twitter { get; } = new();
-    public RecordingTelegram Telegram { get; } = new();
-    public RecordingFacebook Facebook { get; } = new();
-    public RecordingDiscord Discord { get; } = new();
     public RecordingFcmSender Fcm { get; } = new();
 
     public RedisEventDispatcher Dispatcher { get; }
@@ -71,19 +66,12 @@ internal sealed class IncidentPipelineHarness : IDisposable
         Delayed = new RedisDelayedDispatcher(Redis, Clock);
         Scheduler = new NotificationScheduler(Delayed, fcmOptions);
         Locks = new RedisSingleFlightLock(Redis);
-        Threads = new SocialThreadStore(Mongo, Clock);
         Processed = new RedisProcessedMarker(Redis, Options.Create(new QueueOptions()));
-        PipelineOptions = Options.Create(new IncidentPipelineOptions { SocialLinkDomain = "fogos.pt" });
-
-        Renderer = new RendererClient(
-            new StubHttpClientFactory(new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError))),
-            Options.Create(new RendererOptions { Retries = 1, RetryBaseDelay = TimeSpan.Zero, MinBytes = 1 }),
-            Ops, NullLogger<RendererClient>.Instance);
 
         Resolver = new LocationResolver(Mongo, Ops);
         Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, NullLogger<IncidentIngestService>.Instance);
         Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, new Fogos.Infrastructure.Incidents.KmlVersionStore(Mongo, Clock), NullLogger<IcnfEnrichmentService>.Instance);
-        Important = new ImportantFireChecker(Mongo, Threads, Locks, Clock, Twitter, Telegram, Facebook, Scheduler, FcmNotifier, PipelineOptions, NullLogger<ImportantFireChecker>.Instance);
+        Important = new ImportantFireChecker(Mongo, Locks, Clock, Scheduler, FcmNotifier, NullLogger<ImportantFireChecker>.Instance);
 
         BuildRoutes();
         EnsureIndexesAsync().GetAwaiter().GetResult();
@@ -93,14 +81,11 @@ internal sealed class IncidentPipelineHarness : IDisposable
     public RedisDelayedDispatcher Delayed { get; }
     public NotificationScheduler Scheduler { get; }
     public ISingleFlightLock Locks { get; }
-    public SocialThreadStore Threads { get; }
     public IProcessedMarker Processed { get; }
-    public RendererClient Renderer { get; }
     public LocationResolver Resolver { get; }
     public IncidentIngestService Ingest { get; }
     public IcnfEnrichmentService Enrichment { get; }
     public ImportantFireChecker Important { get; }
-    public IOptions<IncidentPipelineOptions> PipelineOptions { get; }
 
     private async Task EnsureIndexesAsync()
     {
@@ -157,23 +142,19 @@ internal sealed class IncidentPipelineHarness : IDisposable
     private void BuildRoutes()
     {
         var nearest = new AssignNearestWeatherStationHandler(Mongo);
-        var history = new IncidentHistoryHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, FcmNotifier, PipelineOptions);
-        var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, Discord, Renderer, Scheduler, FcmNotifier, PipelineOptions);
-        var social = new NewIncidentSocialHandler(Mongo, Clock, Threads, Twitter, Telegram, Facebook, Renderer, Scheduler, FcmNotifier, PipelineOptions);
+        var history = new IncidentHistoryHandler(Mongo, Clock, FcmNotifier, Processed);
+        var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock, Scheduler, FcmNotifier);
         var notify = new NewIncidentNotificationsHandler(Mongo, Clock, FcmNotifier, Scheduler, Processed, Ops);
         var kickoff = new IcnfKickoffHandler(Mongo, Clock, Dispatcher);
         var icnfProcess = new ProcessIcnfFireDataHandler(Enrichment);
-        var icnfSocial = new IcnfSocialHandler(Mongo, Threads, Twitter, Telegram, Facebook, Renderer, Scheduler, FcmNotifier, PipelineOptions);
 
         Add<IncidentCreated>((e, ct) => nearest.HandleAsync(e, ct));
         Add<IncidentCreated>((e, ct) => history.HandleAsync(e, ct));
-        Add<IncidentCreated>((e, ct) => social.HandleAsync(e, ct));
         Add<IncidentCreated>((e, ct) => notify.HandleAsync(e, ct));
         Add<IncidentCreated>((e, ct) => kickoff.HandleAsync(e, ct));
         Add<IncidentResourcesChanged>((e, ct) => history.HandleAsync(e, ct));
         Add<IncidentStatusChanged>((e, ct) => statusHistory.HandleAsync(e, ct));
         Add<ProcessIcnfFireData>((e, ct) => icnfProcess.HandleAsync(e, ct));
-        Add<IcnfEnriched>((e, ct) => icnfSocial.HandleAsync(e, ct));
     }
 
     private void Add<T>(Func<T, CancellationToken, Task> handler) where T : IDomainEvent
@@ -202,52 +183,4 @@ internal sealed class TestClock : IClock
         return new DateTimeOffset(unspecified, FogosClock.Lisbon.GetUtcOffset(unspecified));
     }
     public DateTimeOffset ToLisbon(DateTimeOffset utc) => TimeZoneInfo.ConvertTime(utc, FogosClock.Lisbon);
-}
-
-internal sealed class RecordingTwitter : ITwitterPublisher
-{
-    public readonly ConcurrentQueue<SocialPost> Posts = new();
-    private int _n;
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "twitter", CancellationToken ct = default)
-    {
-        Posts.Enqueue(post);
-        return Task.FromResult(PublishResult.Ok($"tw-{Interlocked.Increment(ref _n)}"));
-    }
-}
-
-internal sealed class RecordingTelegram : ITelegramPublisher
-{
-    public readonly ConcurrentQueue<SocialPost> Posts = new();
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "telegram", CancellationToken ct = default)
-    {
-        Posts.Enqueue(post);
-        return Task.FromResult(PublishResult.Ok("tg"));
-    }
-}
-
-internal sealed class RecordingFacebook : IFacebookPublisher
-{
-    public readonly ConcurrentQueue<SocialPost> Posts = new();
-    public readonly ConcurrentQueue<(string PostId, string Message)> Comments = new();
-    private int _n;
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "facebook", CancellationToken ct = default)
-    {
-        Posts.Enqueue(post);
-        return Task.FromResult(PublishResult.Ok($"fb-{Interlocked.Increment(ref _n)}"));
-    }
-    public Task<PublishResult> CommentOnPostAsync(string postId, string message, string channelKey = "facebook", CancellationToken ct = default)
-    {
-        Comments.Enqueue((postId, message));
-        return Task.FromResult(PublishResult.Ok("cmt"));
-    }
-}
-
-internal sealed class RecordingDiscord : IDiscordPostPublisher
-{
-    public readonly ConcurrentQueue<SocialPost> Posts = new();
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "discordPosts", CancellationToken ct = default)
-    {
-        Posts.Enqueue(post);
-        return Task.FromResult(PublishResult.Ok("dc"));
-    }
 }

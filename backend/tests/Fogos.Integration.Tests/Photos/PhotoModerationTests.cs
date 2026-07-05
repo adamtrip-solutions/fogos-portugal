@@ -1,15 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using Fogos.Domain.Auth;
-using Fogos.Domain.Events;
 using Fogos.Domain.Photos;
-using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
-using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Storage;
-using Fogos.Worker.Handlers;
 using Fogos.Worker.Jobs.Photos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -111,47 +105,6 @@ public sealed class PhotoModerationTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
-    public async Task Approved_photo_fan_out_is_captured_in_dry_run()
-    {
-        Skip.IfNot(fixture.Available, fixture.SkipReason);
-        await SeedData.ResetAsync(fixture);
-        var ctx = SeedData.Context(fixture);
-        await ctx.Incidents.InsertOneAsync(SeedData.Incident("MOD3"));
-        await SeedOperatorAsync();
-        var (photoId, _) = await UploadAsync("MOD3", seed: 63);
-
-        await fixture.GraphQLAsync(OperatorKey,
-            "mutation($id:ID!){ moderatePhoto(photoId:$id, decision:APPROVE, publish:true){ id } }",
-            new { id = photoId });
-
-        // Run the Worker-side handler directly (dry-run publishers + recording ops).
-        var ops = new RecordingOps();
-        var handler = BuildHandler(ops);
-        await handler.HandleAsync(new PhotoApproved(photoId, "MOD3"), CancellationToken.None);
-
-        var channels = ops.Captures.Select(c => c.Channel).ToHashSet();
-        Assert.Superset(new HashSet<string> { "twitter", "facebook", "telegram", "discordPosts", "fcm" }, channels);
-        Assert.Equal(5, ops.Captures.Count);
-
-        var tweet = ops.Captures.Single(c => c.Channel == "twitter").Payload;
-        Assert.Contains("Foi publicada uma nova foto no incêndio em Rua de Teste", tweet);
-        Assert.Contains("https://fogosportugal.pt/fogo/MOD3/detalhe", tweet);
-        Assert.Contains("Tirada às", tweet);            // TakenAt extra
-        Assert.Contains("km do local do incêndio", tweet); // distance extra
-
-        // The image bytes were fetched from storage (base publishers mark image posts with "[img]").
-        var telegram = ops.Captures.Single(c => c.Channel == "telegram").Payload;
-        Assert.StartsWith("[img]", telegram);
-
-        var discord = ops.Captures.Single(c => c.Channel == "discordPosts").Payload;
-        Assert.Contains("https://cdn.example.test/incidents/MOD3/", discord);
-
-        var push = ops.Captures.Single(c => c.Channel == "fcm").Payload;
-        Assert.Contains("Foi publicada uma nova foto deste incêndio.", push);
-        Assert.Contains("incident-MOD3", push);
-    }
-
-    [SkippableFact]
     public async Task Reject_deletes_document_and_stored_object()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
@@ -240,28 +193,5 @@ public sealed class PhotoModerationTests(ContainerFixture fixture)
         await ctx.IncidentPhotos.DeleteManyAsync(Builders<IncidentPhoto>.Filter.Empty);
         await job.RunAsync(CancellationToken.None);
         Assert.Single(ops.Infos);
-    }
-
-    /// <summary>Hand-wires the Worker fan-out handler over the shared containers with dry-run publishers.</summary>
-    private ApprovedPhotoSocialHandler BuildHandler(RecordingOps ops)
-    {
-        var services = fixture.Factory.Services;
-        var mongo = services.GetRequiredService<MongoContext>();
-        var storage = services.GetRequiredService<IObjectStorage>();
-        var clock = services.GetRequiredService<IClock>();
-
-        var publishing = Options.Create(new PublishingOptions()); // everything defaults to DryRun
-        var factory = new StubHttpClientFactory(new StubHttpMessageHandler(_ => new HttpResponseMessage()));
-
-        var twitter = new TwitterPublisher(factory, publishing, Options.Create(new TwitterOptions()), ops, NullLogger<TwitterPublisher>.Instance);
-        var telegram = new TelegramPublisher(factory, publishing, Options.Create(new TelegramOptions()), ops, NullLogger<TelegramPublisher>.Instance);
-        var facebook = new FacebookPublisher(factory, publishing, Options.Create(new FacebookOptions()), ops, NullLogger<FacebookPublisher>.Instance);
-        var discord = new DiscordPostPublisher(factory, publishing, Options.Create(new DiscordPostOptions()), ops, NullLogger<DiscordPostPublisher>.Instance);
-        var fcm = new FcmNotifier(new RecordingFcmSender(), publishing, Options.Create(new FcmOptions()), ops,
-            new FakeHostEnvironment("Production"), NullLogger<FcmNotifier>.Instance);
-
-        return new ApprovedPhotoSocialHandler(
-            mongo, storage, twitter, telegram, facebook, discord, fcm, clock,
-            Options.Create(new IncidentPipelineOptions()));
     }
 }

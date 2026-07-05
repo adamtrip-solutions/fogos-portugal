@@ -154,9 +154,8 @@ public sealed class Mutation
 
     /// <summary>
     /// Attaches a KML perimeter to an incident (VOST-curated slot when <paramref name="vost"/> is true,
-    /// else the ANEPC slot), then dispatches <see cref="KmlAttached"/> so the worker announces the new
-    /// "área de interesse" (renderer screenshot + threaded tweet, dry-run, text-only on renderer failure).
-    /// Ports <c>IncidentController::addKML</c>. The payload must parse as XML with a <c>&lt;kml&gt;</c> root.
+    /// else the ANEPC slot), then dispatches <see cref="KmlAttached"/>. Ports
+    /// <c>IncidentController::addKML</c>. The payload must parse as XML with a <c>&lt;kml&gt;</c> root.
     /// </summary>
     [Authorize(Policy = ApiScopes.WriteIncidents)]
     public async Task<Incident> AttachKml(

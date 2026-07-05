@@ -22,22 +22,6 @@ public sealed class AlertReads(MongoContext context)
         }
     }
 
-    /// <summary>Newest-first events for a subscription (optionally after an instant), capped.</summary>
-    public async Task<IReadOnlyList<AlertEvent>> EventsAsync(
-        string subscriptionId, DateTimeOffset? after, int limit, CancellationToken ct = default)
-    {
-        var f = Builders<AlertEvent>.Filter;
-        var filter = f.Eq(x => x.SubscriptionId, subscriptionId);
-        if (after is { } a)
-            filter &= f.Gt(x => x.CreatedAt, a);
-
-        return await context.AlertEvents
-            .Find(filter)
-            .Sort(Builders<AlertEvent>.Sort.Descending(x => x.CreatedAt))
-            .Limit(limit)
-            .ToListAsync(ct);
-    }
-
     /// <summary>Concelho subscriptions watching a DICO.</summary>
     public async Task<IReadOnlyList<AlertSubscription>> ConcelhoSubscriptionsByDicoAsync(string dico, CancellationToken ct = default)
     {

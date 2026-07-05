@@ -1,16 +1,6 @@
-using System.Net;
 using Fogos.Domain.Auth;
-using Fogos.Domain.Events;
 using Fogos.Domain.Incidents;
-using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
-using Fogos.Infrastructure.Rendering;
-using Fogos.Worker.Handlers;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace Fogos.Integration.Tests.Writes;
@@ -18,7 +8,6 @@ namespace Fogos.Integration.Tests.Writes;
 /// <summary>
 /// <c>attachKml</c> operator mutation: stores the perimeter in the ANEPC slot (or the VOST slot when
 /// <c>vost:true</c>), rejects non-KML payloads, and flips the <c>hasKml</c>/<c>hasKmlVost</c> read flags.
-/// The perimeter announcement (renderer + tweet) is exercised through the worker handler, dry-run.
 /// </summary>
 [Collection("fogos")]
 public sealed class AttachKmlTests(ContainerFixture fixture)
@@ -102,42 +91,4 @@ public sealed class AttachKmlTests(ContainerFixture fixture)
         Assert.Null(stored.Kml);
     }
 
-    [SkippableFact]
-    public async Task Perimeter_post_is_captured_and_survives_renderer_failure()
-    {
-        Skip.IfNot(fixture.Available, fixture.SkipReason);
-        await SeedData.ResetAsync(fixture);
-        var ctx = SeedData.Context(fixture);
-        await ctx.Incidents.InsertOneAsync(SeedData.Incident("KML4"));
-
-        var ops = new RecordingOps();
-        var handler = BuildHandler(ops);
-        await handler.HandleAsync(new KmlAttached("KML4", Vost: false), CancellationToken.None);
-
-        var tweet = ops.Captures.Single(c => c.Channel == "twitter").Payload;
-        Assert.Contains("Nova área de interesse por @VostPT", tweet);
-        Assert.Contains("https://fogos.pt/fogo/KML4/detalhe", tweet);
-        Assert.Contains("image=no", tweet); // renderer failed → text-only, post still went out
-    }
-
-    private KmlAttachedSocialHandler BuildHandler(RecordingOps ops)
-    {
-        var services = fixture.Factory.Services;
-        var mongo = services.GetRequiredService<MongoContext>();
-        var clock = services.GetRequiredService<IClock>();
-        var threads = new SocialThreadStore(mongo, clock);
-
-        var publishing = Options.Create(new PublishingOptions()); // DryRun defaults
-        var factory = new StubHttpClientFactory(new StubHttpMessageHandler(_ => new HttpResponseMessage()));
-        var twitter = new TwitterPublisher(factory, publishing, Options.Create(new TwitterOptions()), ops, NullLogger<TwitterPublisher>.Instance);
-
-        // Renderer that always fails → the post degrades to text-only.
-        var failingRenderer = new RendererClient(
-            new StubHttpClientFactory(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError))),
-            Options.Create(new RendererOptions { Url = "http://renderer.invalid", ScreenshotDomain = "fogos.pt", Retries = 1, RetryBaseDelay = TimeSpan.Zero, MinBytes = 1 }),
-            ops, NullLogger<RendererClient>.Instance);
-
-        return new KmlAttachedSocialHandler(mongo, threads, twitter, failingRenderer,
-            Options.Create(new IncidentPipelineOptions { SocialLinkDomain = "fogos.pt" }));
-    }
 }

@@ -5,7 +5,6 @@ using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Queue;
 using Fogos.Worker.Handlers;
 using Microsoft.Extensions.DependencyInjection;
@@ -126,18 +125,14 @@ public sealed class AddPositTests(ContainerFixture fixture)
         var services = fixture.Factory.Services;
         var mongo = services.GetRequiredService<MongoContext>();
         var clock = services.GetRequiredService<IClock>();
-        var threads = new SocialThreadStore(mongo, clock);
+        var redis = services.GetRequiredService<IConnectionMultiplexer>();
+        var processed = new RedisProcessedMarker(redis, Options.Create(new QueueOptions()));
 
         var ops = new RecordingOps();
         var publishing = Options.Create(new PublishingOptions()); // DryRun defaults
-        var factory = new StubHttpClientFactory(new StubHttpMessageHandler(_ => new HttpResponseMessage()));
-        var twitter = new TwitterPublisher(factory, publishing, Options.Create(new TwitterOptions()), ops, NullLogger<TwitterPublisher>.Instance);
-        var telegram = new TelegramPublisher(factory, publishing, Options.Create(new TelegramOptions()), ops, NullLogger<TelegramPublisher>.Instance);
-        var facebook = new FacebookPublisher(factory, publishing, Options.Create(new FacebookOptions()), ops, NullLogger<FacebookPublisher>.Instance);
         var fcm = new FcmNotifier(new RecordingFcmSender(), publishing, Options.Create(new FcmOptions()), ops,
             new FakeHostEnvironment("Production"), NullLogger<FcmNotifier>.Instance);
 
-        return new IncidentHistoryHandler(mongo, clock, threads, twitter, telegram, facebook, fcm,
-            Options.Create(new IncidentPipelineOptions()));
+        return new IncidentHistoryHandler(mongo, clock, fcm, processed);
     }
 }

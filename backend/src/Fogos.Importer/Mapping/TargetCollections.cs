@@ -7,7 +7,6 @@ public static class TargetCollections
     public const string IncidentHistory = "incident_history";
     public const string IncidentStatusHistory = "incident_status_history";
     public const string IncidentPhotos = "incident_photos";
-    public const string SocialThreads = "social_threads";
 
     public const string WeatherStations = "weather_stations";
     public const string WeatherHourly = "weather_hourly";

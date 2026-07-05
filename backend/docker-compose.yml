@@ -6,7 +6,7 @@
 #   docker compose --profile dev up -d      # full local stack
 #   docker compose up -d api worker         # app only, pointed at external infra via env
 #
-# All publishers default to DryRun and all webhooks are empty — nothing goes live by accident.
+# FCM push defaults to DryRun and all webhooks are empty — nothing goes live by accident.
 
 services:
   api:
@@ -29,11 +29,7 @@ services:
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
-      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
-      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
       Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     restart: unless-stopped
 
@@ -55,24 +51,7 @@ services:
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__twitter: ${PUBLISH_TWITTER:-DryRun}
-      Publishing__Channels__telegram: ${PUBLISH_TELEGRAM:-DryRun}
-      Publishing__Channels__facebook: ${PUBLISH_FACEBOOK:-DryRun}
       Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      Publishing__Channels__discordPosts: ${PUBLISH_DISCORD_POSTS:-DryRun}
-      # ── Renderer (social screenshots) ──
-      Renderer__Url: ${RENDERER_URL:-http://renderer:3000}
-      Renderer__ScreenshotDomain: ${SCREENSHOT_DOMAIN:-fogos.pt}
-      # ── Publisher secrets (all empty by default; publishers stay DryRun regardless) ──
-      Twitter__ConsumerKey: ${TWITTER_CONSUMER_KEY:-}
-      Twitter__ConsumerSecret: ${TWITTER_CONSUMER_SECRET:-}
-      Twitter__AccessToken: ${TWITTER_ACCESS_TOKEN:-}
-      Twitter__AccessTokenSecret: ${TWITTER_ACCESS_TOKEN_SECRET:-}
-      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
-      Telegram__ChatId: ${TELEGRAM_CHAT_ID:-@fogospt}
-      Facebook__PageId: ${FACEBOOK_PAGE_ID:-}
-      Facebook__AccessToken: ${FACEBOOK_ACCESS_TOKEN:-}
-      DiscordPosts__WebhookUrl: ${DISCORD_POSTS_WEBHOOK:-}
       # ── FCM ──
       Fcm__CredentialsPath: ${FCM_CREDENTIALS_PATH:-}
       Fcm__ProjectId: ${FCM_PROJECT_ID:-}
@@ -81,20 +60,6 @@ services:
       Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
       Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
       Sentry__Dsn: ${SENTRY_DSN:-}
-    depends_on:
-      renderer:
-        condition: service_started
-    restart: unless-stopped
-
-  # Node/Playwright social-screenshot service. Runs in the default profile — production needs it too.
-  renderer:
-    build:
-      context: ./renderer
-      dockerfile: Dockerfile
-    environment:
-      PORT: "3000"
-    ports:
-      - "3000:3000" # exposed so a host-run worker can use Renderer__Url=http://localhost:3000
     restart: unless-stopped
 
   mongodb:

@@ -117,33 +117,6 @@ public sealed class Query
             yearIgnitions, previousYearIgnitions, yearBurnAreaHa);
     }
 
-    /// <summary>
-    /// Delivered alert events for a subscription, newest first (max 50). Touches the subscription's
-    /// <c>lastSeenAt</c> so the inactivity purge treats a polling device as active.
-    /// </summary>
-    public async Task<IReadOnlyList<AlertEvent>> AlertEvents(
-        [ID] string subscriptionId,
-        AlertReads alerts,
-        MongoContext mongo,
-        IClock clock,
-        CancellationToken ct,
-        DateTimeOffset? after = null)
-    {
-        var events = await alerts.EventsAsync(subscriptionId, after, 50, ct);
-        try
-        {
-            await mongo.AlertSubscriptions.UpdateOneAsync(
-                Builders<AlertSubscription>.Filter.Eq(x => x.Id, subscriptionId),
-                Builders<AlertSubscription>.Update.Set(x => x.LastSeenAt, clock.UtcNow),
-                cancellationToken: ct);
-        }
-        catch (FormatException)
-        {
-            // malformed subscription id — nothing to touch.
-        }
-        return events;
-    }
-
     /// <summary>Recent situation reports, newest first.</summary>
     public async Task<IReadOnlyList<SituationReport>> SituationReports(
         SituationReportReads reads,

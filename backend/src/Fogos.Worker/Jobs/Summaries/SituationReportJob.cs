@@ -20,8 +20,8 @@ namespace Fogos.Worker.Jobs.Summaries;
 /// Twice-daily (09:00 + 20:00 Lisbon) nationwide situation report. Composes from live data — active-fire
 /// count, latest nationwide totals, top-5 active fires by mobilized assets, escalating count, warnings
 /// issued in the last 12 h, and the year's accounted ICNF burn area — persists it, then dispatches
-/// <see cref="SituationReportCreated"/> for social fan-out + webhook delivery. Single-flight (fleet posts
-/// once); the slot is derived from the Lisbon hour so a single job serves both triggers.
+/// <see cref="SituationReportCreated"/> for webhook delivery. Single-flight (fleet posts once); the
+/// slot is derived from the Lisbon hour so a single job serves both triggers.
 /// </summary>
 public sealed class SituationReportJob(
     ISingleFlightLock lockService,

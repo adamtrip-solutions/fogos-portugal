@@ -1,8 +1,5 @@
 using Fogos.Domain.Risk;
-using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Publishing;
-using Fogos.Infrastructure.Rendering;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -10,18 +7,13 @@ using MongoDB.Driver;
 namespace Fogos.Worker.Jobs.Risk;
 
 /// <summary>
-/// Core RCM ingest+publish, independent of Quartz so it is directly fixture-testable. Parses the IPMA
-/// page, upserts <c>rcm_daily</c> (one row per concelho, key = DICO+forecast date), assembles and
-/// upserts the three served <c>rcm_geojson</c> horizons (Today/Tomorrow/After), and — when asked —
-/// composes and dry-run-publishes the risk-map post with an optional renderer screenshot.
+/// Core RCM ingest, independent of Quartz so it is directly fixture-testable. Parses the IPMA page,
+/// upserts <c>rcm_daily</c> (one row per concelho, key = DICO+forecast date) and assembles and upserts
+/// the three served <c>rcm_geojson</c> horizons (Today/Tomorrow/After).
 /// </summary>
 public sealed class RcmProcessor(
     MongoContext mongo,
     ConcelhoPolygons polygons,
-    ITwitterPublisher twitter,
-    ITelegramPublisher telegram,
-    IFacebookPublisher facebook,
-    RendererClient renderer,
     ILogger<RcmProcessor> logger)
 {
     private static readonly ReplaceOptions Upsert = new() { IsUpsert = true };
@@ -35,18 +27,14 @@ public sealed class RcmProcessor(
     /// (so the caller can announce <c>RcmProcessed</c> for risk-alert matching). <paramref name="page"/>
     /// is the raw JSP HTML.
     /// </summary>
-    public async Task<DateOnly> ProcessAsync(string page, bool publishSocial, bool tomorrow, CancellationToken ct = default)
+    public async Task<DateOnly> ProcessAsync(string page, CancellationToken ct = default)
     {
         var parsed = RcmPageParser.Parse(page); // throws RcmParseException — the job classifies it.
 
         var rows = await UpsertDailyAsync(parsed, ct);
         await UpsertGeoJsonAsync(parsed, ct);
 
-        logger.LogInformation("RCM ingest: {Count} concelhos for {Date} (social={Social}, tomorrow={Tomorrow}).",
-            rows.Count, parsed.ForecastDate, publishSocial, tomorrow);
-
-        if (publishSocial)
-            await PublishAsync(parsed, rows, tomorrow, ct);
+        logger.LogInformation("RCM ingest: {Count} concelhos for {Date}.", rows.Count, parsed.ForecastDate);
 
         return parsed.ForecastDate;
     }
@@ -114,36 +102,5 @@ public sealed class RcmProcessor(
             await mongo.RcmGeoJson.ReplaceOneAsync(
                 Builders<RiskGeoJson>.Filter.Eq(x => x.Id, doc.Id), doc, Upsert, ct);
         }
-    }
-
-    private async Task PublishAsync(RcmParseResult parsed, IReadOnlyList<ConcelhoRisk> rows, bool tomorrow, CancellationToken ct)
-    {
-        var day = tomorrow ? RiskDay.Tomorrow : RiskDay.Today;
-        var levels = rows
-            .Select(r => (r.Concelho, Level: r.For(day)))
-            .Where(x => x.Level is >= 1 and <= 5)
-            .Select(x => (x.Concelho, x.Level!.Value));
-
-        var text = RiskPostComposer.ComposeRiskMap(parsed.ForecastDate, tomorrow, levels);
-
-        // Legacy captured the risk map at pt?risk=1 / pt?risk-tomorrow=1; degrade to text-only on failure.
-        var mapPath = tomorrow ? "pt?risk-tomorrow=1" : "pt?risk=1";
-        byte[]? image;
-        try
-        {
-            image = await renderer.CaptureAsync(mapPath, ct: ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "RCM map render failed; posting text-only.");
-            image = null;
-        }
-
-        var post = new SocialPost { Text = text, ImageBytes = image };
-
-        // Publishers never throw and default to DryRun (captured to ops). Fire all channels.
-        await twitter.PublishAsync(post, ct: ct);
-        await telegram.PublishAsync(post, ct: ct);
-        await facebook.PublishAsync(post, ct: ct);
     }
 }

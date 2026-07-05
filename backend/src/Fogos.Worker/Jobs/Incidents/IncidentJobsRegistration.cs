@@ -13,7 +13,7 @@ namespace Fogos.Worker.Jobs.Incidents;
 
 /// <summary>
 /// Registration entry point for the incident cluster (the <c>[jobs:incidents]</c> marker in Program.cs):
-/// the ingest services + selectable source, the social-thread store, the ICNF enrichment service, and the
+/// the ingest services + selectable source, the ICNF enrichment service, and the
 /// Quartz jobs with cadences ported from bootstrap/app.php (ArcGIS 5 min, HistoryTotal 2 min, ICNF table
 /// 5 min, UpdateICNFData buckets 0–6 on their exact crons). Event handlers register themselves via the
 /// Worker assembly scan (AddEventHandlers).
@@ -29,7 +29,6 @@ public static class IncidentJobsRegistration
         services.AddScoped<IncidentIngestService>();
         services.AddScoped<ImportantFireChecker>();
         services.AddScoped<IcnfEnrichmentService>();
-        services.AddSingleton<SocialThreadStore>();
         services.AddSingleton<IncidentFeedFreshness>();
 
         // ── Sources: ArcGIS primary, ANEPC fallback (selectable via Incidents:Source) ──────────

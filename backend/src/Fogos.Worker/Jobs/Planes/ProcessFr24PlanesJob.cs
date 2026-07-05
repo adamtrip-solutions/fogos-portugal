@@ -28,8 +28,7 @@ namespace Fogos.Worker.Jobs.Planes;
 /// (d) the shared FR24 monthly credit budget is below the 95% guard.
 ///
 /// On the first sighting of a <c>notify</c> aircraft — no prior stored position within 30 minutes —
-/// it publishes the legacy "meio aéreo no radar" post to X + Facebook and schedules an FCM push. All
-/// social/push channels default to dry-run.
+/// it schedules the legacy "meio aéreo no radar" FCM push. The push defaults to dry-run.
 /// </summary>
 [DisallowConcurrentExecution]
 public sealed class ProcessFr24PlanesJob(
@@ -39,8 +38,6 @@ public sealed class ProcessFr24PlanesJob(
     MongoContext mongo,
     IClock clock,
     IOpsNotifier ops,
-    ITwitterPublisher twitter,
-    IFacebookPublisher facebook,
     NotificationScheduler notifications,
     FcmNotifier fcm,
     IOptions<FogosSourcesOptions> sources,
@@ -248,10 +245,6 @@ public sealed class ProcessFr24PlanesJob(
             aircraft.Type ?? "",
             aircraft.Registration ?? "",
             aircraft.Base ?? "");
-
-        var post = new SocialPost { Text = message };
-        await twitter.PublishAsync(post, ct: ct);
-        await facebook.PublishAsync(post, ct: ct);
 
         try
         {

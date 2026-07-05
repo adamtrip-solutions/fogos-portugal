@@ -10,10 +10,8 @@ using Quartz;
 namespace Fogos.Worker.Jobs.Risk;
 
 /// <summary>
-/// IPMA fire-risk (RCM) ingest. Runs hourly with no social output, plus 09:00 (publish today's risk)
-/// and 18:00 (publish tomorrow's risk) Lisbon-local — the social/tomorrow flags arrive via job data,
-/// mirroring legacy <c>ProcessRCM(false)</c> / <c>(true)</c> / <c>(true,true)</c>. Single-flight
-/// across the fleet; parse failures escalate to ops with their cause and never crash the scheduler.
+/// IPMA fire-risk (RCM) ingest, hourly Lisbon-local. Single-flight across the fleet; parse failures
+/// escalate to ops with their cause and never crash the scheduler.
 /// </summary>
 public sealed class ProcessRcmJob(
     ISingleFlightLock lockService,
@@ -25,23 +23,19 @@ public sealed class ProcessRcmJob(
     IOpsNotifier ops) : UniqueJob(lockService, logger)
 {
     public const string FreshnessJob = "rcm";
-    public const string PublishSocialKey = "publishSocial";
-    public const string TomorrowKey = "tomorrow";
 
     private static readonly TimeSpan Cadence = TimeSpan.FromHours(1);
 
     protected override async Task ExecuteCoreAsync(IJobExecutionContext context)
     {
         var ct = context.CancellationToken;
-        var publishSocial = context.MergedJobDataMap.GetBoolean(PublishSocialKey);
-        var tomorrow = context.MergedJobDataMap.GetBoolean(TomorrowKey);
 
         await freshness.CheckStaleAsync(FreshnessJob, Cadence, ct);
 
         try
         {
             var page = await ipma.GetRcmPageAsync(ct);
-            var forecastDate = await processor.ProcessAsync(page, publishSocial, tomorrow, ct);
+            var forecastDate = await processor.ProcessAsync(page, ct);
             await freshness.MarkSuccessAsync(FreshnessJob, ct);
 
             // Announce the daily-risk update so subscriptions with a risk threshold get matched.

@@ -7,7 +7,6 @@ using Fogos.Domain.Locations;
 using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
-using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
@@ -33,7 +32,6 @@ public sealed class MongoContext
     public IMongoCollection<IncidentHistorySnapshot> IncidentHistory => Database.GetCollection<IncidentHistorySnapshot>("incident_history");
     public IMongoCollection<IncidentStatusChange> IncidentStatusHistory => Database.GetCollection<IncidentStatusChange>("incident_status_history");
     public IMongoCollection<IncidentPhoto> IncidentPhotos => Database.GetCollection<IncidentPhoto>("incident_photos");
-    public IMongoCollection<SocialThread> SocialThreads => Database.GetCollection<SocialThread>("social_threads");
 
     public IMongoCollection<WeatherStation> WeatherStations => Database.GetCollection<WeatherStation>("weather_stations");
     public IMongoCollection<WeatherObservation> WeatherHourly => Database.GetCollection<WeatherObservation>("weather_hourly");

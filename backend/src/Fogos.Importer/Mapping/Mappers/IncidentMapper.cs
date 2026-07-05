@@ -1,5 +1,4 @@
 using Fogos.Domain.Incidents;
-using Fogos.Domain.Social;
 using Fogos.Domain.Time;
 using MongoDB.Bson;
 using static Fogos.Importer.Mapping.LegacyBson;
@@ -7,14 +6,13 @@ using static Fogos.Importer.Mapping.LegacyBson;
 namespace Fogos.Importer.Mapping.Mappers;
 
 /// <summary>
-/// <c>data</c> → <c>incidents</c> (+ <c>social_threads</c>). The centre of gravity of the whole
-/// import: dual id/_id → single business <c>_id</c>, the [lat,lng] coordinate trap, dirty
-/// status keys, five isX booleans → one Kind, and thread state split off the incident.
+/// <c>data</c> → <c>incidents</c>. The centre of gravity of the whole import: dual id/_id → single
+/// business <c>_id</c>, the [lat,lng] coordinate trap, dirty status keys, and five isX booleans → one Kind.
 /// </summary>
 public sealed class IncidentMapper(IClock clock) : ILegacyCollectionMapper
 {
     public string Name => "data";
-    public string TargetDescription => "incidents (+ social_threads)";
+    public string TargetDescription => "incidents";
 
     public MapResult Map(BsonDocument doc)
     {
@@ -82,12 +80,7 @@ public sealed class IncidentMapper(IClock clock) : ILegacyCollectionMapper
             ArcGis = ReadArcGis(doc, clock),
         };
 
-        var thread = ReadSocialThread(id, doc, incident.UpdatedAt);
-        return thread is null
-            ? MapResult.Map(new MappedEntity(TargetCollections.Incidents, incident))
-            : MapResult.Map(
-                new MappedEntity(TargetCollections.Incidents, incident),
-                new MappedEntity(TargetCollections.SocialThreads, thread));
+        return MapResult.Map(new MappedEntity(TargetCollections.Incidents, incident));
     }
 
     private static IncidentKind DeriveKind(BsonDocument doc)
@@ -171,23 +164,4 @@ public sealed class IncidentMapper(IClock clock) : ILegacyCollectionMapper
         };
     }
 
-    private static SocialThread? ReadSocialThread(string incidentId, BsonDocument doc, DateTimeOffset updatedAt)
-    {
-        var lastTweet = ReadString(Get(doc, "lastTweetId"));
-        var facebook = ReadString(Get(doc, "facebookPostId"));
-        var sentImportant = Get(doc, "sentCheckImportant");
-        var notifyBig = Get(doc, "notifyBig");
-        if (lastTweet is null && facebook is null && sentImportant is null && notifyBig is null)
-            return null;
-
-        return new SocialThread
-        {
-            IncidentId = incidentId,
-            LastTweetId = lastTweet,
-            FacebookPostId = facebook,
-            SentImportantPost = ReadBool(sentImportant),
-            SentBigIncidentPost = ReadBool(notifyBig),
-            UpdatedAt = updatedAt,
-        };
-    }
 }

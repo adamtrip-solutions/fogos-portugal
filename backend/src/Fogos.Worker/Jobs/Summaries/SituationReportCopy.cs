@@ -4,8 +4,8 @@ using System.Text;
 namespace Fogos.Worker.Jobs.Summaries;
 
 /// <summary>
-/// European-Portuguese copy for the twice-daily situation report, in the tone of <see cref="SummaryCopy"/>
-/// (emoji-led, plain text). Composed from live counters; kept here so the exact strings are auditable.
+/// European-Portuguese copy for the twice-daily situation report (emoji-led, plain text). Composed from
+/// live counters; kept here so the exact strings are auditable.
 /// </summary>
 public static class SituationReportCopy
 {

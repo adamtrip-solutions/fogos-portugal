@@ -64,11 +64,9 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("deleteAlertSubscription(id: ID!): Boolean!", sdl);
         Assert.Contains("registerWebhook(url: String! events: [String!]!): Webhook!", sdl);
         Assert.Contains("deleteWebhook(id: ID!): Boolean!", sdl);
-        Assert.Contains("alertEvents(subscriptionId: ID! after: DateTime): [AlertEvent!]!", sdl);
         Assert.Contains("situationReports(first: Int! = 7): [SituationReport!]!", sdl);
         Assert.Contains("webhooks: [Webhook!]!", sdl);
         Assert.Contains("type AlertSubscription", sdl);
-        Assert.Contains("type AlertEvent", sdl);
         Assert.Contains("type Webhook", sdl);
         Assert.Contains("type SituationReport", sdl);
         Assert.Contains("input CreateAlertSubscriptionInput", sdl);

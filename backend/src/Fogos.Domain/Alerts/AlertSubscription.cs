@@ -10,9 +10,9 @@ public enum AlertSubscriptionKind
 }
 
 /// <summary>
-/// An anonymous alert subscription (poll-first delivery). A device registers a concelho or a
-/// point+radius watch; matched incidents/risk land in <c>alert_events</c> and, when an FCM token is
-/// present, a direct push is also sent. Purged after 90 days of no <see cref="LastSeenAt"/> activity.
+/// An anonymous alert subscription (push delivery). A device registers a concelho or a point+radius
+/// watch; matched incidents/risk land in <c>alert_events</c> (internal dedupe) and, when an FCM token is
+/// present, a direct push is sent. Purged after 90 days of no <see cref="LastSeenAt"/> activity.
 /// </summary>
 public sealed class AlertSubscription
 {
@@ -38,6 +38,6 @@ public sealed class AlertSubscription
 
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>Last time the device polled its events — drives the 90-day inactivity purge.</summary>
+    /// <summary>Last time the device was seen active — drives the 90-day inactivity purge.</summary>
     public DateTimeOffset? LastSeenAt { get; set; }
 }

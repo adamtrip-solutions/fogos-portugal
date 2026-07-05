@@ -1,9 +1,7 @@
-using System.Globalization;
 using Fogos.Domain.Time;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Ops;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Scheduling;
 using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Jobs.Weather.Parsing;
@@ -16,9 +14,7 @@ namespace Fogos.Worker.Jobs.Weather;
 
 /// <summary>
 /// Every 15 min. Scrapes the IPMA homepage <c>result_warnings</c> JS blob, drops green warnings,
-/// dedups by md5 <c>control</c> hash, and inserts new <c>weather_warnings</c>. A new warning for the
-/// Setúbal district (area <c>STB</c>) is posted (dry-run) to Telegram, mirroring
-/// <c>WeatherWarningObserver</c> → <c>SendWeatherWarningToTelegram</c>. Port of
+/// dedups by md5 <c>control</c> hash, and inserts new <c>weather_warnings</c>. Port of
 /// <c>HandleWeatherWarnings.php</c>.
 /// </summary>
 [DisallowConcurrentExecution]
@@ -26,14 +22,12 @@ public sealed class HandleWeatherWarningsJob(
     IpmaClient ipma,
     MongoContext mongo,
     IClock clock,
-    ITelegramPublisher telegram,
     WeatherFreshnessTracker freshness,
     IOpsNotifier ops,
     ISingleFlightLock locks,
     ILogger<HandleWeatherWarningsJob> logger) : UniqueJob(locks, logger)
 {
     public const string JobName = "HandleWeatherWarnings";
-    public const string SetubalArea = "STB";
     public static readonly TimeSpan Cadence = TimeSpan.FromMinutes(15);
 
     protected override Task ExecuteCoreAsync(IJobExecutionContext context) => RunAsync(context.CancellationToken);
@@ -96,26 +90,10 @@ public sealed class HandleWeatherWarningsJob(
             }
 
             inserted++;
-
-            if (string.Equals(w.AreaCode, SetubalArea, StringComparison.OrdinalIgnoreCase))
-                await telegram.PublishAsync(new SocialPost { Text = BuildTelegramMessage(warning) }, "telegram", ct);
         }
 
         // A successful scrape with zero warnings is still a success (no active warnings is normal).
         await freshness.MarkSuccessAsync(JobName, ct);
         logger.LogInformation("{Job}: {Inserted} new warning(s) of {Total} scraped", JobName, inserted, warnings.Count);
-    }
-
-    /// <summary>Mirrors the legacy <c>SendWeatherWarningToTelegram</c> message layout.</summary>
-    private string BuildTelegramMessage(WeatherWarning w)
-    {
-        var start = clock.ToLisbon(w.StartsAt).ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
-        var end = clock.ToLisbon(w.EndsAt).ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
-        return $"⚠️ Novo Aviso IPMA ⚠️\n"
-               + $"- {w.LevelPt}\n"
-               + $"- {w.AwarenessType}:\n"
-               + $"{w.Text}\n\n"
-               + $"- Início: {start}\n"
-               + $"- Fim: {end}";
     }
 }

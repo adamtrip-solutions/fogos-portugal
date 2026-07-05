@@ -85,32 +85,6 @@ public sealed class SituationReportJobTests(ContainerFixture fixture)
         Assert.Equal(42, doc.RootElement.GetProperty("totalMan").GetInt32());
     }
 
-    [SkippableFact]
-    public async Task Social_handler_posts_once_across_redelivery()
-    {
-        Skip.IfNot(fixture.Available, fixture.SkipReason);
-        await ResetAsync();
-        await fixture.FlushRedisAsync();
-        var ctx = SeedData.Context(fixture);
-
-        var report = new SituationReport { At = Now, Slot = "evening", Body = "Ponto de situação de teste", ActiveFires = 0 };
-        await ctx.SituationReports.InsertOneAsync(report);
-
-        var redis = fixture.Factory.Services.GetRequiredService<IConnectionMultiplexer>();
-        var processed = new RedisProcessedMarker(redis, Options.Create(new QueueOptions()));
-        var twitter = new RecordingTwitter();
-        var telegram = new RecordingTelegram();
-        var facebook = new RecordingFacebook();
-
-        var handler = new SituationReportSocialHandler(ctx, processed, twitter, telegram, facebook);
-        await handler.HandleAsync(new SituationReportCreated(report.Id), CancellationToken.None);
-        await handler.HandleAsync(new SituationReportCreated(report.Id), CancellationToken.None); // redelivery — no-op
-
-        Assert.Single(twitter.Posts);
-        Assert.Single(facebook.Posts);
-        Assert.Single(telegram.Posts);
-    }
-
     private static Incident ActiveFire(string id, int man, int terrain, int aerial, bool escalating = false)
     {
         var incident = SeedData.Incident(id, occurredAt: Now.AddHours(-1));

@@ -83,11 +83,11 @@ public sealed class WeatherJobsTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
-    public async Task Warnings_job_inserts_nongreen_once_and_dispatches_stb_to_telegram()
+    public async Task Warnings_job_inserts_nongreen_once_and_dedups_on_rerun()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         using var h = new WeatherJobHarness(fixture);
-        var job = new HandleWeatherWarningsJob(h.Ipma, h.Mongo, h.Clock, h.Telegram, h.Freshness, h.Ops, h.Locks,
+        var job = new HandleWeatherWarningsJob(h.Ipma, h.Mongo, h.Clock, h.Freshness, h.Ops, h.Locks,
             NullLogger<HandleWeatherWarningsJob>.Instance);
 
         await job.RunAsync(CancellationToken.None);
@@ -101,13 +101,9 @@ public sealed class WeatherJobsTests(ContainerFixture fixture)
         Assert.Equal("yellow", stb.Level);
         Assert.Contains("&#x00E7;", stb.Text); // %uXXXX → HTML entity, kept literal as legacy did
 
-        Assert.Single(h.Telegram.Posts);       // only the STB warning is dispatched
-        Assert.Contains("Novo Aviso IPMA", h.Telegram.Posts[0].Post.Text);
-
-        // Rerun → dedup by control: no new inserts, no new dispatch.
+        // Rerun → dedup by control: no new inserts.
         await job.RunAsync(CancellationToken.None);
         Assert.Equal(2, await h.Mongo.WeatherWarnings.CountDocumentsAsync(Builders<WeatherWarning>.Filter.Empty));
-        Assert.Single(h.Telegram.Posts);
     }
 
     [SkippableFact]

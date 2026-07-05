@@ -50,42 +50,8 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         // Credits recorded via the legacy 2 + rows×0.04 model → ceil(2.08) = 3.
         Assert.Equal(3, await ctx.Meter.CurrentAsync());
 
-        // Both notify aircraft are first sightings → one X + FB post each, one push each.
-        Assert.Equal(2, ctx.Twitter.Posts.Count);
-        Assert.Equal(2, ctx.Facebook.Posts.Count);
+        // Both notify aircraft are first sightings → one plane push each.
         Assert.Equal(2, ctx.Push.Dispatched.Count);
-        Assert.All(ctx.Twitter.Posts, p => Assert.Contains("Meio aéreo do DECIR", p.Text));
-        Assert.All(ctx.Twitter.Posts, p => Assert.Contains("#FogosPT", p.Text));
-    }
-
-    [SkippableFact]
-    public async Task Fr24_message_shape_matches_legacy_fields()
-    {
-        Skip.IfNot(fixture.Available, fixture.SkipReason);
-        await fixture.FlushRedisAsync();
-
-        var mongo = NewMongo();
-        await SeedAerialFireAsync(mongo);
-        await mongo.TrackedAircraft.InsertOneAsync(new TrackedAircraft
-        {
-            Icao = PlaneFixtures.Hex1,
-            Registration = PlaneFixtures.Reg1,
-            Name = "Bombeiros 01",
-            Type = "AT-802",
-            Base = "Viseu",
-            Notify = true,
-            Active = true,
-        });
-
-        await using var redis = await ConnectRedisAsync();
-        var ctx = BuildFr24(mongo, redis, new FakeClock(LisbonMidday), RespondWith(SingleAircraftFr24));
-
-        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-
-        var post = Assert.Single(ctx.Twitter.Posts);
-        Assert.Equal(
-            "🚁ℹ️ Meio aéreo do DECIR Bombeiros 01 - AT-802 - CS-ABC com base em Viseu no radar! #FogosPT ℹ️🚁",
-            post.Text);
     }
 
     [SkippableFact]
@@ -102,22 +68,22 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         var clock = new FakeClock(LisbonMidday);
         var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft));
 
-        // Run 1: fresh sightings → 2 posts.
+        // Run 1: fresh sightings → 2 pushes.
         await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(2, ctx.Twitter.Posts.Count);
+        Assert.Equal(2, ctx.Push.Dispatched.Count);
 
-        // Run 2 immediately: previous positions are < 30 min old → no new posts.
+        // Run 2 immediately: previous positions are < 30 min old → no new pushes.
         await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(2, ctx.Twitter.Posts.Count);
+        Assert.Equal(2, ctx.Push.Dispatched.Count);
         Assert.Equal(4, await CountBySourceAsync(mongo, "fr24")); // positions still appended
 
-        // Age every stored position past the 30-minute gap, then run again → reposts.
+        // Age every stored position past the 30-minute gap, then run again → re-notifies.
         await mongo.FlightPositions.UpdateManyAsync(
             FilterDefinition<FlightPosition>.Empty,
             Builders<FlightPosition>.Update.Set(x => x.SampledAt, clock.UtcNow - TimeSpan.FromMinutes(40)));
 
         await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(4, ctx.Twitter.Posts.Count);
+        Assert.Equal(4, ctx.Push.Dispatched.Count);
     }
 
     [SkippableFact]
@@ -273,15 +239,9 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
 
     // ── builders / helpers ───────────────────────────────────────────────────────────────────────
 
-    private const string SingleAircraftFr24 = """
-    { "data": [ { "fr24_id": "z1", "hex": "4CA7B1", "reg": "CS-ABC", "lat": 40.1, "lon": -8.2, "alt": 5000, "timestamp": "2026-06-15T11:59:00Z" } ] }
-    """;
-
     private sealed record Fr24Context(
         ProcessFr24PlanesJob Job,
         StubHttpMessageHandler Handler,
-        RecordingTwitter Twitter,
-        RecordingFacebook Facebook,
         RecordingDelayedDispatcher Push,
         Fr24CreditMeter Meter);
 
@@ -309,8 +269,6 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         var meter = new Fr24CreditMeter(redis, clock, sources);
         ops ??= new RecordingOps();
         var freshness = new PlaneJobFreshness(redis, clock, ops);
-        var twitter = new RecordingTwitter();
-        var facebook = new RecordingFacebook();
         var push = new RecordingDelayedDispatcher();
 
         var fcm = new FcmNotifier(
@@ -320,10 +278,10 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
 
         var job = new ProcessFr24PlanesJob(
             fr24Client, meter, new AircraftReads(mongo), mongo, clock, ops,
-            twitter, facebook, notifications, fcm,
+            notifications, fcm,
             sources, publishing, fcmOptions, freshness, NullLogger<ProcessFr24PlanesJob>.Instance);
 
-        return new Fr24Context(job, handler, twitter, facebook, push, meter);
+        return new Fr24Context(job, handler, push, meter);
     }
 
     private static ProcessAdsbfiPlanesJob BuildAdsbfi(MongoContext mongo, IConnectionMultiplexer redis, FakeClock clock, StubHttpMessageHandler handler)

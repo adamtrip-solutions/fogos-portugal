@@ -76,15 +76,6 @@ public static class GraphQLServiceCollectionExtensions
                 d.Field(x => x.Id).ID();
                 d.Ignore(x => x.FcmToken);
             }))
-            // Alert event: id + references are IDs; the internal dedupe key is hidden.
-            .AddType(new ObjectType<Fogos.Domain.Alerts.AlertEvent>(d =>
-            {
-                d.Name("AlertEvent");
-                d.Field(x => x.Id).ID();
-                d.Field(x => x.SubscriptionId).ID();
-                d.Field(x => x.IncidentId).ID();
-                d.Ignore(x => x.DedupeKey);
-            }))
             // Situation report: surrogate id is an ID.
             .AddType(new ObjectType<Fogos.Domain.Reports.SituationReport>(d =>
             {

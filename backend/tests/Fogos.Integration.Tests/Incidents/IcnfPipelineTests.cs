@@ -10,13 +10,13 @@ namespace Fogos.Integration.Tests.Incidents;
 /// <summary>
 /// ICNF pipeline: the new-fire-from-table job creates a "3103" (Mato) incident with the -1 ICNF-only
 /// sentinels, and the enrichment service merges the icnf sub-document, downloads the KML, and raises
-/// IcnfEnriched whose social handler posts the first-KML / burn-area / cause messages.
+/// IcnfEnriched.
 /// </summary>
 [Collection("fogos")]
 public sealed class IcnfPipelineTests(ContainerFixture fixture)
 {
     [SkippableFact]
-    public async Task New_fire_creates_3103_then_enrichment_merges_and_posts()
+    public async Task New_fire_creates_3103_then_enrichment_merges()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         using var h = new IncidentPipelineHarness(fixture);
@@ -55,12 +55,6 @@ public sealed class IcnfPipelineTests(ContainerFixture fixture)
         Assert.Equal("Fogueira", merged.Icnf.Cause);
         Assert.Equal("112", merged.Icnf.AlertSource);
         Assert.Contains("PERIMETER", merged.Kml);
-
-        // ── Phase 3: social handler posts on the icnf stream ───────────────────
-        await h.DrainAsync("icnf");
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Area ardida disponível"));
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Total de área ardida"));
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Alerta via") && p.Text.Contains("Fogueira"));
     }
 
     [SkippableFact]

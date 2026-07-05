@@ -1,6 +1,5 @@
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Scheduling;
 using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Jobs.Weather;
@@ -12,15 +11,13 @@ namespace Fogos.Integration.Tests.Weather;
 
 /// <summary>
 /// Wires up the weather jobs against the shared Testcontainers Mongo/Redis, each test getting an
-/// isolated database. IPMA HTTP is served from <see cref="WeatherFixtures"/> via a URL-routing stub;
-/// Telegram is a recording double so STB dispatch can be asserted without a real bot.
+/// isolated database. IPMA HTTP is served from <see cref="WeatherFixtures"/> via a URL-routing stub.
 /// </summary>
 internal sealed class WeatherJobHarness : IDisposable
 {
     public MongoContext Mongo { get; }
     public IConnectionMultiplexer Redis { get; }
     public RecordingOps Ops { get; } = new();
-    public RecordingTelegram Telegram { get; } = new();
     public IpmaClient Ipma { get; }
     public WeatherFreshnessTracker Freshness { get; }
     public ISingleFlightLock Locks { get; }
@@ -54,18 +51,6 @@ internal sealed class WeatherJobHarness : IDisposable
     {
         _client.DropDatabase(Mongo.Database.DatabaseNamespace.DatabaseName);
         Redis.Dispose();
-    }
-}
-
-/// <summary>Recording Telegram publisher — captures posts (STB warning dispatch) without a bot.</summary>
-internal sealed class RecordingTelegram : ITelegramPublisher
-{
-    public readonly List<(SocialPost Post, string Channel)> Posts = [];
-
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "telegram", CancellationToken ct = default)
-    {
-        Posts.Add((post, channelKey));
-        return Task.FromResult(PublishResult.Ok("recorded"));
     }
 }
 

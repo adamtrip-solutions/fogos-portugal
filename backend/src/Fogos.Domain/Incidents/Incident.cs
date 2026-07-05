@@ -4,7 +4,7 @@ namespace Fogos.Domain.Incidents;
 
 /// <summary>
 /// The central entity. `_id` is the ANEPC business id (numero_sado) — a string,
-/// no ObjectId duality. Social threading state lives in <c>social_threads</c>, not here.
+/// no ObjectId duality.
 /// </summary>
 public sealed class Incident
 {

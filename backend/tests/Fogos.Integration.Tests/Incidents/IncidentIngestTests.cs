@@ -1,12 +1,13 @@
 using Fogos.Domain.Events;
 using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
-using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
+using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Queue;
 using Fogos.Worker.Handlers;
 using Fogos.Worker.Jobs.Incidents;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace Fogos.Integration.Tests.Incidents;
@@ -56,16 +57,9 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
         Assert.True(await h.Mongo.IncidentHistory.CountDocumentsAsync(FilterDefinition<IncidentHistorySnapshot>.Empty) > 0);
         Assert.True(await h.Mongo.IncidentStatusHistory.CountDocumentsAsync(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, "SEEDED_STATUS")) == 1);
 
-        var thread = await h.Threads.GetAsync("NEW1", CancellationToken.None);
-        Assert.NotNull(thread!.LastTweetId);
-        Assert.NotNull(thread.FacebookPostId);
-
         Assert.NotNull((await Find(h, "NEW1")).NearestWeatherStationId);
 
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Novo incêndio"));
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("Dominado")); // SEEDED_STATUS 5 → 7
-
-        // Delayed pushes queued (new-fire / new-incident / status-change all go through the 3-min scheduler).
+        // Delayed pushes queued (new-incident / status-change all go through the 3-min scheduler).
         var delayed = await h.Redis.GetDatabase().SortedSetLengthAsync(QueueKeys.DelayedSet);
         Assert.True(delayed > 0);
         var withScores = await h.Redis.GetDatabase().SortedSetRangeByRankWithScoresAsync(QueueKeys.DelayedSet, 0, 0);
@@ -78,7 +72,7 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
-    public async Task New_incident_fanout_is_idempotent_across_redelivery()
+    public async Task New_incident_notifications_are_idempotent_across_redelivery()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         await fixture.FlushRedisAsync();
@@ -86,33 +80,22 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
 
         await h.Mongo.Incidents.InsertOneAsync(Fire("IDEMP1", IncidentStatusCatalog.EmCurso, 10, 5, 1, h.Clock.UtcNow));
 
-        var social = new NewIncidentSocialHandler(h.Mongo, h.Clock, h.Threads, h.Twitter, h.Telegram, h.Facebook,
-            h.Renderer, h.Scheduler, h.FcmNotifier, h.PipelineOptions);
         var notify = new NewIncidentNotificationsHandler(h.Mongo, h.Clock, h.FcmNotifier, h.Scheduler, h.Processed, h.Ops);
 
         var evt = new IncidentCreated("IDEMP1");
         var db = h.Redis.GetDatabase();
 
-        // First delivery: one social capture per channel, and one scheduled push per handler
-        // (new-fire from social + new-incident from notifications).
-        await social.HandleAsync(evt, CancellationToken.None);
+        // First delivery: one nearby data push + one delayed district "new-incident" push.
         await notify.HandleAsync(evt, CancellationToken.None);
 
-        Assert.Single(h.Twitter.Posts);
-        Assert.Single(h.Facebook.Posts);
-        Assert.Single(h.Telegram.Posts);
-        Assert.Equal(2, await db.SortedSetLengthAsync(QueueKeys.DelayedSet)); // new-fire + new-incident
+        Assert.Equal(1, await db.SortedSetLengthAsync(QueueKeys.DelayedSet)); // new-incident
         var nearbySends = h.Fcm.Sends.Count;
-        Assert.True((await h.Threads.GetAsync("IDEMP1", CancellationToken.None))!.SentNewIncidentPost);
+        Assert.True(nearbySends > 0);
 
-        // At-least-once redelivery re-runs both handlers on the same event → no duplicates.
-        await social.HandleAsync(evt, CancellationToken.None);
+        // At-least-once redelivery re-runs the handler on the same event → no duplicates.
         await notify.HandleAsync(evt, CancellationToken.None);
 
-        Assert.Single(h.Twitter.Posts);
-        Assert.Single(h.Facebook.Posts);
-        Assert.Single(h.Telegram.Posts);
-        Assert.Equal(2, await db.SortedSetLengthAsync(QueueKeys.DelayedSet));
+        Assert.Equal(1, await db.SortedSetLengthAsync(QueueKeys.DelayedSet));
         Assert.Equal(nearbySends, h.Fcm.Sends.Count); // nearby data push not re-sent
     }
 
@@ -126,7 +109,7 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
 
         var job = new ProcessOcorrenciasSiteJob(h.Locks, NullLogger<ProcessOcorrenciasSiteJob>.Instance,
             h.ArcGisSource(IncidentFixtures.FeaturePage()), h.Ingest, h.Important, new IncidentFeedFreshness(h.Redis, h.Ops, h.Clock),
-            h.Mongo, h.Ops, h.PipelineOptions);
+            h.Mongo, h.Ops, Options.Create(new IncidentPipelineOptions()));
 
         var flipped = await job.ReconcileActiveAsync(new HashSet<string> { "KEEP" }, CancellationToken.None);
 
@@ -148,13 +131,9 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
         var posted = await h.Important.RunAsync();
         Assert.Equal(1, posted);
         Assert.True((await Find(h, "BIG")).Important);
-        Assert.True((await h.Threads.GetAsync("BIG", CancellationToken.None))!.SentImportantPost);
-        Assert.Contains(h.Twitter.Posts, p => p.Text.Contains("importante"));
         Assert.False((await Find(h, "SMALL")).Important);
 
-        var tweetCount = h.Twitter.Posts.Count;
         Assert.Equal(0, await h.Important.RunAsync()); // no repost
-        Assert.Equal(tweetCount, h.Twitter.Posts.Count);
     }
 
     [SkippableFact]

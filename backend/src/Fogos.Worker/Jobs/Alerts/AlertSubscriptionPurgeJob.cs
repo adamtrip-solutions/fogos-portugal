@@ -13,7 +13,7 @@ namespace Fogos.Worker.Jobs.Alerts;
 
 /// <summary>
 /// Daily purge of stale alert subscriptions: those created more than <c>PurgeAfterDays</c> ago with no
-/// poll activity in the same window (LastSeenAt null or older than the cutoff). Single-flight.
+/// activity in the same window (LastSeenAt null or older than the cutoff). Single-flight.
 /// </summary>
 public sealed class AlertSubscriptionPurgeJob(
     ISingleFlightLock lockService,

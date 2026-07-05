@@ -8,7 +8,6 @@ using Fogos.Domain.Locations;
 using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
-using Fogos.Domain.Social;
 using Fogos.Domain.Stats;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
@@ -94,13 +93,6 @@ public static class FogosClassMaps
         BsonClassMap.RegisterClassMap<IncidentHistorySnapshot>(cm => MapObjectId(cm, c => c.Id));
         BsonClassMap.RegisterClassMap<IncidentStatusChange>(cm => MapObjectId(cm, c => c.Id));
         BsonClassMap.RegisterClassMap<IncidentPhoto>(cm => MapObjectId(cm, c => c.Id));
-
-        // Per-incident thread state keyed by incident id.
-        BsonClassMap.RegisterClassMap<SocialThread>(cm =>
-        {
-            cm.AutoMap();
-            cm.MapIdMember(c => c.IncidentId);
-        });
 
         // ── Weather ───────────────────────────────────────────────────────────
         BsonClassMap.RegisterClassMap<WeatherStation>(cm =>

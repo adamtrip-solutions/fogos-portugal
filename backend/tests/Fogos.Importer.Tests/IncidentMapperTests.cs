@@ -1,5 +1,4 @@
 using Fogos.Domain.Incidents;
-using Fogos.Domain.Social;
 using Fogos.Importer.Mapping;
 using Fogos.Importer.Mapping.Mappers;
 using MongoDB.Bson;
@@ -11,7 +10,7 @@ public class IncidentMapperTests
     private static readonly IncidentMapper Mapper = new(Mapping.Clock);
 
     [Fact]
-    public void Happy_path_maps_dual_id_sec_dates_coords_dico_icnf_and_thread()
+    public void Happy_path_maps_dual_id_sec_dates_coords_dico_and_icnf()
     {
         var doc = Fixtures.Load("data", "incident_happy");
         var result = Mapping.MapOne(Mapper, doc);
@@ -59,14 +58,6 @@ public class IncidentMapperTests
         Assert.Equal("<kml>perimeter</kml>", incident.Kml);
         Assert.Equal(560, incident.NearestWeatherStationId);
         Assert.True(incident.Important);
-
-        // SocialThread extracted from lastTweetId / facebookPostId / flags.
-        var thread = Mapping.MappedSingle<SocialThread>(result);
-        Assert.Equal("2022080812345", thread.IncidentId);
-        Assert.Equal("1556677889900112233", thread.LastTweetId);
-        Assert.Equal("998877", thread.FacebookPostId);
-        Assert.True(thread.SentImportantPost);
-        Assert.False(thread.SentBigIncidentPost);
     }
 
     [Fact]
@@ -203,16 +194,4 @@ public class IncidentMapperTests
         Assert.False(Mapping.MappedSingle<Incident>(Mapping.MapOne(Mapper, inactive)).Active);
     }
 
-    [Fact]
-    public void No_thread_fields_yields_incident_only()
-    {
-        var doc = new BsonDocument
-        {
-            ["id"] = "n1", ["dateTime"] = new BsonDocument("sec", 1660000000), ["location"] = "X",
-            ["statusCode"] = 5, ["naturezaCode"] = "3101",
-        };
-        var result = Mapping.MapOne(Mapper, doc);
-        Assert.Null(Mapping.MappedOrNull<SocialThread>(result));
-        Assert.NotNull(Mapping.MappedOrNull<Incident>(result));
-    }
 }

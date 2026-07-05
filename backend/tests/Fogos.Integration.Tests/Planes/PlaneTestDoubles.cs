@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using Fogos.Domain.Events;
 using Fogos.Domain.Time;
-using Fogos.Infrastructure.Notifications;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Queue;
 using Quartz;
 
@@ -24,32 +22,6 @@ internal sealed class FakeClock(DateTimeOffset utcNow) : IClock
     }
 
     public DateTimeOffset ToLisbon(DateTimeOffset utc) => TimeZoneInfo.ConvertTime(utc, FogosClock.Lisbon);
-}
-
-/// <summary>Records the posts a plane job publishes so the first-sighting fan-out can be asserted.</summary>
-internal sealed class RecordingTwitter : ITwitterPublisher
-{
-    public readonly ConcurrentBag<SocialPost> Posts = [];
-
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "twitter", CancellationToken ct = default)
-    {
-        Posts.Add(post);
-        return Task.FromResult(PublishResult.Ok(PublishResult.DryRunId()));
-    }
-}
-
-internal sealed class RecordingFacebook : IFacebookPublisher
-{
-    public readonly ConcurrentBag<SocialPost> Posts = [];
-
-    public Task<PublishResult> PublishAsync(SocialPost post, string channelKey = "facebook", CancellationToken ct = default)
-    {
-        Posts.Add(post);
-        return Task.FromResult(PublishResult.Ok(PublishResult.DryRunId()));
-    }
-
-    public Task<PublishResult> CommentOnPostAsync(string postId, string message, string channelKey = "facebook", CancellationToken ct = default) =>
-        Task.FromResult(PublishResult.Ok(PublishResult.DryRunId()));
 }
 
 /// <summary>Captures scheduled push events instead of enqueueing them on Redis.</summary>

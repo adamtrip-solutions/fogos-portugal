@@ -2,8 +2,6 @@ import { createServerFn } from '@tanstack/react-start'
 import { queryOptions } from '@tanstack/react-query'
 
 import type {
-  AlertEvent,
-  AlertSubscription,
   ConcelhoProfile,
   IncidentDetail,
   IncidentListItem,
@@ -401,91 +399,4 @@ export const concelhoProfileQuery = (dico: string) =>
     queryFn: () => fetchConcelhoProfile({ data: dico }),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
-  })
-
-// ── Alert subscriptions (WP4) ────────────────────────────────────────────────
-
-const ALERT_EVENTS_QUERY = /* GraphQL */ `
-  query AlertEvents($subscriptionId: ID!, $after: DateTime) {
-    alertEvents(subscriptionId: $subscriptionId, after: $after) {
-      id
-      kind
-      incidentId
-      message
-      createdAt
-    }
-  }
-`
-
-export const fetchAlertEvents = createServerFn({ method: 'GET' })
-  .validator((input: { subscriptionId: string; after?: string | null }) => input)
-  .handler(async ({ data }) => {
-    const result = await graphql<{ alertEvents: AlertEvent[] }>(
-      ALERT_EVENTS_QUERY,
-      { subscriptionId: data.subscriptionId, after: data.after ?? null },
-    )
-    return result.alertEvents
-  })
-
-export const alertEventsQuery = (subscriptionId: string | null) =>
-  queryOptions({
-    queryKey: ['alert-events', subscriptionId] as const,
-    queryFn: () =>
-      subscriptionId
-        ? fetchAlertEvents({ data: { subscriptionId } })
-        : Promise.resolve([] as AlertEvent[]),
-    enabled: subscriptionId != null,
-    // Poll every 60s while a subscription exists (see AlertsPopover).
-    refetchInterval: 60_000,
-    staleTime: 30_000,
-  })
-
-const CREATE_ALERT_SUBSCRIPTION_MUTATION = /* GraphQL */ `
-  mutation CreateAlert($input: CreateAlertSubscriptionInput!) {
-    createAlertSubscription(input: $input) {
-      id
-      kind
-      dico
-      point { latitude longitude }
-      radiusKm
-      riskThreshold
-      createdAt
-      lastSeenAt
-    }
-  }
-`
-
-export interface CreateAlertSubscriptionInput {
-  kind: 'CONCELHO' | 'POINT'
-  dico?: string | null
-  latitude?: number | null
-  longitude?: number | null
-  radiusKm?: number | null
-  riskThreshold?: number | null
-  fcmToken?: string | null
-}
-
-export const createAlertSubscription = createServerFn({ method: 'POST' })
-  .validator((input: CreateAlertSubscriptionInput) => input)
-  .handler(async ({ data: input }) => {
-    const result = await graphql<{
-      createAlertSubscription: AlertSubscription
-    }>(CREATE_ALERT_SUBSCRIPTION_MUTATION, { input })
-    return result.createAlertSubscription
-  })
-
-const DELETE_ALERT_SUBSCRIPTION_MUTATION = /* GraphQL */ `
-  mutation DeleteAlert($id: ID!) {
-    deleteAlertSubscription(id: $id)
-  }
-`
-
-export const deleteAlertSubscription = createServerFn({ method: 'POST' })
-  .validator((id: string) => id)
-  .handler(async ({ data: id }) => {
-    const result = await graphql<{ deleteAlertSubscription: boolean }>(
-      DELETE_ALERT_SUBSCRIPTION_MUTATION,
-      { id },
-    )
-    return result.deleteAlertSubscription
   })

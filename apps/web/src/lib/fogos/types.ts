@@ -280,32 +280,6 @@ export interface ConcelhoProfile {
   yearBurnAreaHa: number
 }
 
-// ── Alerts (WP4) ─────────────────────────────────────────────────────────────
-
-export type AlertSubscriptionKind = 'CONCELHO' | 'POINT'
-
-/** An anonymous alert subscription as returned by `createAlertSubscription`. */
-export interface AlertSubscription {
-  id: string
-  kind: AlertSubscriptionKind
-  dico: string | null
-  point: Coordinates | null
-  radiusKm: number | null
-  riskThreshold: number | null
-  createdAt: string
-  lastSeenAt: string | null
-}
-
-/** A delivered alert event (`alertEvents`). */
-export interface AlertEvent {
-  id: string
-  /** NEW_INCIDENT | ESCALATION | REKINDLE | RISK. */
-  kind: string
-  incidentId: string | null
-  message: string
-  createdAt: string
-}
-
 /** Shape returned by the `incident(id)` detail query. */
 export interface IncidentDetail {
   id: string

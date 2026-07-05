@@ -3,7 +3,6 @@ import { Link } from '@tanstack/react-router'
 import { ChartColumn, Flame, Map, Menu } from 'lucide-react'
 
 import { countLabel } from '#/lib/fogos/format.ts'
-import { AlertsPopover } from '#/components/alerts-popover.tsx'
 import { AppDrawer } from '#/components/app-drawer.tsx'
 import { ThemeToggle } from '#/components/theme-toggle.tsx'
 
@@ -158,10 +157,9 @@ function RightPill({
           />
         </>
       )}
-      {/* Divider before the actions: when Só ativos is present it always has a
+      {/* Divider before the theme toggle: when Só ativos is present it always has a
           neighbour to its left; otherwise (bar variant) only the md+ nav does. */}
       <Divider className={withActive ? '' : 'hidden md:block'} />
-      <AlertsPopover triggerClassName={`relative ${GHOST_ITEM}`} />
       <ThemeToggle className={ICON_ITEM} />
     </div>
   )

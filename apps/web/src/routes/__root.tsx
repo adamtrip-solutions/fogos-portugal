@@ -9,7 +9,6 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import { THEME_INIT_SCRIPT } from '#/lib/theme.ts'
-import { ToastProvider } from '#/components/toast.tsx'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 import appCss from '../styles.css?url'
@@ -71,7 +70,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        {children}
         <TanStackDevtools
           config={{
             position: 'bottom-right',

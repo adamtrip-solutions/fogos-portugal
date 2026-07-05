@@ -6,7 +6,8 @@
 #   docker compose --profile dev up -d      # full local stack
 #   docker compose up -d api worker         # app only, pointed at external infra via env
 #
-# FCM push defaults to DryRun and all webhooks are empty — nothing goes live by accident.
+# Dev is cloud-free: photo storage is a local MinIO (the R2 stand-in). FR24 defaults to DryRun and
+# all webhooks are empty — nothing goes live or spends by accident.
 
 services:
   api:
@@ -21,15 +22,15 @@ services:
       Mongo__Database: ${MONGO_DATABASE:-fogos}
       Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
       ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
-      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
-      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__AccessKey: ${STORAGE_ACCESS_KEY:-minioadmin}
+      ObjectStorage__SecretKey: ${STORAGE_SECRET_KEY:-minioadmin}
       ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
       ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__Region: auto
       ObjectStorage__ForcePathStyle: "true"
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     restart: unless-stopped
 
@@ -43,22 +44,20 @@ services:
       Mongo__Database: ${MONGO_DATABASE:-fogos}
       Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
       ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
-      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
-      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ObjectStorage__AccessKey: ${STORAGE_ACCESS_KEY:-minioadmin}
+      ObjectStorage__SecretKey: ${STORAGE_SECRET_KEY:-minioadmin}
       ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
       ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__Region: auto
       ObjectStorage__ForcePathStyle: "true"
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      # ── FCM ──
-      Fcm__CredentialsPath: ${FCM_CREDENTIALS_PATH:-}
-      Fcm__ProjectId: ${FCM_PROJECT_ID:-}
       # ── External sources ──
       Sources__Firms__Key: ${NASA_FIRMS_KEY:-}
       Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
       Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
+      Sources__Fr24__Mode: ${FR24_MODE:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     restart: unless-stopped
 
@@ -92,8 +91,8 @@ services:
     profiles: ["dev"]
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -110,9 +109,9 @@ services:
       - /bin/sh
       - -c
       - >
-        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do sleep 1; done;
-        mc mb --ignore-existing local/incident-photos;
-        mc anonymous set download local/incident-photos;
+        until mc alias set local http://minio:9000 ${STORAGE_ACCESS_KEY:-minioadmin} ${STORAGE_SECRET_KEY:-minioadmin}; do sleep 1; done;
+        mc mb --ignore-existing local/${STORAGE_BUCKET:-incident-photos};
+        mc anonymous set download local/${STORAGE_BUCKET:-incident-photos};
         exit 0;
 
 volumes:

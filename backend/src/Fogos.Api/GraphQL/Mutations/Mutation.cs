@@ -252,7 +252,6 @@ public sealed class Mutation
         var subscription = new AlertSubscription
         {
             Kind = input.Kind,
-            FcmToken = string.IsNullOrWhiteSpace(input.FcmToken) ? null : input.FcmToken,
             CreatedAt = clock.UtcNow,
         };
 

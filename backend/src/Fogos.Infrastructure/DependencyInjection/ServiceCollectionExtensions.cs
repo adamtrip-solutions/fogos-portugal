@@ -26,7 +26,6 @@ public static class ServiceCollectionExtensions
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
         services.Configure<OpsOptions>(configuration.GetSection(OpsOptions.SectionName));
-        services.Configure<PublishingOptions>(configuration.GetSection(PublishingOptions.SectionName));
         services.Configure<AlertOptions>(configuration.GetSection(AlertOptions.SectionName));
         services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));
 

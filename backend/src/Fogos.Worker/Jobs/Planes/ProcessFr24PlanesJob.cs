@@ -3,10 +3,7 @@ using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Ops;
-using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Sources;
 using Microsoft.Extensions.Logging;
@@ -21,14 +18,14 @@ namespace Fogos.Worker.Jobs.Planes;
 /// and appends <c>flight_positions</c> (source <c>fr24</c>). Ported from the legacy
 /// <c>ProcessFR24Planes</c> (offset 0 of the 3-minute plane cycle).
 ///
-/// Four gates run <b>before</b> any API call, in the legacy order:
-/// (a) FR24 enabled (the <c>fr24</c> publisher channel is not Off) and a key is configured;
+/// Gates run <b>before</b> any API call, in the legacy order:
+/// (a) FR24 mode is not Off and a key is configured;
 /// (b) the Lisbon daylight window (sunrise + 1h → sunset − 1h);
 /// (c) at least one active fire incident committing aerial assets;
 /// (d) the shared FR24 monthly credit budget is below the 95% guard.
 ///
-/// On the first sighting of a <c>notify</c> aircraft — no prior stored position within 30 minutes —
-/// it schedules the legacy "meio aéreo no radar" FCM push. The push defaults to dry-run.
+/// The spend gate is <c>Sources:Fr24:Mode</c> (<c>FR24_MODE</c>): <c>Off</c> disables polling entirely;
+/// <c>DryRun</c> (default) runs every gate above but never makes the paid API call; <c>On</c> polls live.
 /// </summary>
 [DisallowConcurrentExecution]
 public sealed class ProcessFr24PlanesJob(
@@ -38,21 +35,13 @@ public sealed class ProcessFr24PlanesJob(
     MongoContext mongo,
     IClock clock,
     IOpsNotifier ops,
-    NotificationScheduler notifications,
-    FcmNotifier fcm,
     IOptions<FogosSourcesOptions> sources,
-    IOptions<PublishingOptions> publishing,
-    IOptions<FcmOptions> fcmOptions,
     PlaneJobFreshness freshness,
     ILogger<ProcessFr24PlanesJob> logger) : IJob
 {
     public const string JobName = "fr24-planes";
-    public const string FcmChannelKey = "fr24";
 
     private static readonly TimeSpan Cadence = TimeSpan.FromMinutes(3);
-
-    /// <summary>Legacy <c>NOTIFY_GAP_MINUTES</c>: a fresh sighting only if the last one is older than this.</summary>
-    private static readonly TimeSpan NotifyGap = TimeSpan.FromMinutes(30);
 
     public async Task Execute(IJobExecutionContext context)
     {
@@ -74,10 +63,9 @@ public sealed class ProcessFr24PlanesJob(
         var fr24Options = sources.Value.Fr24;
 
         // (a) enabled + key configured
-        if (publishing.Value.ModeFor(FcmChannelKey) == PublisherMode.Off ||
-            string.IsNullOrWhiteSpace(fr24Options.ApiKey))
+        if (fr24Options.Mode == PublisherMode.Off || string.IsNullOrWhiteSpace(fr24Options.ApiKey))
         {
-            logger.LogDebug("FR24 poll skipped: channel Off or no API key");
+            logger.LogDebug("FR24 poll skipped: mode Off or no API key");
             return;
         }
 
@@ -127,6 +115,15 @@ public sealed class ProcessFr24PlanesJob(
         if (registrations.Count == 0)
             return;
 
+        // Spend gate: DryRun exercises every gate above but never makes the paid FR24 call.
+        if (fr24Options.Mode == PublisherMode.DryRun)
+        {
+            logger.LogInformation(
+                "FR24 poll dry-run: {Count} tracked registrations would be polled; no paid call made.",
+                registrations.Count);
+            return;
+        }
+
         await freshness.CheckStaleAsync(JobName, Cadence, ct);
 
         string json;
@@ -156,7 +153,7 @@ public sealed class ProcessFr24PlanesJob(
         // Record the credits this poll spent (legacy cost model: 2 + rows × 0.04).
         await creditMeter.TryConsumeAsync((int)Math.Ceiling(2 + samples.Count * 0.04));
 
-        await PersistAndNotifyAsync(samples, fleet, ct);
+        await PersistAsync(samples, fleet, ct);
 
         await freshness.MarkSuccessAsync(JobName, ct);
     }
@@ -170,16 +167,11 @@ public sealed class ProcessFr24PlanesJob(
         return await mongo.Incidents.Find(filter).Limit(1).AnyAsync(ct);
     }
 
-    private async Task PersistAndNotifyAsync(
+    private async Task PersistAsync(
         IReadOnlyList<PlaneSample> samples, IReadOnlyList<TrackedAircraft> fleet, CancellationToken ct)
     {
         var byIcao = BuildLookup(fleet, a => a.Icao);
         var byReg = BuildLookup(fleet, a => a.Registration);
-
-        var icaos = samples.Select(s => s.Icao).Distinct().ToList();
-        var previous = icaos.Count > 0
-            ? await aircraftReads.LatestPositionsByIcaosAsync(icaos, ct)
-            : new Dictionary<string, FlightPosition>();
 
         foreach (var sample in samples)
         {
@@ -197,9 +189,6 @@ public sealed class ProcessFr24PlanesJob(
                     Fr24Id = sample.Fr24Id,
                 };
                 await mongo.FlightPositions.InsertOneAsync(position, cancellationToken: ct);
-
-                if (aircraft is { Notify: true } && IsFreshSighting(previous, sample.Icao))
-                    await PublishFirstSightingAsync(aircraft, ct);
             }
             catch (Exception ex)
             {
@@ -207,9 +196,6 @@ public sealed class ProcessFr24PlanesJob(
             }
         }
     }
-
-    private bool IsFreshSighting(IReadOnlyDictionary<string, FlightPosition> previous, string icao) =>
-        !previous.TryGetValue(icao, out var last) || clock.UtcNow - last.SampledAt > NotifyGap;
 
     private static TrackedAircraft? Match(
         PlaneSample sample,
@@ -235,43 +221,5 @@ public sealed class ProcessFr24PlanesJob(
                 map.TryAdd(k, aircraft);
         }
         return map;
-    }
-
-    private async Task PublishFirstSightingAsync(TrackedAircraft aircraft, CancellationToken ct)
-    {
-        var message = string.Format(
-            "🚁ℹ️ Meio aéreo do DECIR {0} - {1} - {2} com base em {3} no radar! #FogosPT ℹ️🚁",
-            aircraft.Name ?? aircraft.Registration ?? aircraft.Icao,
-            aircraft.Type ?? "",
-            aircraft.Registration ?? "",
-            aircraft.Base ?? "");
-
-        try
-        {
-            await notifications.ScheduleAsync(
-                kind: "plane",
-                incidentId: null,
-                title: "Meio Aéreo",
-                body: message,
-                topics: PlaneTopics(),
-                ct: ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Scheduling the FR24 plane push failed");
-        }
-    }
-
-    /// <summary>Legacy plane topics: <c>{prefix}planes</c> (+ mobile variants when legacy topics are on).</summary>
-    private string[] PlaneTopics()
-    {
-        var prefix = fcm.Prefix;
-        var topics = new List<string> { $"{prefix}planes" };
-        if (fcmOptions.Value.LegacyTopicsEnabled)
-        {
-            topics.Add($"{prefix}mobile-android-planes");
-            topics.Add($"{prefix}mobile-ios-planes");
-        }
-        return topics.ToArray();
     }
 }

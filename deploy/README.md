@@ -9,7 +9,8 @@ hostnames onto them.
 ```
 Cloudflare tunnel (host)  ──►  127.0.0.1:${WEB_PORT}  →  web  (TanStack Start SSR)
                           └─►  127.0.0.1:${API_PORT}  →  api  (Fogos.Api)
-internal network only:    mongo (rs0) · redis · minio · worker
+internal network only:    mongo (rs0) · redis · worker
+external managed:         Cloudflare R2 (photo storage, off-stack)
 ```
 
 Images are pulled from GHCR, pinned by `deploy/versions.env`. CI/build/release lives in
@@ -37,11 +38,10 @@ cp deploy/versions.env ~/fogos-deploy/versions.env  # pinned image tags (deploy 
 > It reads both files from this dir via `--env-file`, so `git pull` never clobbers your secrets
 > or fights the version pins. Override the location with the `DEPLOY_STATE_DIR` repo variable.
 
-Edit `~/fogos-deploy/.env`: set real `MINIO_ROOT_PASSWORD`, a stable `AUTH_RSA_PRIVATE_KEY_PEM`
-(generate with `dotnet run --project backend/src/Fogos.AdminCli -- keys` helpers or your own
-RSA key — leaving it empty auto-generates an ephemeral key that dies on restart), the FCM
-credentials you intend to flip to `On`, and `SENTRY_DSN`. Leave `PUBLISH_FCM` at `DryRun` until
-the switchover playbook.
+Edit `~/fogos-deploy/.env`: fill in the Cloudflare R2 `STORAGE_*` values (see §8), set a stable
+`AUTH_RSA_PRIVATE_KEY_PEM` (generate with `dotnet run --project backend/src/Fogos.AdminCli -- keys`
+helpers or your own RSA key — leaving it empty auto-generates an ephemeral key that dies on
+restart), and `SENTRY_DSN`. Leave `FR24_MODE` at `DryRun` until you intend to spend FR24 credits.
 
 Log in to GHCR once so `pull` works (a classic PAT with `read:packages`, or `gh auth token`):
 
@@ -161,7 +161,9 @@ Every image tag is immutable in GHCR, so rollback is deterministic.
 
 ## 6. Backups
 
-The real disaster-recovery artifacts are Mongo, the MinIO bucket, and `~/fogos-deploy/.env`.
+The real disaster-recovery artifacts are Mongo and `~/fogos-deploy/.env`. Photo objects live in
+Cloudflare R2 (managed) — enable bucket versioning / a lifecycle policy there rather than backing
+up a local volume; the stack holds no photo state.
 
 Nightly `mongodump` (launchd/cron example — a few hundred MB gzipped):
 
@@ -174,9 +176,6 @@ mkdir -p "$OUT"
 docker compose --env-file ~/fogos-deploy/.env -f ~/fogos-deploy/deploy/compose.yml \
   exec -T mongo mongodump --db "${MONGO_DATABASE:-fogos}" --archive --gzip \
   > "$OUT/mongo-$STAMP.archive.gz"
-# MinIO objects:
-docker compose --env-file ~/fogos-deploy/.env -f ~/fogos-deploy/deploy/compose.yml \
-  cp minio:/data "$OUT/minio-$STAMP" 2>/dev/null || true
 # Offsite (e.g. rclone to B2/S3) + keep a copy of ~/fogos-deploy/.env there too.
 find "$OUT" -name 'mongo-*.archive.gz' -mtime +14 -delete
 ```
@@ -204,3 +203,26 @@ These can't be created from the workflow files and are **required**:
 
 CI/build runners (Blacksmith) are already available via the org's Blacksmith GitHub App — no
 per-repo setup beyond the runner labels the workflows already use.
+
+---
+
+## 8. Object storage — Cloudflare R2
+
+Photo upload/serve uses **Cloudflare R2** (S3-compatible, managed, off-stack). The app is
+R2-native (`ForcePathStyle=true`, `Region=auto`); the stack boots fine with the `STORAGE_*` keys
+empty — the photo features just stay inert until you set them. Setup:
+
+1. **Create the bucket** — Cloudflare dashboard → R2 → *Create bucket* (e.g. `incident-photos`).
+2. **Create an API token** — R2 → *Manage R2 API Tokens* → *Create* with **Object Read & Write**
+   permission, scoped to that bucket. Copy the **Access Key ID** and **Secret Access Key**.
+3. **Enable public access** for read-serving — either the bucket's **r2.dev** subdomain (quick) or
+   a **custom domain** (recommended, e.g. `media.fogosportugal.pt`). This URL is what browsers hit.
+4. **Fill in `.env`:**
+   - `STORAGE_ENDPOINT` = `https://<accountid>.r2.cloudflarestorage.com` (the S3 API endpoint)
+   - `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` = the token pair from step 2
+   - `STORAGE_BUCKET` = the bucket name
+   - `STORAGE_PUBLIC_BASE_URL` = the public URL from step 3
+
+R2's free tier covers 10 GB of storage with **zero egress fees**, which suits the photo workload.
+The **dev** stack (`backend/docker-compose.yml`) keeps a local **MinIO** stand-in instead, so a
+laptop run needs no cloud credentials.

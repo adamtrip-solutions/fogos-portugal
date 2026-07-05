@@ -88,6 +88,12 @@ public sealed class Fr24Options
     public string BaseUrl { get; set; } = "https://fr24api.flightradar24.com";
     public string ApiKey { get; set; } = "";
 
+    /// <summary>
+    /// Spend gate for the paid FR24 poll (<c>FR24_MODE</c>). <c>Off</c> disables polling; <c>DryRun</c>
+    /// (default) runs every poll gate but never makes the paid API call; <c>On</c> polls live (needs a key).
+    /// </summary>
+    public PublisherMode Mode { get; set; } = PublisherMode.DryRun;
+
     /// <summary>Monthly credit budget (shared with the live platform); 0 disables the budget guard.</summary>
     public int MonthlyBudget { get; set; } = 0;
 

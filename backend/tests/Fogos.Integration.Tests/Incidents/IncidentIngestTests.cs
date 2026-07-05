@@ -59,44 +59,36 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
 
         Assert.NotNull((await Find(h, "NEW1")).NearestWeatherStationId);
 
-        // Delayed pushes queued (new-incident / status-change all go through the 3-min scheduler).
-        var delayed = await h.Redis.GetDatabase().SortedSetLengthAsync(QueueKeys.DelayedSet);
-        Assert.True(delayed > 0);
-        var withScores = await h.Redis.GetDatabase().SortedSetRangeByRankWithScoresAsync(QueueKeys.DelayedSet, 0, 0);
-        var dueAt = DateTimeOffset.FromUnixTimeMilliseconds((long)withScores[0].Score);
-        Assert.Equal(h.Clock.UtcNow.AddMinutes(3), dueAt, TimeSpan.FromSeconds(2));
-
         // ICNF kickoff enqueued fire creations onto the icnf stream.
         var icnf = await h.Redis.GetDatabase().StreamLengthAsync(QueueKeys.Stream("icnf"));
         Assert.True(icnf > 0);
     }
 
     [SkippableFact]
-    public async Task New_incident_notifications_are_idempotent_across_redelivery()
+    public async Task Aero_medical_ops_alert_fires_once_and_is_idempotent_across_redelivery()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         await fixture.FlushRedisAsync();
         using var h = new IncidentPipelineHarness(fixture);
 
-        await h.Mongo.Incidents.InsertOneAsync(Fire("IDEMP1", IncidentStatusCatalog.EmCurso, 10, 5, 1, h.Clock.UtcNow));
+        // Aero-medical occurrence (naturezaCode 2409) → one Discord ops info alert.
+        var aero = Fire("AERO1", IncidentStatusCatalog.EmCurso, 10, 5, 1, h.Clock.UtcNow);
+        aero.NaturezaCode = NaturezaCatalog.AeroAlertCode;
+        aero.Location = "Serra da Estrela";
+        await h.Mongo.Incidents.InsertOneAsync(aero);
+        // A plain fire in the same batch must NOT raise an ops alert.
+        await h.Mongo.Incidents.InsertOneAsync(Fire("PLAIN1", IncidentStatusCatalog.EmCurso, 10, 5, 1, h.Clock.UtcNow));
 
-        var notify = new NewIncidentNotificationsHandler(h.Mongo, h.Clock, h.FcmNotifier, h.Scheduler, h.Processed, h.Ops);
+        var handler = new AeroMedicalOpsHandler(h.Mongo, h.Clock, h.Processed, h.Ops);
 
-        var evt = new IncidentCreated("IDEMP1");
-        var db = h.Redis.GetDatabase();
+        await handler.HandleAsync(new IncidentCreated("AERO1"), CancellationToken.None);
+        await handler.HandleAsync(new IncidentCreated("PLAIN1"), CancellationToken.None);
+        // At-least-once redelivery re-runs the handler on the same event → no duplicate alert.
+        await handler.HandleAsync(new IncidentCreated("AERO1"), CancellationToken.None);
 
-        // First delivery: one nearby data push + one delayed district "new-incident" push.
-        await notify.HandleAsync(evt, CancellationToken.None);
-
-        Assert.Equal(1, await db.SortedSetLengthAsync(QueueKeys.DelayedSet)); // new-incident
-        var nearbySends = h.Fcm.Sends.Count;
-        Assert.True(nearbySends > 0);
-
-        // At-least-once redelivery re-runs the handler on the same event → no duplicates.
-        await notify.HandleAsync(evt, CancellationToken.None);
-
-        Assert.Equal(1, await db.SortedSetLengthAsync(QueueKeys.DelayedSet));
-        Assert.Equal(nearbySends, h.Fcm.Sends.Count); // nearby data push not re-sent
+        var alert = Assert.Single(h.Ops.Infos);
+        Assert.Contains("acidente aereo", alert);
+        Assert.Contains("Serra da Estrela", alert);
     }
 
     [SkippableFact]

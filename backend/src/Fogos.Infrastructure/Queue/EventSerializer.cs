@@ -28,7 +28,6 @@ public static class EventSerializer
         [nameof(KmlAttached)] = typeof(KmlAttached),
         [nameof(PhotoSubmitted)] = typeof(PhotoSubmitted),
         [nameof(PhotoApproved)] = typeof(PhotoApproved),
-        [nameof(PushNotificationRequested)] = typeof(PushNotificationRequested),
         [nameof(IncidentEscalating)] = typeof(IncidentEscalating),
         [nameof(RekindleDetected)] = typeof(RekindleDetected),
         [nameof(ClusterDetected)] = typeof(ClusterDetected),

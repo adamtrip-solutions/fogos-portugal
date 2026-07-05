@@ -17,7 +17,7 @@ lands), CI on GitHub Actions with Blacksmith runners, automated versioning/relea
 | Images | GHCR (`ghcr.io/<you>/fogosportugal-{api,worker,frontend}`), **arm64** |
 | Ingress | **Cloudflare Tunnel** (no port-forwarding, TLS + DDoS shielding for free) |
 | Versioning | **Release Please (manifest mode)** + Conventional Commits → per-component versions, changelogs, and releases (`api-vX.Y.Z`, `web-vX.Y.Z`) |
-| Runtime | One `docker compose` stack in OrbStack: mongo (1-node replica set), redis, minio, api, worker, frontend, cloudflared |
+| Runtime | One `docker compose` stack in OrbStack: mongo (1-node replica set), redis, api, worker, frontend; photo storage is **external Cloudflare R2** (managed, off-stack) |
 
 ## 1. Runtime topology (what runs where)
 
@@ -25,11 +25,11 @@ Everything runs as linux/arm64 containers inside OrbStack on the Mac, one compos
 
 ```
 cloudflared ──► frontend (TanStack Start SSR, node)  ──► api (internal http)
-            └─► api (Fogos.Api)                      ──► mongo, redis, minio
+            └─► api (Fogos.Api)                      ──► mongo, redis, R2 (external)
                 worker (Fogos.Worker)                ──► mongo, redis + outbound polling
                 mongo  — single-node replica set (REQUIRED: change streams power GraphQL subscriptions)
                 redis  — streams (event bus) + subscriptions + rate limits
-                minio  — photo storage
+                R2     — Cloudflare R2 photo storage (external managed, S3-compatible; not a stack service)
 ```
 
 Routing via the tunnel: `fogosportugal.pt` → frontend `:3000`; `api.fogosportugal.pt` → api `:8080`
@@ -40,7 +40,7 @@ Notes:
 - Mongo must be started with `--replSet rs0` + a one-shot init container that runs `rs.initiate()`.
   Without it the ChangeStreamBridge (subscriptions) silently can't run.
 - Images must be **arm64** (Apple Silicon). Build them on Blacksmith's arm64 runners — native, no QEMU.
-- Volumes: `mongo-data`, `minio-data` on the OrbStack VM disk.
+- Volumes: `mongo-data` on the OrbStack VM disk (photo objects live in R2, not on a local volume).
 
 ## 2. Repo shape & branching
 
@@ -167,8 +167,9 @@ the dev laptop that caused the historical data gaps). Remaining items:
   Start up automatically after a power failure`.
 - **Runner as a service**: `./svc.sh install && ./svc.sh start` (the runner ships a launchd wrapper).
 - **Backups**: nightly `mongodump --archive --gzip` (cron/launchd) to a second disk + offsite (e.g.
-  `rclone` to B2/S3; the archive of a few hundred MB is trivial). MinIO data likewise. Test a restore
-  once before calling this done.
+  `rclone` to B2/S3; the archive of a few hundred MB is trivial). Photo objects are in Cloudflare
+  R2 (managed) — use R2 bucket versioning / a lifecycle policy there. Test a restore once before
+  calling this done.
 - **Monitoring**: the stack already has `/healthz/*` + a Discord ops notifier. Add one external
   watcher that isn't on the Mac — healthchecks.io (free) pinged by a launchd cron on the Mac
   ("I'm alive") + an HTTP check on `fogosportugal.pt`. If the Mac dies, you hear about it.
@@ -178,8 +179,8 @@ the dev laptop that caused the historical data gaps). Remaining items:
 
 - GitHub → environment `production` secrets: GHCR is automatic (`GITHUB_TOKEN`), Cloudflare tunnel
   token, anything the smoke test needs.
-- On the Mac: one `deploy/.env` (never committed) with Mongo/Redis passwords, FCM service account,
-  JWT RSA PEM, MinIO creds. Compose injects per-service. Backup this file with the
+- On the Mac: one `deploy/.env` (never committed) with Mongo/Redis passwords, Cloudflare R2 storage
+  credentials, and the JWT RSA PEM. Compose injects per-service. Backup this file with the
   same offsite mechanism (it's the real disaster-recovery artifact).
 
 ## 9. Rollout order (suggested implementation sequence)

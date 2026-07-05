@@ -6,9 +6,9 @@ using Microsoft.Extensions.Hosting;
 namespace Fogos.Worker.Queue;
 
 /// <summary>
-/// Wires the queue consumer side: one <see cref="StreamConsumerService"/> per configured stream, the
-/// delayed-dispatch pump, and DI registration of every <c>IEventHandler&lt;TEvent&gt;</c> in the
-/// Worker assembly (so Wave-2/3 handlers register just by existing).
+/// Wires the queue consumer side: one <see cref="StreamConsumerService"/> per configured stream and DI
+/// registration of every <c>IEventHandler&lt;TEvent&gt;</c> in the Worker assembly (so Wave-2/3 handlers
+/// register just by existing).
 /// </summary>
 public static class QueueWorkerServiceCollectionExtensions
 {
@@ -24,7 +24,6 @@ public static class QueueWorkerServiceCollectionExtensions
                 ActivatorUtilities.CreateInstance<StreamConsumerService>(sp, captured));
         }
 
-        services.AddHostedService<DelayedDispatchPump>();
         return services;
     }
 

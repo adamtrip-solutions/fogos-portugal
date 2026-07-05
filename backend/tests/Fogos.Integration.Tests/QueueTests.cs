@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using Fogos.Domain.Events;
 using Fogos.Infrastructure.DependencyInjection;
 using Fogos.Infrastructure.Mongo;
@@ -15,7 +14,7 @@ using MongoDB.Driver;
 
 namespace Fogos.Integration.Tests;
 
-/// <summary>Redis Streams queue: round-trip delivery, retry→dead-letter, delayed dispatch; FR24 meter.</summary>
+/// <summary>Redis Streams queue: round-trip delivery, retry→dead-letter; FR24 credit meter.</summary>
 [Collection("fogos")]
 public sealed class QueueTests(ContainerFixture fixture)
 {
@@ -75,34 +74,6 @@ public sealed class QueueTests(ContainerFixture fixture)
         Assert.Equal(3, dead["attempts"].AsInt32);
         Assert.Contains("boom", dead["error"].AsString);
         Assert.True(counter.Count >= 3, $"handler should have run 3 times, ran {counter.Count}");
-    }
-
-    [SkippableFact]
-    public async Task Delayed_dispatch_delivers_after_the_delay()
-    {
-        Skip.IfNot(fixture.Available, fixture.SkipReason);
-        await fixture.FlushRedisAsync();
-
-        var sink = new EventSink();
-        await using var sp = BuildProvider(services =>
-        {
-            services.AddSingleton(sink);
-            services.AddScoped<IEventHandler<IncidentCreated>, RecordingIncidentHandler>();
-        });
-
-        await using var consumer = StartConsumer(sp, "default");
-        await using var pump = StartHosted(ActivatorUtilities.CreateInstance<DelayedDispatchPump>(sp));
-
-        var sw = Stopwatch.StartNew();
-        await sp.GetRequiredService<IDelayedDispatcher>()
-            .DispatchAsync(new IncidentCreated("later"), TimeSpan.FromSeconds(1));
-
-        var delivered = await sink.WaitAsync(TimeSpan.FromSeconds(10));
-        sw.Stop();
-
-        Assert.True(delivered, "delayed event should have arrived");
-        Assert.Contains("later", sink.Ids);
-        Assert.True(sw.ElapsedMilliseconds >= 800, $"delivered too early: {sw.ElapsedMilliseconds}ms");
     }
 
     [SkippableFact]

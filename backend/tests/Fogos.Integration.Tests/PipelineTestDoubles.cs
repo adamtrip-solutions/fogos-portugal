@@ -1,8 +1,5 @@
 using System.Collections.Concurrent;
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Ops;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 
 namespace Fogos.Integration.Tests;
 
@@ -30,27 +27,6 @@ internal sealed class RecordingOps : IOpsNotifier
         Captures.Add((channel, payload));
         return Task.CompletedTask;
     }
-}
-
-/// <summary>Recording FCM sender double — captures every send without any Firebase credentials.</summary>
-internal sealed class RecordingFcmSender : IFcmSender
-{
-    public readonly ConcurrentBag<FcmSend> Sends = [];
-
-    public Task<string> SendAsync(FcmSend message, CancellationToken ct = default)
-    {
-        Sends.Add(message);
-        return Task.FromResult($"fake-{Sends.Count}");
-    }
-}
-
-/// <summary>Minimal <see cref="IHostEnvironment"/> for driving the FCM topic prefix in tests.</summary>
-internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
-{
-    public string EnvironmentName { get; set; } = environmentName;
-    public string ApplicationName { get; set; } = "Fogos.Tests";
-    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }
 
 /// <summary>An <see cref="IHttpClientFactory"/> that hands out clients over a single stub handler.</summary>

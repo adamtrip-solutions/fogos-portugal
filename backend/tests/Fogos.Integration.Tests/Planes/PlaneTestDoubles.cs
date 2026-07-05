@@ -1,7 +1,4 @@
-using System.Collections.Concurrent;
-using Fogos.Domain.Events;
 using Fogos.Domain.Time;
-using Fogos.Infrastructure.Queue;
 using Quartz;
 
 namespace Fogos.Integration.Tests.Planes;
@@ -22,18 +19,6 @@ internal sealed class FakeClock(DateTimeOffset utcNow) : IClock
     }
 
     public DateTimeOffset ToLisbon(DateTimeOffset utc) => TimeZoneInfo.ConvertTime(utc, FogosClock.Lisbon);
-}
-
-/// <summary>Captures scheduled push events instead of enqueueing them on Redis.</summary>
-internal sealed class RecordingDelayedDispatcher : IDelayedDispatcher
-{
-    public readonly ConcurrentBag<IDomainEvent> Dispatched = [];
-
-    public Task DispatchAsync(IDomainEvent evt, TimeSpan delay, string stream = "default", CancellationToken ct = default)
-    {
-        Dispatched.Add(evt);
-        return Task.CompletedTask;
-    }
 }
 
 /// <summary>

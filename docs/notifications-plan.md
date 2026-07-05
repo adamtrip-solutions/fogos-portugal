@@ -14,6 +14,16 @@ today and the Expo mobile app next, with area-based push as the flagship capabil
 > FCM/APNs directly. Firebase disappears from the backend entirely — the FCM server key and APNs
 > key live in the user's EAS account as Expo's transport credentials. The FCM-specific details
 > below (`FcmNotifier`, topics, collapse keys) describe the current legacy code, which N1 replaces.
+>
+> **Update 2026-07-05 (3) — the FCM stack is now fully removed (ahead of N1).** `FcmNotifier`,
+> `FcmSender`, `FcmTopics`, `NotificationScheduler`, the delayed-dispatch subsystem
+> (`IDelayedDispatcher`/`RedisDelayedDispatcher`/`DelayedDispatchPump`), the push handlers, and the
+> `fcmToken` subscription field are all deleted; git history is the archive. What survives is the
+> non-push duty in each handler (alert matching + `alert_events`, incident/status history,
+> important-fire flagging, the aero-medical Discord ops alert, FR24 polling). **N1 now means:** a
+> device registry, an `ExpoPushClient` (batched HTTP), and reintroducing a debounce primitive when a
+> delivery path actually needs one — not a like-for-like rebuild of the removed FCM code. The
+> sections below are historical context for the legacy behaviour N1 replaces.
 
 ## 1. What exists today (inventory)
 

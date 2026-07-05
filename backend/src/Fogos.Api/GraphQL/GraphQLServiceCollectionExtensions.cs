@@ -69,12 +69,11 @@ public static class GraphQLServiceCollectionExtensions
                 d.Field(x => x.RekindleOfId).ID();
                 d.Ignore(x => x.RekindleKinds); // internal per-kind claim bookkeeping
             }))
-            // Alert subscription: id is an ID; the FCM token is never exposed.
+            // Alert subscription: id is an ID.
             .AddType(new ObjectType<Fogos.Domain.Alerts.AlertSubscription>(d =>
             {
                 d.Name("AlertSubscription");
                 d.Field(x => x.Id).ID();
-                d.Ignore(x => x.FcmToken);
             }))
             // Situation report: surrogate id is an ID.
             .AddType(new ObjectType<Fogos.Domain.Reports.SituationReport>(d =>

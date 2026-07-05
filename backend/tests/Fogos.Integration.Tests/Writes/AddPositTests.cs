@@ -3,13 +3,9 @@ using Fogos.Domain.Events;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
-using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Queue;
 using Fogos.Worker.Handlers;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using StackExchange.Redis;
 
@@ -125,14 +121,6 @@ public sealed class AddPositTests(ContainerFixture fixture)
         var services = fixture.Factory.Services;
         var mongo = services.GetRequiredService<MongoContext>();
         var clock = services.GetRequiredService<IClock>();
-        var redis = services.GetRequiredService<IConnectionMultiplexer>();
-        var processed = new RedisProcessedMarker(redis, Options.Create(new QueueOptions()));
-
-        var ops = new RecordingOps();
-        var publishing = Options.Create(new PublishingOptions()); // DryRun defaults
-        var fcm = new FcmNotifier(new RecordingFcmSender(), publishing, Options.Create(new FcmOptions()), ops,
-            new FakeHostEnvironment("Production"), NullLogger<FcmNotifier>.Instance);
-
-        return new IncidentHistoryHandler(mongo, clock, fcm, processed);
+        return new IncidentHistoryHandler(mongo, clock);
     }
 }

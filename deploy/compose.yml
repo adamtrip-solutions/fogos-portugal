@@ -5,7 +5,10 @@
 # Ingress is a HOST-LEVEL Cloudflare tunnel the operator runs outside this stack (shared with
 # other services) — there is no cloudflared container here. Only `web` and `api` publish host
 # ports, bound to 127.0.0.1; the tunnel maps hostnames to those ports (see README). Everything
-# else (mongo, redis, minio, worker) is reachable only on the internal network.
+# else (mongo, redis, worker) is reachable only on the internal network.
+#
+# Object storage is external Cloudflare R2 (managed, off-stack) — set the STORAGE_* keys in .env.
+# The dev stack (backend/docker-compose.yml) keeps a local MinIO stand-in; production does not.
 #
 # Image tags come from versions.env (API_VERSION / WEB_VERSION). For a local build-from-source
 # run, layer deploy/compose.local.yml on top (it swaps the `image:` refs for `build:`).
@@ -54,33 +57,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    volumes:
-      - minio-data:/data
-    restart: unless-stopped
-
-  # One-shot: wait for MinIO, create the photo bucket + make it publicly readable, then exit.
-  # (The minio server image ships no shell/mc, so bucket setup + readiness both live here.)
-  minio-init:
-    image: minio/mc
-    depends_on:
-      minio:
-        condition: service_started
-    restart: "no"
-    entrypoint:
-      - /bin/sh
-      - -c
-      - >
-        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do sleep 1; done;
-        mc mb --ignore-existing local/${STORAGE_BUCKET:-incident-photos};
-        mc anonymous set download local/${STORAGE_BUCKET:-incident-photos};
-        exit 0;
-
   api:
     image: ghcr.io/adamtrip-solutions/fogos-portugal-api:${API_VERSION:-latest}
     depends_on:
@@ -88,8 +64,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
     ports:
       # Host-local only; the Cloudflare tunnel maps api.<domain> → this port.
       - "127.0.0.1:${API_PORT:-8080}:8080"
@@ -99,16 +73,17 @@ services:
       Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongo:27017/?replicaSet=rs0}
       Mongo__Database: ${MONGO_DATABASE:-fogos}
       Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
-      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
-      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
-      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Object storage: external Cloudflare R2. Empty endpoint = photo features inert (boots fine).
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-}
+      ObjectStorage__AccessKey: ${STORAGE_ACCESS_KEY:-}
+      ObjectStorage__SecretKey: ${STORAGE_SECRET_KEY:-}
       ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
-      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-}
+      ObjectStorage__Region: auto
       ObjectStorage__ForcePathStyle: "true"
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
       Auth__RsaPrivateKeyPem: ${AUTH_RSA_PRIVATE_KEY_PEM:-}
       Sentry__Dsn: ${SENTRY_DSN:-}
     healthcheck:
@@ -131,21 +106,21 @@ services:
       Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:-mongodb://mongo:27017/?replicaSet=rs0}
       Mongo__Database: ${MONGO_DATABASE:-fogos}
       Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379}
-      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-http://minio:9000}
-      ObjectStorage__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
-      ObjectStorage__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Object storage: external Cloudflare R2. Empty endpoint = photo features inert (boots fine).
+      ObjectStorage__Endpoint: ${STORAGE_ENDPOINT:-}
+      ObjectStorage__AccessKey: ${STORAGE_ACCESS_KEY:-}
+      ObjectStorage__SecretKey: ${STORAGE_SECRET_KEY:-}
       ObjectStorage__Bucket: ${STORAGE_BUCKET:-incident-photos}
-      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:9000/incident-photos}
+      ObjectStorage__PublicBaseUrl: ${STORAGE_PUBLIC_BASE_URL:-}
+      ObjectStorage__Region: auto
       ObjectStorage__ForcePathStyle: "true"
       Ops__DiscordGeneralWebhook: ${DISCORD_GENERAL_WEBHOOK:-}
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
-      Publishing__Channels__fcm: ${PUBLISH_FCM:-DryRun}
-      Fcm__CredentialsPath: ${FCM_CREDENTIALS_PATH:-}
-      Fcm__ProjectId: ${FCM_PROJECT_ID:-}
       Sources__Firms__Key: ${NASA_FIRMS_KEY:-}
       Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
       Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
+      Sources__Fr24__Mode: ${FR24_MODE:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     restart: unless-stopped
 
@@ -175,5 +150,4 @@ services:
 
 volumes:
   mongo-data:
-  minio-data:
   redis-data:

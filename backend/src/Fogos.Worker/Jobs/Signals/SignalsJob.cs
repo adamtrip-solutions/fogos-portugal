@@ -143,7 +143,7 @@ public sealed class SignalsJob(
         // Dispatch the escalation event BEFORE persisting the flag: if dispatch throws (or the process
         // dies) the $set never lands, so next run still sees wasEscalating=false and retries the sequence.
         // A dispatch-ok / persist-fails race is harmless — downstream consumers dedupe per incident
-        // (EscalationPushHandler's escalationpush:{id} marker, WP4 alerts' esc:{id} key).
+        // (WP4 alerts' esc:{id} key).
         if (firstTransition)
         {
             var previousAssets = window?.BaselineAssets ?? fire.Resources.TotalAssets;

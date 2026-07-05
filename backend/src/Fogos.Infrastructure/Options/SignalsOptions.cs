@@ -48,10 +48,6 @@ public sealed class SignalsOptions
     /// <summary>Re-evaluate critical conditions only when the last evaluation is older than this.</summary>
     public int ConditionsEvalMinMinutes { get; set; } = 55;
 
-    // ── Push ────────────────────────────────────────────────────────────────────
-    /// <summary>Only send the escalation push when total assets reach this many.</summary>
-    public int EscalationPushMinAssets { get; set; } = 50;
-
     // ── Ignition clustering ─────────────────────────────────────────────────────
     /// <summary>Single-linkage distance (km) that links two ignitions into the same cluster.</summary>
     public double ClusterLinkKm { get; set; } = 10;

@@ -71,6 +71,8 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("type SituationReport", sdl);
         Assert.Contains("input CreateAlertSubscriptionInput", sdl);
         Assert.Contains("enum AlertSubscriptionKind", sdl);
+        // FCM was fully removed: no device-token field survives on the input or output type.
+        Assert.DoesNotContain("fcmToken", sdl);
 
         // Input + key types.
         Assert.Contains("input IncidentFilter", sdl);

@@ -2,9 +2,7 @@ using System.Net;
 using Fogos.Domain.Aircraft;
 using Fogos.Domain.Time;
 using Fogos.Infrastructure.Mongo;
-using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
-using Fogos.Infrastructure.Publishing;
 using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Sources;
 using Fogos.Worker.Jobs.Planes;
@@ -29,7 +27,7 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
     // ── FR24 ───────────────────────────────────────────────────────────────────────────────────
 
     [SkippableFact]
-    public async Task Fr24_happy_path_appends_positions_records_credits_and_posts_first_sighting()
+    public async Task Fr24_happy_path_appends_positions_and_records_credits()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         await fixture.FlushRedisAsync();
@@ -49,13 +47,10 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
 
         // Credits recorded via the legacy 2 + rows×0.04 model → ceil(2.08) = 3.
         Assert.Equal(3, await ctx.Meter.CurrentAsync());
-
-        // Both notify aircraft are first sightings → one plane push each.
-        Assert.Equal(2, ctx.Push.Dispatched.Count);
     }
 
     [SkippableFact]
-    public async Task Fr24_dedups_within_30min_and_reposts_after_the_gap()
+    public async Task Fr24_dry_run_mode_runs_gates_but_makes_no_paid_call()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
         await fixture.FlushRedisAsync();
@@ -66,24 +61,15 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
 
         await using var redis = await ConnectRedisAsync();
         var clock = new FakeClock(LisbonMidday);
-        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft));
-
-        // Run 1: fresh sightings → 2 pushes.
-        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(2, ctx.Push.Dispatched.Count);
-
-        // Run 2 immediately: previous positions are < 30 min old → no new pushes.
-        await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(2, ctx.Push.Dispatched.Count);
-        Assert.Equal(4, await CountBySourceAsync(mongo, "fr24")); // positions still appended
-
-        // Age every stored position past the 30-minute gap, then run again → re-notifies.
-        await mongo.FlightPositions.UpdateManyAsync(
-            FilterDefinition<FlightPosition>.Empty,
-            Builders<FlightPosition>.Update.Set(x => x.SampledAt, clock.UtcNow - TimeSpan.FromMinutes(40)));
+        // Every gate green, but the spend gate is DryRun → no HTTP call, no positions, no credits spent.
+        var ctx = BuildFr24(mongo, redis, clock, RespondWith(PlaneFixtures.Fr24TwoAircraft),
+            fr24Mode: PublisherMode.DryRun);
 
         await ctx.Job.Execute(new FakeJobExecutionContext(CancellationToken.None));
-        Assert.Equal(4, ctx.Push.Dispatched.Count);
+
+        Assert.Equal(0, ctx.Handler.Attempts);
+        Assert.Equal(0, await CountBySourceAsync(mongo, "fr24"));
+        Assert.Equal(0, await ctx.Meter.CurrentAsync());
     }
 
     [SkippableFact]
@@ -242,7 +228,6 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
     private sealed record Fr24Context(
         ProcessFr24PlanesJob Job,
         StubHttpMessageHandler Handler,
-        RecordingDelayedDispatcher Push,
         Fr24CreditMeter Meter);
 
     private static Func<int, HttpResponseMessage> RespondWith(string json) =>
@@ -254,34 +239,25 @@ public sealed class PlaneJobTests(ContainerFixture fixture)
         FakeClock clock,
         Func<int, HttpResponseMessage> responder,
         int monthlyBudget = 100_000, // fail-closed: a real budget is required for the job to spend at all
-        PublisherMode fr24Channel = PublisherMode.DryRun,
+        PublisherMode fr24Mode = PublisherMode.On,
         RecordingOps? ops = null)
     {
         var sources = Options.Create(new FogosSourcesOptions
         {
-            Fr24 = new Fr24Options { ApiKey = "test-key", MonthlyBudget = monthlyBudget },
+            Fr24 = new Fr24Options { ApiKey = "test-key", MonthlyBudget = monthlyBudget, Mode = fr24Mode },
         });
-        var publishing = Options.Create(new PublishingOptions { Channels = { ["fr24"] = fr24Channel } });
-        var fcmOptions = Options.Create(new FcmOptions());
 
         var handler = new StubHttpMessageHandler(responder);
         var fr24Client = new Fr24Client(new HttpClient(handler), sources);
         var meter = new Fr24CreditMeter(redis, clock, sources);
         ops ??= new RecordingOps();
         var freshness = new PlaneJobFreshness(redis, clock, ops);
-        var push = new RecordingDelayedDispatcher();
-
-        var fcm = new FcmNotifier(
-            new RecordingFcmSender(), publishing, fcmOptions, ops,
-            new FakeHostEnvironment("Production"), NullLogger<FcmNotifier>.Instance);
-        var notifications = new NotificationScheduler(push, fcmOptions);
 
         var job = new ProcessFr24PlanesJob(
             fr24Client, meter, new AircraftReads(mongo), mongo, clock, ops,
-            notifications, fcm,
-            sources, publishing, fcmOptions, freshness, NullLogger<ProcessFr24PlanesJob>.Instance);
+            sources, freshness, NullLogger<ProcessFr24PlanesJob>.Instance);
 
-        return new Fr24Context(job, handler, push, meter);
+        return new Fr24Context(job, handler, meter);
     }
 
     private static ProcessAdsbfiPlanesJob BuildAdsbfi(MongoContext mongo, IConnectionMultiplexer redis, FakeClock clock, StubHttpMessageHandler handler)

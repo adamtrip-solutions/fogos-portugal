@@ -51,10 +51,13 @@ const dayTimeFmt = new Intl.DateTimeFormat('pt-PT', {
 export function ResourceChart({
   history,
   current,
+  startedAt,
 }: {
   history: ResourceSnapshot[]
   /** Latest known values (stamped with the incident's `updatedAt`) — extends the series to the last update. */
   current?: ResourceSnapshot
+  /** The incident's `occurredAt` (alert time) — anchors the series at zero. */
+  startedAt?: string
 }) {
   const points = useMemo<Point[]>(() => {
     const sorted = (current ? [...history, current] : history)
@@ -68,8 +71,25 @@ export function ResourceChart({
       .filter((p) => p.man != null || p.terrain != null || p.aerial != null)
       .sort((a, b) => a.ts - b.ts)
     // `current` can coincide with the newest snapshot — keep one point per instant.
-    return sorted.filter((p, i) => i === 0 || p.ts !== sorted[i - 1].ts)
-  }, [history, current])
+    const deduped = sorted.filter((p, i) => i === 0 || p.ts !== sorted[i - 1].ts)
+    // Anchor the series at zero on the alert instant: we only start observing a
+    // fire once ANEPC surfaces it, so the first snapshot lands mid-ramp (e.g.
+    // 43 operacionais out of nowhere). A synthetic 0/0/0 at occurredAt shows
+    // the ramp-up. Chart-only — the stored history and the public API carry
+    // real observations exclusively (a stored zero would also read as an
+    // explosive delta to the escalation detector).
+    const start = startedAt ? Date.parse(startedAt) : Number.NaN
+    const first = deduped[0]
+    if (
+      first &&
+      Number.isFinite(start) &&
+      start < first.ts &&
+      ((first.man ?? 0) > 0 || (first.terrain ?? 0) > 0 || (first.aerial ?? 0) > 0)
+    ) {
+      return [{ ts: start, man: 0, terrain: 0, aerial: 0 }, ...deduped]
+    }
+    return deduped
+  }, [history, current, startedAt])
 
   if (points.length === 0) return null
 

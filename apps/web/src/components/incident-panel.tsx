@@ -391,6 +391,7 @@ function PanelContent({
       {detail && (
         <ResourceChart
           history={detail.history}
+          startedAt={detail.occurredAt}
           current={{
             at: detail.updatedAt,
             man: detail.resources.man,

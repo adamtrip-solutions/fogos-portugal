@@ -52,7 +52,19 @@ public static class PipelineServiceCollectionExtensions
                     handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
                 return handler;
             })
-            .AddStandardResilienceHandler();
+            .AddStandardResilienceHandler(o =>
+            {
+                // fogos.icnf.pt is a slow legacy ASP site (the occurrences table is ~4.7k rows of HTML and
+                // grows through fire season; 10–30s responses under summer load are normal). The default 10s
+                // attempt timeout abandons requests the server would have answered and immediately re-sends
+                // the same work — tripling ICNF's load for zero answers. Longer attempts, fewer retries; the
+                // circuit breaker still bounds a sustained outage (its sampling window must be ≥ 2× the
+                // attempt timeout, hence 60s).
+                o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+                o.Retry.MaxRetryAttempts = 2;
+                o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
+                o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+            });
 
         services.AddSingleton<Fr24CreditMeter>();
 

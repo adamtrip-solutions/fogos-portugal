@@ -1,22 +1,16 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, Loader2, MapPin, TriangleAlert } from 'lucide-react'
+import { Loader2, MapPin, TriangleAlert } from 'lucide-react'
 
 import { concelhoProfileQuery } from '#/lib/fogos/api.ts'
 import { formatInteger, formatSignedPercent, yoyRatio } from '#/lib/fogos/stats.ts'
-import {
-  colorWithHash,
-  formatHectares,
-  formatRelative,
-  incidentTitle,
-  locationParts,
-} from '#/lib/fogos/format.ts'
+import { formatHectares } from '#/lib/fogos/format.ts'
 import type {
   ConcelhoProfile,
   ConcelhoRiskDay,
-  IncidentListItem,
   WeatherWarning,
 } from '#/lib/fogos/types.ts'
+import { IncidentRow } from '#/components/incident-row.tsx'
 import { PageHeader } from '#/components/page-header.tsx'
 import { StatTile } from '#/components/stat-tile.tsx'
 
@@ -191,42 +185,6 @@ function RiskStrip({ risk }: { risk: ConcelhoRiskDay[] }) {
         })}
       </div>
     </section>
-  )
-}
-
-function IncidentRow({ incident }: { incident: IncidentListItem }) {
-  const place = locationParts(
-    incident.freguesia,
-    incident.concelho,
-    incident.district,
-  )
-  return (
-    <li>
-      <Link
-        to="/"
-        search={{ incident: incident.id }}
-        className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/70 px-4 py-3 shadow-sm transition-colors hover:bg-white/90 dark:border-white/10 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
-      >
-        <span
-          className="mt-0.5 size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: colorWithHash(incident.status.color) }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {incidentTitle(incident)}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {place || incident.location}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {incident.status.label}
-            <span className="mx-1.5 opacity-40">·</span>
-            {formatRelative(incident.occurredAt)}
-          </p>
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
-    </li>
   )
 }
 

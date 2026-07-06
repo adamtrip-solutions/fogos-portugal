@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 
+import { STATUS_BUCKETS, STATUS_BUCKET_CODES } from './format.ts'
+import type { StatusBucket } from './format.ts'
 import type {
   ConcelhoProfile,
   IncidentDetail,
@@ -184,6 +186,11 @@ const lisbonDateFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Lisbon',
 })
 
+/** Lisbon calendar day (YYYY-MM-DD) `days` before now — the `after` cutoff. */
+function lisbonDateDaysAgo(days: number): string {
+  return lisbonDateFmt.format(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+}
+
 // Recent incidents: fires that STARTED on/after (now − 3 days)'s Lisbon
 // calendar day. Wider than the display window on purpose — multi-day fires
 // still in resolution/vigilância only surface through this query (the
@@ -191,9 +198,7 @@ const lisbonDateFmt = new Intl.DateTimeFormat('en-CA', {
 // Paginates up to 5 pages (500 incidents), newest first.
 export const fetchRecentIncidents = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const after = lisbonDateFmt.format(
-      new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    )
+    const after = lisbonDateDaysAgo(3)
 
     const nodes: IncidentListItem[] = []
     let cursor: string | null = null
@@ -413,4 +418,88 @@ export const concelhoProfileQuery = (dico: string) =>
     queryFn: () => fetchConcelhoProfile({ data: dico }),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
+  })
+
+// ── Incidents table page (/ocorrencias) ──────────────────────────────────────
+
+const INCIDENTS_PAGE_QUERY = /* GraphQL */ `
+  query IncidentsPage($filter: IncidentFilter, $after: String) {
+    incidents(filter: $filter, first: 50, after: $after) {
+      totalCount
+      pageInfo { hasNextPage endCursor }
+      nodes { ${INCIDENT_LIST_FIELDS} }
+    }
+  }
+`
+
+/** Time window for the incidents table; maps to an `after` Lisbon-day cutoff. */
+export type IncidentsWindow = '1d' | '3d' | '7d' | '30d' | 'all'
+
+const WINDOW_DAYS: Record<Exclude<IncidentsWindow, 'all'>, number> = {
+  '1d': 0, // "Hoje" — today's Lisbon calendar day only, not a rolling 24h
+
+  '3d': 3,
+  '7d': 7,
+  '30d': 30,
+}
+
+/** The subset of `IncidentFilter` the table page drives (fire-only by default). */
+export interface IncidentsFilter {
+  after?: string
+  statusCodes?: number[]
+  district?: string
+}
+
+/**
+ * Resolve the page's search params into the GraphQL `IncidentFilter`. Buckets
+ * only constrain `statusCodes` when a strict subset is selected (all four = no
+ * constraint); `kind`/`all` are never set so the default fire-only view stands.
+ */
+export function buildIncidentsFilter(params: {
+  window: IncidentsWindow
+  buckets: readonly StatusBucket[]
+  district?: string
+}): IncidentsFilter {
+  const filter: IncidentsFilter = {}
+  if (params.window !== 'all') {
+    filter.after = lisbonDateDaysAgo(WINDOW_DAYS[params.window])
+  }
+  const buckets = params.buckets
+  if (buckets.length > 0 && buckets.length < STATUS_BUCKETS.length) {
+    filter.statusCodes = buckets.flatMap((b) => STATUS_BUCKET_CODES[b])
+  }
+  if (params.district) filter.district = params.district
+  return filter
+}
+
+interface IncidentsPage {
+  incidents: {
+    totalCount: number
+    pageInfo: { hasNextPage: boolean; endCursor: string | null }
+    nodes: IncidentListItem[]
+  }
+}
+
+export const fetchIncidentsPage = createServerFn({ method: 'GET' })
+  .validator((input: { filter: IncidentsFilter; after?: string | null }) => input)
+  .handler(async ({ data }) => {
+    return await graphql<IncidentsPage>(INCIDENTS_PAGE_QUERY, {
+      filter: data.filter,
+      after: data.after ?? null,
+    })
+  })
+
+export const incidentsPageQuery = (filter: IncidentsFilter) =>
+  infiniteQueryOptions({
+    queryKey: ['incidents-page', filter] as const,
+    queryFn: ({ pageParam }) =>
+      fetchIncidentsPage({ data: { filter, after: pageParam } }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) =>
+      last.incidents.pageInfo.hasNextPage
+        ? last.incidents.pageInfo.endCursor
+        : undefined,
+    // Not live-critical: refetching an infinite query refetches every loaded
+    // page, so no refetchInterval here (unlike the map feeds).
+    staleTime: 30_000,
   })

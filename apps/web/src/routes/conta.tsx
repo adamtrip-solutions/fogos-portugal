@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 
 import {
+  accountsEnabledQuery,
   createAlertSubscription,
   createApiKey,
   deleteAlertSubscription,
@@ -65,6 +66,10 @@ export const Route = createFileRoute('/conta')({
   validateSearch: (search: Record<string, unknown>): ContaSearch => ({
     tab: search.tab === 'alertas' ? 'alertas' : 'chaves',
   }),
+  // Resolve the accounts flag during SSR so the disabled/enabled state renders
+  // without a client round-trip (and without ever consulting Clerk state).
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(accountsEnabledQuery()).catch(() => null),
   component: Conta,
 })
 
@@ -113,32 +118,73 @@ function formatDate(iso: string | null): string {
   return dateFmt.format(new Date(iso))
 }
 
+/** Parse a decimal input; null when empty, NaN, or outside [min, max]. */
+function parseInRange(raw: string, min: number, max: number): number | null {
+  if (raw.trim() === '') return null
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < min || n > max) return null
+  return n
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 function Conta() {
-  // Clerk 6 has no <SignedIn>/<SignedOut> components — gate on the hook. Until
-  // Clerk loads (or forever, if the keys are unset) `isLoaded` is false.
-  const { isLoaded, isSignedIn } = useAuth()
+  // Gate on the deployment flag FIRST: when CLERK_SECRET_KEY is unset the
+  // middleware isn't registered (src/start.ts) and Clerk never reaches
+  // `isLoaded`, so relying on Clerk state here would spin forever.
+  const enabled = useQuery(accountsEnabledQuery())
 
   return (
     <div className="min-h-[100dvh] bg-zinc-50 dark:bg-zinc-950">
       <PageHeader />
       <main className="mx-auto max-w-3xl px-4 py-6">
-        {!isLoaded ? (
+        {enabled.data === true ? (
+          <AccountsGate />
+        ) : enabled.data === false ? (
+          <AccountsDisabledView />
+        ) : (
           <div className="flex items-center justify-center py-20">
             <Loader2
               className="size-6 animate-spin text-muted-foreground"
               aria-hidden
             />
           </div>
-        ) : isSignedIn ? (
-          <SignedInView />
-        ) : (
-          <SignedOutView />
         )}
       </main>
     </div>
   )
+}
+
+function AccountsDisabledView() {
+  return (
+    <div className="mx-auto max-w-md py-10">
+      <div className={`${CARD_CLASS} py-10 text-center`}>
+        <h1 className="text-lg font-semibold text-foreground">
+          A minha conta
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          As contas ainda não estão disponíveis.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function AccountsGate() {
+  // Clerk 6 has no <SignedIn>/<SignedOut> components — gate on the hook.
+  const { isLoaded, isSignedIn } = useAuth()
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2
+          className="size-6 animate-spin text-muted-foreground"
+          aria-hidden
+        />
+      </div>
+    )
+  }
+  return isSignedIn ? <SignedInView /> : <SignedOutView />
 }
 
 function SignedOutView() {
@@ -182,6 +228,8 @@ function SignedInView() {
         <button
           type="button"
           role="tab"
+          id="tab-chaves"
+          aria-controls="panel-chaves"
           aria-selected={search.tab === 'chaves'}
           onClick={() => setTab('chaves')}
           className={search.tab === 'chaves' ? PILL_SELECTED : PILL_IDLE}
@@ -191,6 +239,8 @@ function SignedInView() {
         <button
           type="button"
           role="tab"
+          id="tab-alertas"
+          aria-controls="panel-alertas"
           aria-selected={search.tab === 'alertas'}
           onClick={() => setTab('alertas')}
           className={search.tab === 'alertas' ? PILL_SELECTED : PILL_IDLE}
@@ -199,15 +249,21 @@ function SignedInView() {
         </button>
       </div>
 
-      {meResult.isLoading ? (
-        <LoadingCard />
-      ) : meResult.isError || !me ? (
-        <ErrorCard onRetry={() => meResult.refetch()} />
-      ) : search.tab === 'chaves' ? (
-        <KeysTab me={me} />
-      ) : (
-        <AlertsTab me={me} />
-      )}
+      <div
+        role="tabpanel"
+        id={search.tab === 'chaves' ? 'panel-chaves' : 'panel-alertas'}
+        aria-labelledby={search.tab === 'chaves' ? 'tab-chaves' : 'tab-alertas'}
+      >
+        {meResult.isLoading ? (
+          <LoadingCard />
+        ) : meResult.isError || !me ? (
+          <ErrorCard onRetry={() => meResult.refetch()} />
+        ) : search.tab === 'chaves' ? (
+          <KeysTab me={me} />
+        ) : (
+          <AlertsTab me={me} />
+        )}
+      </div>
     </div>
   )
 }
@@ -400,7 +456,11 @@ function CreateKeyDialog({
   const canSubmit = name.trim().length > 0 && !mutation.isPending
 
   return (
-    <Modal title="Criar chave de API" onClose={onClose}>
+    <Modal
+      title="Criar chave de API"
+      description="Dê um nome à nova chave de API e confirme a criação."
+      onClose={onClose}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -463,7 +523,14 @@ function ShowKeyDialog({
   }
 
   return (
-    <Modal title="Chave criada" onClose={onClose}>
+    // locked: the plaintext is unrecoverable — no Escape/overlay/X dismissal;
+    // the only way out is o botão "Concluído".
+    <Modal
+      title="Chave criada"
+      description="Copie a chave agora — por segurança, não voltará a ser mostrada."
+      onClose={onClose}
+      locked
+    >
       <div className="space-y-4">
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
           <TriangleAlert
@@ -762,15 +829,16 @@ function AlertDialog({
     existing?.radiusKm ? String(existing.radiusKm) : '10',
   )
 
+  // Client-side numeric ranges (the API re-validates): lat −90..90,
+  // lng −180..180, raio 1..50 km. NaN/empty ⇒ null ⇒ submit stays disabled.
+  const latNum = parseInRange(lat, -90, 90)
+  const lngNum = parseInRange(lng, -180, 180)
+  const radiusNum = parseInRange(radiusKm, 1, 50)
+
   const buildInput = (): AlertSubscriptionInput =>
     kind === 'CONCELHO'
       ? { kind, dico, riskThreshold }
-      : {
-          kind,
-          latitude: lat ? Number(lat) : null,
-          longitude: lng ? Number(lng) : null,
-          radiusKm: radiusKm ? Number(radiusKm) : null,
-        }
+      : { kind, latitude: latNum, longitude: lngNum, radiusKm: radiusNum }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -783,11 +851,12 @@ function AlertDialog({
   const valid =
     kind === 'CONCELHO'
       ? dico != null
-      : lat !== '' && lng !== '' && radiusKm !== ''
+      : latNum != null && lngNum != null && radiusNum != null
 
   return (
     <Modal
       title={existing ? 'Editar alerta' : 'Criar alerta'}
+      description="Escolha um concelho ou um ponto no mapa para receber alertas de incêndio."
       onClose={onClose}
     >
       <form
@@ -820,10 +889,17 @@ function AlertDialog({
         {kind === 'CONCELHO' ? (
           <>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
+              <label
+                id="concelho-label"
+                className="text-sm font-medium text-foreground"
+              >
                 Concelho
               </label>
-              <ConcelhoPicker value={dico} onChange={setDico} />
+              <ConcelhoPicker
+                value={dico}
+                onChange={setDico}
+                labelId="concelho-label"
+              />
             </div>
             <div className="space-y-1.5">
               <label
@@ -870,6 +946,7 @@ function AlertDialog({
                   value={lat}
                   onChange={(e) => setLat(e.target.value)}
                   placeholder="39.5"
+                  aria-invalid={lat !== '' && latNum == null}
                   className={INPUT_CLASS}
                 />
               </div>
@@ -886,6 +963,7 @@ function AlertDialog({
                   value={lng}
                   onChange={(e) => setLng(e.target.value)}
                   placeholder="-8.0"
+                  aria-invalid={lng !== '' && lngNum == null}
                   className={INPUT_CLASS}
                 />
               </div>
@@ -903,6 +981,7 @@ function AlertDialog({
                 value={radiusKm}
                 onChange={(e) => setRadiusKm(e.target.value)}
                 placeholder="10"
+                aria-invalid={radiusKm !== '' && radiusNum == null}
                 className={INPUT_CLASS}
               />
               <p className="text-xs text-muted-foreground">
@@ -939,9 +1018,12 @@ function AlertDialog({
 function ConcelhoPicker({
   value,
   onChange,
+  labelId,
 }: {
   value: string | null
   onChange: (dico: string | null) => void
+  /** id of the external <label> naming this picker (aria-labelledby). */
+  labelId?: string
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -975,6 +1057,7 @@ function ConcelhoPicker({
       <DialogPrimitive.Trigger asChild>
         <button
           type="button"
+          aria-labelledby={labelId}
           className={`${SELECT_CLASS} flex items-center justify-between text-left`}
         >
           <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
@@ -995,6 +1078,9 @@ function ConcelhoPicker({
           <DialogPrimitive.Title className="sr-only">
             Escolher concelho
           </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            Procure e selecione o concelho para o alerta.
+          </DialogPrimitive.Description>
           <div className="border-b border-black/5 p-3 dark:border-white/10">
             <input
               ref={inputRef}
@@ -1045,29 +1131,50 @@ function ConcelhoPicker({
 
 function Modal({
   title,
+  description,
   onClose,
+  locked = false,
   children,
 }: {
   title: string
+  /** Screen-reader summary (Radix aria-describedby). */
+  description: string
   onClose: () => void
+  /**
+   * When true, Escape / overlay-click / the X button can't dismiss — only an
+   * explicit action inside the modal (used for the show-once key).
+   */
+  locked?: boolean
   children: React.ReactNode
 }) {
   return (
-    <DialogPrimitive.Root open onOpenChange={(open) => !open && onClose()}>
+    <DialogPrimitive.Root
+      open
+      onOpenChange={(open) => !open && !locked && onClose()}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-black/10 bg-white/90 p-5 shadow-2xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10 dark:bg-zinc-900/90">
+        <DialogPrimitive.Content
+          onEscapeKeyDown={locked ? (e) => e.preventDefault() : undefined}
+          onInteractOutside={locked ? (e) => e.preventDefault() : undefined}
+          className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-black/10 bg-white/90 p-5 shadow-2xl backdrop-blur-xl data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10 dark:bg-zinc-900/90"
+        >
           <div className="mb-4 flex items-start justify-between gap-2">
             <DialogPrimitive.Title className="text-lg font-semibold text-foreground">
               {title}
             </DialogPrimitive.Title>
-            <DialogPrimitive.Close
-              aria-label="Fechar"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-            >
-              <X className="size-4" aria-hidden />
-            </DialogPrimitive.Close>
+            {!locked && (
+              <DialogPrimitive.Close
+                aria-label="Fechar"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+              >
+                <X className="size-4" aria-hidden />
+              </DialogPrimitive.Close>
+            )}
           </div>
+          <DialogPrimitive.Description className="sr-only">
+            {description}
+          </DialogPrimitive.Description>
           {children}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

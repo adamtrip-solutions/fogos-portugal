@@ -129,6 +129,25 @@ export interface AlertSubscriptionInput {
   riskThreshold?: number | null
 }
 
+// ── Accounts feature flag ────────────────────────────────────────────────────
+
+// Whether the accounts feature is on for this deployment: clerkMiddleware is
+// only registered when CLERK_SECRET_KEY is set (src/start.ts), and with the
+// middleware absent ClerkProvider never reaches `isLoaded` — so /conta gates on
+// this server fn instead of Clerk state to avoid an infinite spinner.
+export const fetchAccountsEnabled = createServerFn({ method: 'GET' }).handler(
+  async () => !!process.env.CLERK_SECRET_KEY,
+)
+
+export const accountsEnabledQuery = () =>
+  queryOptions({
+    queryKey: ['accounts-enabled'] as const,
+    queryFn: () => fetchAccountsEnabled(),
+    // Fixed for the lifetime of the server process.
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 const API_KEY_FIELDS = /* GraphQL */ `

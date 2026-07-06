@@ -98,7 +98,7 @@ public sealed class Query
         if (user is null)
             return null;
 
-        return new Me(user.Id, user.Email, user.DisplayName, user.Role.ToString());
+        return new Me(user.Id, user.Email, user.DisplayName, user.Role);
     }
 
     /// <summary>The concelho page payload: identity, risk strip, active incidents, warnings, YoY counters. Null when the DICO is unknown.</summary>

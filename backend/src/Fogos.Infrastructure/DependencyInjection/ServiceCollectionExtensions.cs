@@ -68,6 +68,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Reads.IgnitionClusterReads>();
         services.AddSingleton<Reads.AlertReads>();
         services.AddSingleton<Reads.WebhookReads>();
+        services.AddSingleton<Reads.AccountReads>();
         services.AddSingleton<Reads.SituationReportReads>();
 
         // Single write path for KML perimeter versioning (used by the attachKml mutation and ICNF ingest).

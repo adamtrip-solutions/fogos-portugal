@@ -231,29 +231,120 @@ public sealed class Mutation
     }
 
     /// <summary>
-    /// Registers an anonymous alert subscription (Concelho by DICO, or Point + radius). Rate-limited per
-    /// caller IP like the photo-upload gate. Validates: Concelho ⇒ DICO exists in <c>locations</c>;
-    /// Point ⇒ radius 1–50 km and the point inside the Portugal bounding box; risk threshold ∈ {4,5}.
+    /// Registers an alert subscription (Concelho by DICO, or Point + radius). Rate-limited per caller IP
+    /// like the photo-upload gate. Validates: Concelho ⇒ DICO exists in <c>locations</c>; Point ⇒ radius
+    /// 1–50 km and the point inside the Portugal bounding box; risk threshold ∈ {4,5}. When the caller is a
+    /// signed-in user the subscription is owned (per-user cap enforced, exempt from the inactivity purge);
+    /// anonymous callers create unowned subscriptions exactly as before.
     /// </summary>
     public async Task<AlertSubscription> CreateAlertSubscription(
         CreateAlertSubscriptionInput input,
         MongoContext mongo,
         LocationReads locations,
         AlertSubscriptionGate gate,
+        AccountReads accounts,
         IClock clock,
         IFogosCallerAccessor callerAccessor,
         IOptions<AlertOptions> options,
         CancellationToken ct)
     {
-        if (!await gate.TryAcquireAsync(callerAccessor.Caller.RemoteIp, ct))
+        var caller = callerAccessor.Caller;
+        if (!await gate.TryAcquireAsync(caller.RemoteIp, ct))
             throw Fail("Demasiados pedidos de subscrição. Tente novamente dentro de momentos.", "RATE_LIMITED");
 
         var o = options.Value;
+        if (caller.IsUser && caller.UserId is { } userId
+            && await accounts.CountAlertSubscriptionsByUserAsync(userId, ct) >= o.MaxSubscriptionsPerUser)
+            throw Fail($"Máximo de {o.MaxSubscriptionsPerUser} subscrições por utilizador atingido.", "ALERT_SUBSCRIPTION_LIMIT");
+
         var subscription = new AlertSubscription
         {
             Kind = input.Kind,
+            OwnerUserId = caller.UserId,
             CreatedAt = clock.UtcNow,
         };
+        await ValidateAndApplyAsync(subscription, input, locations, o, ct);
+
+        await mongo.AlertSubscriptions.InsertOneAsync(subscription, cancellationToken: ct);
+        return subscription;
+    }
+
+    /// <summary>
+    /// Updates one of the caller's own alert subscriptions, re-running the full create validation. Owner-only:
+    /// throws when the id is unknown or owned by someone else.
+    /// </summary>
+    public async Task<AlertSubscription> UpdateAlertSubscription(
+        [ID] string id,
+        CreateAlertSubscriptionInput input,
+        MongoContext mongo,
+        LocationReads locations,
+        IFogosCallerAccessor callerAccessor,
+        IOptions<AlertOptions> options,
+        CancellationToken ct)
+    {
+        var userId = RequireUser(callerAccessor);
+
+        AlertSubscription? existing;
+        try
+        {
+            var f = Builders<AlertSubscription>.Filter;
+            existing = await mongo.AlertSubscriptions
+                .Find(f.Eq(x => x.Id, id) & f.Eq(x => x.OwnerUserId, userId))
+                .FirstOrDefaultAsync(ct);
+        }
+        catch (FormatException)
+        {
+            existing = null;
+        }
+
+        if (existing is null)
+            throw Fail("Subscrição não encontrada.", "ALERT_SUBSCRIPTION_NOT_FOUND");
+
+        // Re-validate against the new input, then reset the fields of the other kind so the document stays
+        // consistent when the subscription switches between Concelho and Point.
+        existing.Dico = null;
+        existing.RiskThreshold = null;
+        existing.Point = null;
+        existing.RadiusKm = null;
+        await ValidateAndApplyAsync(existing, input, locations, options.Value, ct);
+
+        // Replace re-serialises through the class map (IgnoreIfNull), so cleared fields are unset — while
+        // Id, OwnerUserId, CreatedAt, and LastSeenAt are preserved from the loaded document.
+        await mongo.AlertSubscriptions.ReplaceOneAsync(
+            Builders<AlertSubscription>.Filter.Eq(x => x.Id, existing.Id), existing, cancellationToken: ct);
+        return existing;
+    }
+
+    /// <summary>
+    /// Deletes an alert subscription by id. Only unowned subscriptions, or those owned by the caller, are
+    /// removable — so an anonymous caller can no longer delete a user-owned subscription. Returns false when
+    /// the id is unknown, malformed, or owned by another user.
+    /// </summary>
+    public async Task<bool> DeleteAlertSubscription(
+        [ID] string id, MongoContext mongo, IFogosCallerAccessor callerAccessor, CancellationToken ct)
+    {
+        var userId = callerAccessor.Caller.UserId;
+        var f = Builders<AlertSubscription>.Filter;
+        try
+        {
+            var result = await mongo.AlertSubscriptions.DeleteOneAsync(
+                f.Eq(x => x.Id, id) & f.Or(f.Eq(x => x.OwnerUserId, null), f.Eq(x => x.OwnerUserId, userId)), ct);
+            return result.DeletedCount > 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Validates <paramref name="input"/> and applies the Concelho/Point fields onto <paramref name="sub"/>.
+    /// Shared by create and update so both enforce the exact same rules.
+    /// </summary>
+    private static async Task ValidateAndApplyAsync(
+        AlertSubscription sub, CreateAlertSubscriptionInput input, LocationReads locations, AlertOptions o, CancellationToken ct)
+    {
+        sub.Kind = input.Kind;
 
         if (input.Kind == AlertSubscriptionKind.Concelho)
         {
@@ -261,11 +352,11 @@ public sealed class Mutation
                 throw Fail("O concelho (dico) é obrigatório para subscrições de concelho.", "ALERT_DICO_REQUIRED");
             if (await locations.ByDicoAsync(input.Dico, ct) is null)
                 throw Fail("Concelho desconhecido.", "ALERT_DICO_UNKNOWN");
-            subscription.Dico = input.Dico;
+            sub.Dico = input.Dico;
 
             if (input.RiskThreshold is int rt && rt is not (4 or 5))
                 throw Fail("O limiar de risco tem de ser 4 ou 5.", "ALERT_RISK_THRESHOLD");
-            subscription.RiskThreshold = input.RiskThreshold;
+            sub.RiskThreshold = input.RiskThreshold;
         }
         else // Point
         {
@@ -281,26 +372,8 @@ public sealed class Mutation
             if (!o.InPortugal(lat, lng))
                 throw Fail("O ponto está fora de Portugal.", "ALERT_POINT_OUT_OF_BOUNDS");
 
-            subscription.Point = GeoPoint.FromLatLng(lat, lng);
-            subscription.RadiusKm = radius;
-        }
-
-        await mongo.AlertSubscriptions.InsertOneAsync(subscription, cancellationToken: ct);
-        return subscription;
-    }
-
-    /// <summary>Deletes an alert subscription by id. Returns false when the id is unknown/malformed.</summary>
-    public async Task<bool> DeleteAlertSubscription([ID] string id, MongoContext mongo, CancellationToken ct)
-    {
-        try
-        {
-            var result = await mongo.AlertSubscriptions.DeleteOneAsync(
-                Builders<AlertSubscription>.Filter.Eq(x => x.Id, id), ct);
-            return result.DeletedCount > 0;
-        }
-        catch (FormatException)
-        {
-            return false;
+            sub.Point = GeoPoint.FromLatLng(lat, lng);
+            sub.RadiusKm = radius;
         }
     }
 
@@ -361,6 +434,68 @@ public sealed class Mutation
         }
     }
 
+    /// <summary>
+    /// Mints a self-service API key for the signed-in user (Registered tier, empty scopes). The plaintext is
+    /// returned once and never stored; only its SHA-256 hash and a display prefix are persisted. Enforces the
+    /// per-user cap over the user's active keys.
+    /// </summary>
+    public async Task<CreatedApiKey> CreateApiKey(
+        string name,
+        MongoContext mongo,
+        AccountReads accounts,
+        IClock clock,
+        IFogosCallerAccessor callerAccessor,
+        IOptions<AuthOptions> options,
+        CancellationToken ct)
+    {
+        var userId = RequireUser(callerAccessor);
+
+        var trimmed = name?.Trim() ?? "";
+        if (trimmed.Length == 0)
+            throw Fail("O nome da chave é obrigatório.", "API_KEY_NAME_REQUIRED");
+
+        if (await accounts.CountActiveApiKeysByUserAsync(userId, ct) >= options.Value.MaxApiKeysPerUser)
+            throw Fail($"Máximo de {options.Value.MaxApiKeysPerUser} chaves de API por utilizador atingido.", "API_KEY_LIMIT");
+
+        var plaintext = ApiKeyGenerator.NewPlaintext();
+        var client = new ApiClient
+        {
+            Name = trimmed,
+            KeyHash = ApiKeyGenerator.Hash(plaintext),
+            Tier = ApiTier.Registered,
+            Scopes = [],
+            OwnerUserId = userId,
+            KeyPrefix = plaintext[..ApiKeyGenerator.PrefixLength],
+            CreatedAt = clock.UtcNow,
+        };
+        await mongo.ApiClients.InsertOneAsync(client, cancellationToken: ct);
+
+        return new CreatedApiKey(ApiKeyInfo.From(client), plaintext);
+    }
+
+    /// <summary>
+    /// Revokes one of the caller's own API keys. Returns false when the key is unknown, malformed, already
+    /// revoked, or owned by another user. The change may take up to ~60s to take effect on the API's
+    /// in-memory key-resolution cache.
+    /// </summary>
+    public async Task<bool> RevokeApiKey(
+        [ID] string id, MongoContext mongo, IClock clock, IFogosCallerAccessor callerAccessor, CancellationToken ct)
+    {
+        var userId = RequireUser(callerAccessor);
+        var f = Builders<ApiClient>.Filter;
+        try
+        {
+            var result = await mongo.ApiClients.UpdateOneAsync(
+                f.Eq(x => x.Id, id) & f.Eq(x => x.OwnerUserId, userId) & f.Eq(x => x.RevokedAt, null),
+                Builders<ApiClient>.Update.Set(x => x.RevokedAt, clock.UtcNow), cancellationToken: ct);
+            return result.ModifiedCount > 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Resolves the authenticated client id, or throws when the caller is anonymous.</summary>
     private static string RequireClient(IFogosCallerAccessor accessor)
     {
@@ -368,6 +503,15 @@ public sealed class Mutation
         if (caller.IsAnonymous || string.IsNullOrEmpty(caller.ClientId))
             throw Fail("É necessária autenticação de cliente.", "UNAUTHENTICATED");
         return caller.ClientId;
+    }
+
+    /// <summary>Resolves the signed-in user id, or throws when the caller is not a signed-in human.</summary>
+    private static string RequireUser(IFogosCallerAccessor accessor)
+    {
+        var caller = accessor.Caller;
+        if (!caller.IsUser || string.IsNullOrEmpty(caller.UserId))
+            throw Fail("É necessária autenticação de utilizador.", "UNAUTHENTICATED");
+        return caller.UserId;
     }
 
     private static string? ComposePositNarrative(PositInput input)

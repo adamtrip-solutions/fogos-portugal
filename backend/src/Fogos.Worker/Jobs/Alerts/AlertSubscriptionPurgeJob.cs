@@ -28,7 +28,10 @@ public sealed class AlertSubscriptionPurgeJob(
     {
         var cutoff = clock.UtcNow - TimeSpan.FromDays(options.Value.PurgeAfterDays);
         var f = Builders<AlertSubscription>.Filter;
+        // Only anonymous (unowned) subscriptions auto-purge. $eq:null also matches documents missing the
+        // field, so legacy anonymous docs still purge; account-owned subscriptions are kept indefinitely.
         var filter = f.Lt(x => x.CreatedAt, cutoff)
+                     & f.Eq(x => x.OwnerUserId, null)
                      & f.Or(f.Eq(x => x.LastSeenAt, null), f.Lt(x => x.LastSeenAt, cutoff));
 
         var result = await mongo.AlertSubscriptions.DeleteManyAsync(filter, ct);

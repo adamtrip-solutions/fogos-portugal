@@ -78,6 +78,21 @@ public sealed class SchemaTests(ContainerFixture fixture)
         // FCM was fully removed: no device-token field survives on the input or output type.
         Assert.DoesNotContain("fcmToken", sdl);
 
+        // PR2 — self-service API keys + owned subscriptions + full `me`.
+        Assert.Contains("role: UserRole!", sdl);
+        Assert.Contains("enum UserRole", sdl);
+        Assert.Contains("apiKeys: [ApiKeyInfo!]!", sdl);
+        Assert.Contains("alertSubscriptions: [AlertSubscription!]!", sdl);
+        Assert.Contains("createApiKey(name: String!): CreatedApiKey!", sdl);
+        Assert.Contains("revokeApiKey(id: ID!): Boolean!", sdl);
+        Assert.Contains("updateAlertSubscription(id: ID! input: CreateAlertSubscriptionInput!): AlertSubscription!", sdl);
+        Assert.Contains("type ApiKeyInfo", sdl);
+        Assert.Contains("keyPrefix: String", sdl);
+        Assert.Contains("type CreatedApiKey", sdl);
+        Assert.Contains("plaintextKey: String!", sdl);
+        // The owning user id is internal — it must never leak on the public AlertSubscription type.
+        Assert.DoesNotContain("ownerUserId", sdl);
+
         // Input + key types.
         Assert.Contains("input IncidentFilter", sdl);
         Assert.Contains("type GeoPoint", sdl);

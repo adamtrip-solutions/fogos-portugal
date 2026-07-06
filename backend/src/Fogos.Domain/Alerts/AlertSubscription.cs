@@ -33,6 +33,13 @@ public sealed class AlertSubscription
     /// <summary>Notify when the concelho risk reaches this level (4 or 5); null = no risk alerts.</summary>
     public int? RiskThreshold { get; set; }
 
+    /// <summary>
+    /// The local <c>users</c> id that owns this subscription (created while signed in). Null for anonymous
+    /// device subscriptions. Owned subscriptions are exempt from the inactivity purge and only their owner
+    /// (or nobody, when null) may mutate them.
+    /// </summary>
+    public string? OwnerUserId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     /// <summary>Last time the device was seen active — drives the 90-day inactivity purge.</summary>

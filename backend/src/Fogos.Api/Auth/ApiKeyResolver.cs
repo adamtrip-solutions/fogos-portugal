@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using System.Text;
 using Fogos.Domain.Auth;
 using Fogos.Infrastructure.Mongo;
 using MongoDB.Driver;
@@ -17,9 +15,8 @@ public sealed class ApiKeyResolver(MongoContext mongo)
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(60);
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
 
-    /// <summary>The canonical SHA-256 hex hash of a plaintext key (shared with the admin CLI).</summary>
-    public static string Hash(string apiKey) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)));
+    /// <summary>The canonical SHA-256 hex hash of a plaintext key (delegates to the shared Domain generator).</summary>
+    public static string Hash(string apiKey) => ApiKeyGenerator.Hash(apiKey);
 
     /// <summary>Returns the matching client (even when revoked, so the caller can 401), or null if unknown.</summary>
     public async Task<ApiClient?> ResolveAsync(string apiKey, CancellationToken ct = default)

@@ -43,6 +43,7 @@ public static class GraphQLServiceCollectionExtensions
             .AddTypeExtension<AircraftExtensions>()
             .AddTypeExtension<StatsExtensions>()
             .AddTypeExtension<IgnitionClusterExtensions>()
+            .AddTypeExtension<MeExtensions>()
             .AddType<Filters.IncidentFilterType>()
             // Concelho profile: DICO is an ID.
             .AddType(new ObjectType<ConcelhoProfile>(d =>
@@ -69,11 +70,12 @@ public static class GraphQLServiceCollectionExtensions
                 d.Field(x => x.RekindleOfId).ID();
                 d.Ignore(x => x.RekindleKinds); // internal per-kind claim bookkeeping
             }))
-            // Alert subscription: id is an ID.
+            // Alert subscription: id is an ID; the owning user id is internal and never exposed publicly.
             .AddType(new ObjectType<Fogos.Domain.Alerts.AlertSubscription>(d =>
             {
                 d.Name("AlertSubscription");
                 d.Field(x => x.Id).ID();
+                d.Ignore(x => x.OwnerUserId);
             }))
             // Situation report: surrogate id is an ID.
             .AddType(new ObjectType<Fogos.Domain.Reports.SituationReport>(d =>

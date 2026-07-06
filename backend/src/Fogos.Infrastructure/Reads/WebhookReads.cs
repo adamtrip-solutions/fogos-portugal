@@ -14,6 +14,18 @@ public sealed class WebhookReads(MongoContext context)
             .Sort(Builders<WebhookEndpoint>.Sort.Descending(x => x.CreatedAt))
             .ToListAsync(ct);
 
+    /// <summary>All endpoints owned by any of the given clients (a user's keys), newest first.</summary>
+    public async Task<IReadOnlyList<WebhookEndpoint>> ByClientIdsAsync(
+        IReadOnlyCollection<string> clientIds, CancellationToken ct = default)
+    {
+        if (clientIds.Count == 0)
+            return [];
+        return await context.WebhookEndpoints
+            .Find(Builders<WebhookEndpoint>.Filter.In(x => x.ClientId, clientIds))
+            .Sort(Builders<WebhookEndpoint>.Sort.Descending(x => x.CreatedAt))
+            .ToListAsync(ct);
+    }
+
     /// <summary>How many endpoints a client currently has (against the per-client cap).</summary>
     public async Task<long> CountByClientAsync(string clientId, CancellationToken ct = default) =>
         await context.WebhookEndpoints.CountDocumentsAsync(

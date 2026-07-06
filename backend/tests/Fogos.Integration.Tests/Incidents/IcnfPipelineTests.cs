@@ -90,6 +90,53 @@ public sealed class IcnfPipelineTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Concluded_new_fire_without_extinction_time_falls_back_to_the_alert_time()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        const string id = "2026001410";
+
+        // Already extinguished per the table, but the XML carries no DHFIM/DATAEXTINCAO. The seed must be
+        // stamped at occurredAt — never ingestion time, which would resurface a days-dead fire as freshly closed.
+        var alertAt = h.Clock.UtcNow.AddDays(-2);
+        h.Icnf.Table = IncidentFixtures.IcnfConcludedTable(id, alertAt);
+        h.Icnf.XmlByNcco[id] = IncidentFixtures.IcnfNewFireXml(id, alertAt); // no extinction fields
+
+        var job = new ProcessIcnfNewFireDataJob(h.Locks, NullLogger<ProcessIcnfNewFireDataJob>.Instance,
+            h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Processed,
+            Microsoft.Extensions.Options.Options.Create(new FogosSourcesOptions()), h.Clock, h.Ops);
+        await job.RunAsync(CancellationToken.None);
+
+        var seed = Assert.Single(await h.Mongo.IncidentStatusHistory
+            .Find(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, id)).ToListAsync());
+        Assert.Equal(IncidentStatusCatalog.Conclusao, seed.Code);
+        Assert.Equal(alertAt, seed.At);
+        Assert.True(h.Clock.UtcNow - seed.At > TimeSpan.FromHours(3)); // still outside the 3h map window
+    }
+
+    [SkippableFact]
+    public async Task Concluded_new_fire_with_future_extinction_time_is_clamped_to_now()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        const string id = "2026001411";
+
+        // Bad feed data: DHFIM claims tomorrow. Clamped to now so the map window can't be pinned open past it.
+        var alertAt = h.Clock.UtcNow.AddDays(-2);
+        h.Icnf.Table = IncidentFixtures.IcnfConcludedTable(id, alertAt);
+        h.Icnf.XmlByNcco[id] = IncidentFixtures.IcnfConcludedFireXml(id, alertAt, h.Clock.UtcNow.AddDays(1));
+
+        var job = new ProcessIcnfNewFireDataJob(h.Locks, NullLogger<ProcessIcnfNewFireDataJob>.Instance,
+            h.Icnf.Client(), h.Ingest, h.Mongo, h.Dispatcher, h.Processed,
+            Microsoft.Extensions.Options.Options.Create(new FogosSourcesOptions()), h.Clock, h.Ops);
+        await job.RunAsync(CancellationToken.None);
+
+        var seed = Assert.Single(await h.Mongo.IncidentStatusHistory
+            .Find(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, id)).ToListAsync());
+        Assert.Equal(h.Clock.UtcNow, seed.At);
+    }
+
+    [SkippableFact]
     public async Task Flood_guards_cap_fetches_and_never_refetch_old_occurrences()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);

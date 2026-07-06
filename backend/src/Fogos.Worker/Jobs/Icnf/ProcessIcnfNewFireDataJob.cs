@@ -153,12 +153,15 @@ public sealed class ProcessIcnfNewFireDataJob(
 
         // Map-safety: an ICNF fire can arrive already extinguished (a closed status from birth). Stamping its
         // initial status-history observation "now" would flood the web map (which shows finished fires for 3h
-        // after statusChangedAt), so we override the stamp with the real extinction time from the XML.
+        // after statusChangedAt), so we override the stamp with the real extinction time from the XML. When the
+        // XML carries no extinction time, fall back to occurredAt — NOT ingestion time: a days-dead fire
+        // stamped "now" would still resurface as freshly closed (and poison rekindle-proximity priors),
+        // whereas occurredAt is always present and at most the lookback window old.
         DateTimeOffset? observedStatusAt = null;
         if (IncidentStatusCatalog.TryNormalize(row.StatusLabel, out var initialStatus)
             && IncidentStatusCatalog.ConcludedCodes.Contains(initialStatus.Code))
         {
-            observedStatusAt = ParseExtinction(occ); // null → ingest falls back to ingestion time
+            observedStatusAt = ParseExtinction(occ) ?? occurredAt;
         }
 
         var raw = new RawIncident
@@ -233,20 +236,23 @@ public sealed class ProcessIcnfNewFireDataJob(
 
     /// <summary>
     /// The fire's real extinction instant: DHFIM (a full Lisbon-local datetime) preferred, falling back to the
-    /// DATAEXTINCAO + HORAEXTINCAO pair. Returns null when neither is present/parseable — the caller then lets
-    /// the ingest service default the stamp to ingestion time (rule 2).
+    /// DATAEXTINCAO + HORAEXTINCAO pair. Future values (bad feed data / clock skew) are clamped to now so the
+    /// map's 3h finished-fire window can never be pinned open past it. Returns null when neither field is
+    /// present/parseable — the caller then falls back to the occurrence's alert time (never ingestion time).
     /// </summary>
     private DateTimeOffset? ParseExtinction(IcnfOccurrence occ)
     {
         if (!string.IsNullOrWhiteSpace(occ.Dhfim)
             && DateTime.TryParseExact(occ.Dhfim.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dhfim))
-            return clock.FromLisbon(dhfim);
+            return ClampToNow(clock.FromLisbon(dhfim));
 
         var raw = $"{occ.DataExtincao} {occ.HoraExtincao}".Trim();
         if (raw.Length > 0
             && DateTime.TryParseExact(raw, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var ext))
-            return clock.FromLisbon(ext);
+            return ClampToNow(clock.FromLisbon(ext));
 
         return null;
     }
+
+    private DateTimeOffset ClampToNow(DateTimeOffset at) => at > clock.UtcNow ? clock.UtcNow : at;
 }

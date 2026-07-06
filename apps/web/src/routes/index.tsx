@@ -143,12 +143,18 @@ function Home() {
     const cutoff = Date.now() - WINDOW_HOURS * 60 * 60 * 1000
     const byId = new Map<string, IncidentListItem>()
     for (const inc of recent.data ?? []) {
-      // Finished fires are windowed by their last change (updatedAt), matching
-      // the server-side updatedAfter fetch but on a tighter rolling window.
-      // Enrichment (ICNF, weather) counts as activity here on purpose, so a
-      // late-enriched concluded fire can briefly resurface (owner's choice).
+      // Finished fires are windowed by when they FINISHED (statusChangedAt;
+      // occurredAt fallback for records ingested already-concluded) — NEVER
+      // updatedAt. The ICNF enrichment job bulk-bumps updatedAt on hundreds
+      // of concluded fires in one sweep; keying visibility on it floods the
+      // map with long-dead gray dots for WINDOW_HOURS after every sweep
+      // (shipped once, 2026-07-06, reverted same day). The server-side
+      // updatedAfter FETCH deliberately stays change-based — breadth there
+      // keeps long-running resolução/vigilância fires in the payload; this
+      // display window alone decides visibility.
+      const finishedAt = inc.statusChangedAt ?? inc.occurredAt
       const keep =
-        isOngoingStatus(inc.status.code) || Date.parse(inc.updatedAt) >= cutoff
+        isOngoingStatus(inc.status.code) || Date.parse(finishedAt) >= cutoff
       if (keep) byId.set(inc.id, inc)
     }
     for (const inc of activeList) byId.set(inc.id, inc)

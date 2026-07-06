@@ -196,10 +196,11 @@ function lisbonDateDaysAgo(days: number): string {
 // in resolução/vigilância visible for as long as anything is happening to them
 // — they only surface through this query, since the activeIncidents feed covers
 // codes 3–6 only — and lets closed fires drop out of the fetch 3 days after
-// their last change (the map narrows further to WINDOW_HOURS for finished
-// fires). Accepted quirk: late ICNF enrichment bumps updatedAt, so an old
-// concluded fire can resurface as a gray dot for one WINDOW_HOURS span per
-// bump. Deliberate — the owner prefers more information.
+// their last change. The map's display window for finished fires keys on
+// statusChangedAt (conclusion time), NOT updatedAt — the ICNF enrichment job
+// bulk-bumps updatedAt on hundreds of concluded fires per sweep, and keying
+// visibility on it flooded the map with long-dead gray dots (2026-07-06).
+// Fetch breadth here stays updatedAt-based on purpose; display decides.
 //
 // The connection sorts by occurredAt desc while this filter is updatedAt-based,
 // so under heavy load (>500 touched records in the window) the page cap would

@@ -6,6 +6,7 @@ using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Stats;
+using Fogos.Domain.Users;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Domain.Webhooks;
@@ -118,6 +119,11 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
         await context.ApiClients.Indexes.CreateManyAsync(
         [
             Unique(Builders<ApiClient>.IndexKeys.Ascending("keyHash"), "keyHash"),
+        ], ct);
+
+        await context.Users.Indexes.CreateManyAsync(
+        [
+            Unique(Builders<User>.IndexKeys.Ascending("clerkUserId"), "clerkUserId"),
         ], ct);
 
         // ── Alerts / Webhooks / Reports (WP4) ────────────────────────────────────

@@ -85,6 +85,9 @@ services:
       Ops__DiscordErrorsWebhook: ${DISCORD_ERRORS_WEBHOOK:-}
       Ops__DiscordDryRunWebhook: ${DISCORD_DRYRUN_WEBHOOK:-}
       Auth__RsaPrivateKeyPem: ${AUTH_RSA_PRIVATE_KEY_PEM:-}
+      # Clerk identity (second Bearer issuer). Empty Authority = disabled; behaviour unchanged.
+      Clerk__Authority: ${CLERK_AUTHORITY:-}
+      Clerk__AuthorizedParties__0: ${CLERK_AUTHORIZED_PARTY:-}
       Sentry__Dsn: ${SENTRY_DSN:-}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz/ready"]

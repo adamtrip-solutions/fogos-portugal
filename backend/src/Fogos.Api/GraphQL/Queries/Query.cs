@@ -9,6 +9,7 @@ using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Time;
+using Fogos.Domain.Users;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Mongo;
@@ -76,6 +77,29 @@ public sealed class Query
         await reads.ActiveAsync(kind is { Count: > 0 } ? kind : [IncidentKind.Fire], ct);
 
     public Stats Stats() => new();
+
+    /// <summary>
+    /// The signed-in user's own identity, or null for machine and anonymous callers. The local
+    /// <c>users</c> record — not the token — is authoritative for role. PR2 extends this type with
+    /// the caller's API keys, webhooks, and alert subscriptions.
+    /// </summary>
+    public async Task<Me?> Me(
+        IFogosCallerAccessor callerAccessor,
+        MongoContext mongo,
+        CancellationToken ct)
+    {
+        var caller = callerAccessor.Caller;
+        if (!caller.IsUser || caller.UserId is null)
+            return null;
+
+        var user = await mongo.Users
+            .Find(Builders<User>.Filter.Eq(u => u.Id, caller.UserId))
+            .FirstOrDefaultAsync(ct);
+        if (user is null)
+            return null;
+
+        return new Me(user.Id, user.Email, user.DisplayName, user.Role.ToString());
+    }
 
     /// <summary>The concelho page payload: identity, risk strip, active incidents, warnings, YoY counters. Null when the DICO is unknown.</summary>
     public async Task<ConcelhoProfile?> ConcelhoProfile(

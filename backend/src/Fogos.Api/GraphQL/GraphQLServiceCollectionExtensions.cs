@@ -81,6 +81,12 @@ public static class GraphQLServiceCollectionExtensions
                 d.Name("SituationReport");
                 d.Field(x => x.Id).ID();
             }))
+            // The signed-in user's own identity: id is an ID.
+            .AddType(new ObjectType<Types.Me>(d =>
+            {
+                d.Name("Me");
+                d.Field(x => x.Id).ID();
+            }))
             // FlightPosition is surfaced as AircraftPosition.
             .AddType(new ObjectType<FlightPosition>(d => d.Name("AircraftPosition")))
             // GeoPoint is a value object: expose only its coordinates, not the haversine helper.

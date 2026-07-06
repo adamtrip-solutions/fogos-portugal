@@ -9,6 +9,7 @@ using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Stats;
+using Fogos.Domain.Users;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Domain.Webhooks;
@@ -143,6 +144,7 @@ public static class FogosClassMaps
         });
         BsonClassMap.RegisterClassMap<Location>(cm => MapObjectId(cm, c => c.Id));
         BsonClassMap.RegisterClassMap<ApiClient>(cm => MapObjectId(cm, c => c.Id));
+        BsonClassMap.RegisterClassMap<User>(cm => MapObjectId(cm, c => c.Id));
     }
 
     /// <summary>AutoMap and bind a surrogate string <c>_id</c> to an ObjectId (generated on insert).</summary>

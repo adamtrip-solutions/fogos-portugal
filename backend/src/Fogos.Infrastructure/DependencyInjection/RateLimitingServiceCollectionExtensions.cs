@@ -15,6 +15,7 @@ public static class RateLimitingServiceCollectionExtensions
     public static IServiceCollection AddFogosRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AuthOptions>(configuration.GetSection(AuthOptions.SectionName));
+        services.Configure<ClerkOptions>(configuration.GetSection(ClerkOptions.SectionName));
         services.Configure<RateLimitOptions>(configuration.GetSection(RateLimitOptions.SectionName));
         services.Configure<PhotoGateOptions>(configuration.GetSection(PhotoGateOptions.SectionName));
 

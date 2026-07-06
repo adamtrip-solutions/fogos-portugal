@@ -19,6 +19,11 @@ public static class AuthServiceCollectionExtensions
         services.AddSingleton<RefreshTokenStore>();
         services.AddSingleton<IFogosCallerAccessor, FogosCallerAccessor>();
 
+        // Clerk identity: a second Bearer issuer (session-JWT validator) plus lazy local provisioning.
+        // Both are inert until Clerk:Authority is configured.
+        services.AddSingleton<ClerkTokenValidator>();
+        services.AddSingleton<UserProvisioningService>();
+
         services.AddAuthorization(options =>
         {
             foreach (var scope in ApiScopes.All)

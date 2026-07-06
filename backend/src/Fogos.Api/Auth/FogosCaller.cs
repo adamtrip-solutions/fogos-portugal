@@ -13,6 +13,18 @@ public sealed class FogosCaller
     public string? Name { get; init; }
     public IReadOnlyList<string> Scopes { get; init; } = [];
 
+    /// <summary>The local <c>users</c> id when the caller is a signed-in human (Clerk Bearer); null otherwise.</summary>
+    public string? UserId { get; init; }
+
+    /// <summary>Clerk's stable subject for a signed-in human; null for machine callers.</summary>
+    public string? ClerkUserId { get; init; }
+
+    /// <summary>Whether the signed-in user's local role is Admin. Always false for machine callers.</summary>
+    public bool IsAdmin { get; init; }
+
+    /// <summary>True when the caller is a signed-in human (as opposed to anonymous or a machine credential).</summary>
+    public bool IsUser => UserId is not null;
+
     /// <summary>Public-context credentials (the web site key) pin Origins and partition by (credential, IP).</summary>
     public bool PublicContext { get; init; }
 

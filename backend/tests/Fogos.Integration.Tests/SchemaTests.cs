@@ -69,6 +69,10 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("type AlertSubscription", sdl);
         Assert.Contains("type Webhook", sdl);
         Assert.Contains("type SituationReport", sdl);
+
+        // Accounts (Clerk) — the signed-in user's own identity; nullable for machine/anonymous callers.
+        Assert.Contains("me: Me", sdl);
+        Assert.Contains("type Me", sdl);
         Assert.Contains("input CreateAlertSubscriptionInput", sdl);
         Assert.Contains("enum AlertSubscriptionKind", sdl);
         // FCM was fully removed: no device-token field survives on the input or output type.

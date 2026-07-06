@@ -1,17 +1,30 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Fogos.Domain.Auth;
+using Fogos.Domain.Users;
+using Fogos.Infrastructure.Options;
+using Microsoft.Extensions.Options;
 
 namespace Fogos.Api.Auth;
 
 /// <summary>
-/// Resolves the caller for every request in order: (1) <c>Authorization: Bearer</c> self-issued JWT,
-/// (2) <c>X-API-Key</c>, (3) anonymous. Populates <see cref="HttpContext.Items"/> and a
-/// <see cref="ClaimsPrincipal"/> (so ASP.NET/HotChocolate authorization policies work), then enforces
-/// Origin pinning for public-context credentials. Invalid credentials short-circuit with 401/403.
+/// Resolves the caller for every request in order: (1) <c>Authorization: Bearer</c> JWT — a self-issued
+/// machine token or a Clerk session token, routed by an unverified <c>iss</c> peek (trust still comes
+/// only from the routed validator); (2) <c>X-API-Key</c>; (3) anonymous. Populates
+/// <see cref="HttpContext.Items"/> and a <see cref="ClaimsPrincipal"/> (so ASP.NET/HotChocolate
+/// authorization policies work), then enforces Origin pinning for public-context credentials. A present
+/// Bearer that fails validation is always a hard 401 — it is never silently downgraded to anonymous.
 /// </summary>
 public sealed class AuthenticationMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, JwtService jwt, ApiKeyResolver apiKeys, ClientIpResolver ipResolver)
+    public async Task InvokeAsync(
+        HttpContext context,
+        JwtService jwt,
+        ApiKeyResolver apiKeys,
+        ClientIpResolver ipResolver,
+        ClerkTokenValidator clerk,
+        UserProvisioningService provisioning,
+        IOptions<ClerkOptions> clerkOptions)
     {
         var ip = ipResolver.Resolve(context);
 
@@ -20,6 +33,35 @@ public sealed class AuthenticationMiddleware(RequestDelegate next)
         if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
             var token = authHeader["Bearer ".Length..].Trim();
+
+            // Route by an unverified iss peek. Clerk authority (when enabled) → Clerk validator +
+            // provisioning; everything else → the self-issued machine validator, which itself rejects
+            // any non-self issuer / unparseable token → 401. Either way, present-but-invalid = 401.
+            var clerkCfg = clerkOptions.Value;
+            if (clerkCfg.Enabled && PeekIssuer(token) == clerkCfg.Authority)
+            {
+                var clerkClaims = await clerk.ValidateAsync(token, context.RequestAborted);
+                if (clerkClaims is null)
+                {
+                    await WriteError(context, StatusCodes.Status401Unauthorized, "invalid_token", "The bearer token is invalid or expired.");
+                    return;
+                }
+
+                var user = await provisioning.GetOrProvisionAsync(clerkClaims, context.RequestAborted);
+                var userCaller = new FogosCaller
+                {
+                    Tier = ApiTier.Registered,
+                    UserId = user.Id,
+                    ClerkUserId = user.ClerkUserId,
+                    Name = user.DisplayName ?? clerkClaims.Name,
+                    IsAdmin = user.Role == UserRole.Admin,
+                    RemoteIp = ip,
+                };
+                Assign(context, userCaller);
+                await next(context);
+                return;
+            }
+
             if (!jwt.TryValidate(token, out var claims) || claims is null)
             {
                 await WriteError(context, StatusCodes.Status401Unauthorized, "invalid_token", "The bearer token is invalid or expired.");
@@ -133,16 +175,44 @@ public sealed class AuthenticationMiddleware(RequestDelegate next)
         if (caller.IsAnonymous)
             return new ClaimsPrincipal(new ClaimsIdentity());
 
+        // Users carry NameIdentifier=UserId and a role claim, but deliberately NO scope claims — every
+        // existing scope policy (write:*, moderate:*) therefore correctly denies a signed-in human.
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, caller.ClientId ?? ""),
+            new(ClaimTypes.NameIdentifier, caller.UserId ?? caller.ClientId ?? ""),
             new("tier", caller.Tier.ToString()),
         };
         if (!string.IsNullOrEmpty(caller.Name))
             claims.Add(new Claim(ClaimTypes.Name, caller.Name));
+        if (caller.IsUser)
+            claims.Add(new Claim("role", caller.IsAdmin ? "Admin" : "User"));
         claims.AddRange(caller.Scopes.Select(s => new Claim("scope", s)));
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "Fogos"));
+    }
+
+    /// <summary>
+    /// Reads the (unverified) <c>iss</c> from a JWT's payload for routing only — one base64url decode,
+    /// no signature check. Trust always comes from the routed validator. Null on any malformed token.
+    /// </summary>
+    private static string? PeekIssuer(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length != 3)
+                return null;
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = (payload.Length % 4) switch { 2 => payload + "==", 3 => payload + "=", _ => payload };
+            using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
+            return doc.RootElement.TryGetProperty("iss", out var iss) && iss.ValueKind == JsonValueKind.String
+                ? iss.GetString()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static Task WriteError(HttpContext context, int status, string code, string message)

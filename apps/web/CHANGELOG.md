@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.2.1...web-v1.3.0) (2026-07-06)
+
+
+### Features
+
+* **web:** send first-party API key on SSR calls to the API ([#27](https://github.com/adamtrip-solutions/fogos-portugal/issues/27)) ([9926c57](https://github.com/adamtrip-solutions/fogos-portugal/commit/9926c5768147241a94a298a45d72d132cbc35d19))
+
 ## [1.2.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.2.0...web-v1.2.1) (2026-07-05)
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.1.0...api-v2.2.0) (2026-07-06)
+
+
+### Features
+
+* incidents table page + map fire filters ([#34](https://github.com/adamtrip-solutions/fogos-portugal/issues/34)) ([4a9b4c1](https://github.com/adamtrip-solutions/fogos-portugal/commit/4a9b4c1bb65978d27dd2be5455b121d9abb13280))
+* map feed keyed on updatedAt (long-running fires stay visible) ([#35](https://github.com/adamtrip-solutions/fogos-portugal/issues/35)) ([ed4aef9](https://github.com/adamtrip-solutions/fogos-portugal/commit/ed4aef934c6812f476676c09ea9d1c82277d2594))
+
+
+### Bug Fixes
+
+* **api:** relax IcnfClient resilience timeouts for fire-season load ([#32](https://github.com/adamtrip-solutions/fogos-portugal/issues/32)) ([5f2981a](https://github.com/adamtrip-solutions/fogos-portugal/commit/5f2981ab3eeb704020ef9f068872cb5fb180b9ea))
+
 ## [2.1.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.0.1...api-v2.1.0) (2026-07-06)
 
 

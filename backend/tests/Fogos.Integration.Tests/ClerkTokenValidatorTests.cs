@@ -135,11 +135,83 @@ public sealed class ClerkTokenValidatorTests
     }
 
     [Fact]
+    public async Task Missing_azp_passes_when_authorized_parties_configured()
+    {
+        // Intentional: azp is browser-origin pinning. Clerk native (Expo) session tokens
+        // legitimately lack azp — failing closed here would break future mobile login.
+        var (validator, _) = Build(authorizedParties: ["https://app.fogos.pt"]);
+        var token = Mint(new()
+        {
+            ["iss"] = Authority,
+            ["sub"] = "user_native",
+            ["exp"] = Now(300),
+        });
+
+        var claims = await validator.ValidateAsync(token);
+        Assert.NotNull(claims);
+        Assert.Equal("user_native", claims!.ClerkUserId);
+    }
+
+    [Fact]
     public async Task Garbage_token_is_rejected()
     {
         var (validator, _) = Build();
         Assert.Null(await validator.ValidateAsync("not.a.jwt"));
         Assert.Null(await validator.ValidateAsync("garbage"));
+    }
+
+    [Fact]
+    public async Task Alg_none_with_empty_signature_is_rejected()
+    {
+        var (validator, _) = Build();
+        var header = new Dictionary<string, object> { ["alg"] = "none", ["typ"] = "JWT", ["kid"] = Kid };
+        var payload = new Dictionary<string, object>
+        {
+            ["iss"] = Authority,
+            ["sub"] = "user_abc",
+            ["exp"] = Now(300),
+        };
+        var token = $"{Encode(header)}.{Encode(payload)}.";
+
+        Assert.Null(await validator.ValidateAsync(token));
+    }
+
+    [Fact]
+    public async Task Hs256_signed_with_public_modulus_as_hmac_secret_is_rejected()
+    {
+        // Classic algorithm-confusion attack: sign with HS256 using the public RSA modulus as the
+        // HMAC secret. The validator must pin RS256 and never fall back to a symmetric check.
+        var (validator, _) = Build();
+        var header = new Dictionary<string, object> { ["alg"] = "HS256", ["typ"] = "JWT", ["kid"] = Kid };
+        var payload = new Dictionary<string, object>
+        {
+            ["iss"] = Authority,
+            ["sub"] = "user_abc",
+            ["exp"] = Now(300),
+        };
+        var signingInput = $"{Encode(header)}.{Encode(payload)}";
+        var modulus = _rsa.ExportParameters(false).Modulus!;
+        using var hmac = new HMACSHA256(modulus);
+        var signature = hmac.ComputeHash(Encoding.ASCII.GetBytes(signingInput));
+        var token = $"{signingInput}.{Base64Url(signature)}";
+
+        Assert.Null(await validator.ValidateAsync(token));
+    }
+
+    [Fact]
+    public async Task Trailing_slash_on_configured_authority_still_validates()
+    {
+        // ClerkOptions normalizes Authority on set, so a pasted URL with a trailing '/' must not
+        // fail-closed against the exact iss comparison.
+        var (validator, _) = Build(authority: Authority + "/");
+        var token = Mint(new()
+        {
+            ["iss"] = Authority,
+            ["sub"] = "user_abc",
+            ["exp"] = Now(300),
+        });
+
+        Assert.NotNull(await validator.ValidateAsync(token));
     }
 
     [Fact]

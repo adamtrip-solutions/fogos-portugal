@@ -21,7 +21,7 @@ public sealed class ClerkTokenValidator
 {
     public const string HttpClientName = "clerk-jwks";
 
-    private static readonly TimeSpan UnknownKidThrottle = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RefetchThrottle = TimeSpan.FromMinutes(5);
 
     private readonly ClerkOptions _options;
     private readonly IHttpClientFactory _httpFactory;
@@ -86,6 +86,8 @@ public sealed class ClerkTokenValidator
 
             // azp allow-list is enforced only when both the config and the token carry it (empty
             // entries — e.g. an unset compose env var — are ignored so they never lock everyone out).
+            // Tokens WITHOUT azp pass by design: azp is browser-origin pinning, and Clerk native
+            // (Expo) session tokens legitimately lack it — failing closed would break mobile login.
             var parties = _options.AuthorizedParties.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
             if (parties.Count > 0 && root.TryGetProperty("azp", out var azp) && azp.ValueKind == JsonValueKind.String)
             {
@@ -123,18 +125,25 @@ public sealed class ClerkTokenValidator
             if (now - _keysFetchedAt < cacheDuration && _keys.TryGetValue(kid, out var afterWait))
                 return afterWait;
 
-            var expired = now - _keysFetchedAt >= cacheDuration;
-            // Unknown kid but the cache is still fresh: refetch at most once per throttle window so a
-            // stream of forged-kid tokens can't turn into a stream of JWKS fetches.
-            if (!expired && now - _lastRefetch < UnknownKidThrottle)
-                return _keys.TryGetValue(kid, out var throttled) ? throttled : null;
-
-            var fetched = await FetchJwksAsync(ct);
-            _lastRefetch = now;
-            if (fetched is not null)
+            // Refetch at most once per throttle window, measured from the last ATTEMPT (success or
+            // failure): this covers both a burst of forged-kid tokens against a fresh cache and a
+            // Clerk outage with an expired cache — failed fetches must not turn every request into
+            // a fetch. Between attempts we serve whatever keys we have; stale keys still verify
+            // honest tokens (availability over strict rotation, keys rotate rarely).
+            if (now - _lastRefetch >= RefetchThrottle)
             {
-                _keys = fetched;
-                _keysFetchedAt = now;
+                _lastRefetch = now;
+                var fetched = await FetchJwksAsync(ct);
+                if (fetched is not null)
+                {
+                    var replaced = _keys;
+                    _keys = fetched;
+                    _keysFetchedAt = now;
+                    // Free the old keys. A fast-path reader racing this dispose gets at worst a
+                    // single ObjectDisposedException → caught → 401; the client just retries.
+                    foreach (var rsa in replaced.Values)
+                        rsa.Dispose();
+                }
             }
 
             return _keys.TryGetValue(kid, out var result) ? result : null;

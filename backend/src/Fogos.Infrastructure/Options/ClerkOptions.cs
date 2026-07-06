@@ -9,8 +9,18 @@ public sealed class ClerkOptions
 {
     public const string SectionName = "Clerk";
 
-    /// <summary>The Clerk instance issuer URL (matches the token <c>iss</c>). Empty = Clerk disabled.</summary>
-    public string Authority { get; set; } = "";
+    private string _authority = "";
+
+    /// <summary>
+    /// The Clerk instance issuer URL (matches the token <c>iss</c>). Empty = Clerk disabled.
+    /// Normalized on set (trailing '/' trimmed) so a pasted URL never breaks the exact <c>iss</c>
+    /// comparison — both the validator and the middleware's iss peek see the normalized form.
+    /// </summary>
+    public string Authority
+    {
+        get => _authority;
+        set => _authority = value?.TrimEnd('/') ?? "";
+    }
 
     /// <summary>JWKS endpoint; defaults to <c>{Authority}/.well-known/jwks.json</c> when unset.</summary>
     public string? JwksUrl { get; set; }
@@ -25,6 +35,6 @@ public sealed class ClerkOptions
 
     /// <summary>The effective JWKS URL — the configured override, or derived from the authority.</summary>
     public string ResolvedJwksUrl => string.IsNullOrWhiteSpace(JwksUrl)
-        ? $"{Authority.TrimEnd('/')}/.well-known/jwks.json"
+        ? $"{Authority}/.well-known/jwks.json"
         : JwksUrl;
 }

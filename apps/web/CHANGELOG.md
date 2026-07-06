@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.4.0...web-v1.5.0) (2026-07-06)
+
+
+### Features
+
+* **web:** five status buckets — Vigilância in blue, closed states gray, 3h concluded window ([#37](https://github.com/adamtrip-solutions/fogos-portugal/issues/37)) ([3495740](https://github.com/adamtrip-solutions/fogos-portugal/commit/3495740c6e7fd30260b8ee78ab209c373748b54e))
+
 ## [1.4.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.3.0...web-v1.4.0) (2026-07-06)
 
 

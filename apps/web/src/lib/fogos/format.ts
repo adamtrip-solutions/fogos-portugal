@@ -41,7 +41,33 @@ export function statusColorForCode(code: number): string {
  * Coarse status grouping shared by the map badges and the legend, so both
  * agree on icon + color. Single source of truth for the 4 buckets.
  */
-export type StatusBucket = 'dispatch' | 'ongoing' | 'resolving' | 'done'
+export const STATUS_BUCKETS = [
+  'dispatch',
+  'ongoing',
+  'resolving',
+  'done',
+] as const
+export type StatusBucket = (typeof STATUS_BUCKETS)[number]
+
+/** PT-PT labels for each bucket (filter UIs, chips). */
+export const STATUS_BUCKET_LABEL: Record<StatusBucket, string> = {
+  dispatch: 'Despacho',
+  ongoing: 'Em curso',
+  resolving: 'Em resolução',
+  done: 'Concluído',
+}
+
+/**
+ * Status codes that map to each bucket — the inverse of `statusBucket`, kept in
+ * lockstep with it. Used to translate a set of selected buckets into the
+ * `statusCodes` filter the API expects.
+ */
+export const STATUS_BUCKET_CODES: Record<StatusBucket, number[]> = {
+  dispatch: [3, 4],
+  ongoing: [5, 6],
+  resolving: [7, 9, 10, 13],
+  done: [8, 11, 12],
+}
 
 export function statusBucket(code: number): StatusBucket {
   if (code === 3 || code === 4) return 'dispatch' // laranja #FF6E02

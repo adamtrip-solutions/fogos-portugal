@@ -116,6 +116,49 @@ public sealed class ReadApiTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
+    public async Task IncidentFilter_statusCodes_district_and_combined_are_honoured()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+
+        var june15 = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.FromHours(1));
+        var june14 = new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.FromHours(1));
+        await ctx.Incidents.InsertManyAsync(
+        [
+            SeedData.Incident("A", occurredAt: june15, district: "Viseu", statusCode: IncidentStatusCatalog.EmCurso),
+            SeedData.Incident("B", occurredAt: june15, district: "Viseu", statusCode: IncidentStatusCatalog.ChegadaAoTeatroDeOperacoes),
+            SeedData.Incident("C", occurredAt: june14, district: "Porto", statusCode: IncidentStatusCatalog.Conclusao),
+            SeedData.Incident("D", occurredAt: june15, district: "Porto", statusCode: IncidentStatusCatalog.EmCurso),
+        ]);
+
+        // statusCodes → only the matching statuses (5, 6); status 8 excluded.
+        var byStatus = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ statusCodes:[5,6] }){ nodes { id } } }"));
+        Assert.Equal(new[] { "A", "B", "D" }, byStatus.Order().ToArray());
+
+        // Null statusCodes (omitted) is unconstrained.
+        var nullStatus = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ }){ nodes { id } } }"));
+        Assert.Equal(new[] { "A", "B", "C", "D" }, nullStatus.Order().ToArray());
+
+        // Explicit empty statusCodes list is also unconstrained (not "match nothing").
+        var emptyStatus = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ statusCodes:[] }){ nodes { id } } }"));
+        Assert.Equal(new[] { "A", "B", "C", "D" }, emptyStatus.Order().ToArray());
+
+        // district → exact match; other districts excluded.
+        var byDistrict = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ district:\"Viseu\" }){ nodes { id } } }"));
+        Assert.Equal(new[] { "A", "B" }, byDistrict.Order().ToArray());
+
+        // Combined statusCodes + after + district AND-composes: only A satisfies all three.
+        var combined = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ statusCodes:[5], after:\"2026-06-15\", district:\"Viseu\" }){ nodes { id } } }"));
+        Assert.Equal(new[] { "A" }, combined.Order().ToArray());
+    }
+
+    [SkippableFact]
     public async Task Ten_incidents_with_photos_and_weather_resolve_without_error()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SobreRouteImport } from './routes/sobre'
+import { Route as OcorrenciasRouteImport } from './routes/ocorrencias'
 import { Route as EstatisticasRouteImport } from './routes/estatisticas'
 import { Route as CreditosRouteImport } from './routes/creditos'
 import { Route as ApiRouteImport } from './routes/api'
@@ -20,6 +21,11 @@ import { Route as ApiWeatherTilesRouteImport } from './routes/api/weather-tiles'
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
   path: '/sobre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OcorrenciasRoute = OcorrenciasRouteImport.update({
+  id: '/ocorrencias',
+  path: '/ocorrencias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstatisticasRoute = EstatisticasRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/api': typeof ApiRouteWithChildren
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
+  '/ocorrencias': typeof OcorrenciasRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/api': typeof ApiRouteWithChildren
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
+  '/ocorrencias': typeof OcorrenciasRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/api': typeof ApiRouteWithChildren
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
+  '/ocorrencias': typeof OcorrenciasRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/creditos'
     | '/estatisticas'
+    | '/ocorrencias'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/creditos'
     | '/estatisticas'
+    | '/ocorrencias'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/creditos'
     | '/estatisticas'
+    | '/ocorrencias'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   ApiRoute: typeof ApiRouteWithChildren
   CreditosRoute: typeof CreditosRoute
   EstatisticasRoute: typeof EstatisticasRoute
+  OcorrenciasRoute: typeof OcorrenciasRoute
   SobreRoute: typeof SobreRoute
   ConcelhoDicoRoute: typeof ConcelhoDicoRoute
 }
@@ -127,6 +140,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre'
       fullPath: '/sobre'
       preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ocorrencias': {
+      id: '/ocorrencias'
+      path: '/ocorrencias'
+      fullPath: '/ocorrencias'
+      preLoaderRoute: typeof OcorrenciasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estatisticas': {
@@ -189,6 +209,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRoute: ApiRouteWithChildren,
   CreditosRoute: CreditosRoute,
   EstatisticasRoute: EstatisticasRoute,
+  OcorrenciasRoute: OcorrenciasRoute,
   SobreRoute: SobreRoute,
   ConcelhoDicoRoute: ConcelhoDicoRoute,
 }

@@ -8,7 +8,13 @@ import {
   incidentQuery,
   recentIncidentsQuery,
 } from '#/lib/fogos/api.ts'
-import { WINDOW_HOURS, isOngoingStatus } from '#/lib/fogos/format.ts'
+import {
+  STATUS_BUCKETS,
+  WINDOW_HOURS,
+  isOngoingStatus,
+  statusBucket,
+} from '#/lib/fogos/format.ts'
+import type { StatusBucket } from '#/lib/fogos/format.ts'
 import { normalizeIncidentParam } from '#/lib/fogos/search.ts'
 import type { IndexSearch } from '#/lib/fogos/search.ts'
 import type { IncidentListItem } from '#/lib/fogos/types.ts'
@@ -18,11 +24,22 @@ import { windFieldOptions } from '#/lib/weather/wind.ts'
 import type { WeatherLayerKey } from '#/lib/weather/catalog.ts'
 import { useTheme } from '#/lib/theme.ts'
 import { AppToolbar } from '#/components/app-toolbar.tsx'
+import { FireFilterControl } from '#/components/fire-filter-control.tsx'
 import { FireMap } from '#/components/fire-map.tsx'
 import type { IncidentMapOverlays } from '#/components/fire-map.tsx'
 import { IncidentPanel } from '#/components/incident-panel.tsx'
 import { MapLegend } from '#/components/map-legend.tsx'
 import { WeatherLayerControl } from '#/components/weather-layer-control.tsx'
+
+/** The two active buckets that the "Só ativos" shortcut maps to. */
+const ACTIVE_BUCKETS: StatusBucket[] = ['dispatch', 'ongoing']
+
+function bucketsEqual(
+  a: ReadonlySet<StatusBucket>,
+  b: readonly StatusBucket[],
+): boolean {
+  return a.size === b.length && b.every((x) => a.has(x))
+}
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -49,11 +66,25 @@ function MapFallback() {
 
 function Home() {
   const theme = useTheme()
-  const [activeOnly, setActiveOnly] = useState(false)
+  // Filter state (ephemeral, not in the URL — same as the weather layer choice).
+  const [buckets, setBuckets] = useState<Set<StatusBucket>>(
+    () => new Set(STATUS_BUCKETS),
+  )
+  const [maxAgeHours, setMaxAgeHours] = useState<number | null>(null)
+  // Only one map panel (layers | filters) is open at a time.
+  const [openPanel, setOpenPanel] = useState<'layers' | 'filters' | null>(null)
   const [weatherLayer, setWeatherLayer] = useState<WeatherLayerKey | 'none'>(
     'none',
   )
   const [radarPlaying, setRadarPlaying] = useState(true)
+
+  // "Só ativos" is a shortcut over the same bucket state: pressed exactly when
+  // the selection is {dispatch, ongoing}. Toggling on narrows to those two;
+  // toggling off restores all four.
+  const activeOnly = bucketsEqual(buckets, ACTIVE_BUCKETS)
+  const setActiveOnly = useCallback((next: boolean) => {
+    setBuckets(new Set(next ? ACTIVE_BUCKETS : STATUS_BUCKETS))
+  }, [])
 
   // Lock the document to the viewport while the full-screen map is mounted, and
   // release it on unmount so the content routes (estatísticas, concelho, sobre…)
@@ -105,12 +136,10 @@ function Home() {
 
   const activeList = active.data ?? []
 
-  // Default view: ongoing fires (active/em resolução/vigilância) always show,
+  // Base view: ongoing fires (active/em resolução/vigilância) always show,
   // whatever their age; finished ones only while their last update is within
   // the window. The activeIncidents version wins the dedup.
-  const list = useMemo<IncidentListItem[]>(() => {
-    if (activeOnly) return activeList
-
+  const baseList = useMemo<IncidentListItem[]>(() => {
     const cutoff = Date.now() - WINDOW_HOURS * 60 * 60 * 1000
     const byId = new Map<string, IncidentListItem>()
     for (const inc of recent.data ?? []) {
@@ -124,7 +153,23 @@ function Home() {
     }
     for (const inc of activeList) byId.set(inc.id, inc)
     return [...byId.values()]
-  }, [activeOnly, activeList, recent.data])
+  }, [activeList, recent.data])
+
+  // Apply the map filters (status bucket + activity window). Computed against
+  // Date.now() at render — fine since the data refetches every 60s.
+  const list = useMemo<IncidentListItem[]>(() => {
+    const now = Date.now()
+    return baseList.filter((inc) => {
+      if (!buckets.has(statusBucket(inc.status.code))) return false
+      if (
+        maxAgeHours != null &&
+        now - Date.parse(inc.updatedAt) > maxAgeHours * 3_600_000
+      ) {
+        return false
+      }
+      return true
+    })
+  }, [baseList, buckets, maxAgeHours])
 
   const selectedInList = useMemo(
     () => list.find((i) => i.id === selectedId) ?? null,
@@ -173,12 +218,11 @@ function Home() {
   const selectedIncident = selectedInList ?? selectedFromDetail
 
   // Keep showing whatever we have while a refetch is in flight; only fall
-  // back to the count skeleton when there is nothing to show yet.
-  const stillLoading = activeOnly
-    ? active.isLoading
-    : active.isLoading || recent.isLoading
+  // back to the count skeleton when there is nothing to show yet. Both feeds
+  // are always needed now that filtering runs over the merged base list.
+  const stillLoading = active.isLoading || recent.isLoading
   const showSkeleton = stillLoading && list.length === 0
-  const isError = active.isError || (!activeOnly && recent.isError)
+  const isError = active.isError || recent.isError
   const showEmpty = !stillLoading && !isError && list.length === 0
 
   return (
@@ -209,14 +253,28 @@ function Home() {
           showActiveOnly
           rightHidden={!!selectedIncident}
           rightSlot={
-            <WeatherLayerControl
-              value={weatherLayer}
-              onChange={setWeatherLayer}
-              availability={weatherAvailability.data}
-              radarPlaying={radarPlaying}
-              onToggleRadarPlaying={() => setRadarPlaying((p) => !p)}
-              radarActiveFrame={radarFrames[radarActiveIndex]}
-            />
+            <>
+              <WeatherLayerControl
+                value={weatherLayer}
+                onChange={setWeatherLayer}
+                availability={weatherAvailability.data}
+                radarPlaying={radarPlaying}
+                onToggleRadarPlaying={() => setRadarPlaying((p) => !p)}
+                radarActiveFrame={radarFrames[radarActiveIndex]}
+                open={openPanel === 'layers'}
+                onOpenChange={(o) => setOpenPanel(o ? 'layers' : null)}
+              />
+              <FireFilterControl
+                open={openPanel === 'filters'}
+                onOpenChange={(o) => setOpenPanel(o ? 'filters' : null)}
+                buckets={buckets}
+                onBucketsChange={setBuckets}
+                maxAgeHours={maxAgeHours}
+                onMaxAgeChange={setMaxAgeHours}
+                visibleCount={list.length}
+                totalCount={baseList.length}
+              />
+            </>
           }
         />
 

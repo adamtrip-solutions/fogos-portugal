@@ -26,6 +26,12 @@ interface WeatherLayerControlProps {
   radarPlaying: boolean
   onToggleRadarPlaying: () => void
   radarActiveFrame: RadarFrame | undefined
+  /**
+   * Optional controlled open state so a parent can enforce "one panel open at a
+   * time". When omitted the control manages its own open state (fallback).
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 /** Formats a Date as `dd/MM HH:mm` for Lisbon display. */
@@ -55,8 +61,12 @@ export function WeatherLayerControl({
   radarPlaying,
   onToggleRadarPlaying,
   radarActiveFrame,
+  open: controlledOpen,
+  onOpenChange,
 }: WeatherLayerControlProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
 
   const aromeDisabled = !availability?.referenceTime
   const activeDef = value === 'none' ? null : WEATHER_LAYERS[value]

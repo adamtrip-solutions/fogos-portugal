@@ -37,6 +37,7 @@ public sealed record ChangeSet
             || stored.Kind != mapped.Kind
             || stored.Active != mapped.Active
             || stored.Dico != mapped.Dico
+            || stored.LocationInferred != mapped.LocationInferred
             || !NullableGeoEquals(stored.Coordinates, mapped.Coordinates)
             || stored.DetailLocation != mapped.DetailLocation
             || stored.Region != mapped.Region

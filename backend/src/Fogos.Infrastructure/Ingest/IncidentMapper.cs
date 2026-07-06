@@ -41,6 +41,7 @@ public static class IncidentMapper
             Concelho = location.Concelho,
             Freguesia = location.Freguesia,
             Dico = location.Dico,
+            LocationInferred = location.Inferred,
             Region = raw.Region,
             SubRegion = raw.SubRegion,
             Coordinates = coordinates,

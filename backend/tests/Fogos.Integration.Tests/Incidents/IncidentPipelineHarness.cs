@@ -55,7 +55,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
         Locks = new RedisSingleFlightLock(Redis);
         Processed = new RedisProcessedMarker(Redis, Options.Create(new QueueOptions()));
 
-        Resolver = new LocationResolver(Mongo, Ops);
+        Resolver = new LocationResolver(Mongo, Ops, new Fogos.Infrastructure.Geo.ConcelhoLocator());
         Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, NullLogger<IncidentIngestService>.Instance);
         Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, new Fogos.Infrastructure.Incidents.KmlVersionStore(Mongo, Clock), NullLogger<IcnfEnrichmentService>.Instance);
         Important = new ImportantFireChecker(Mongo, Locks, Clock, NullLogger<ImportantFireChecker>.Instance);

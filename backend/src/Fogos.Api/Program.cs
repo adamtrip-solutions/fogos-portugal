@@ -29,6 +29,11 @@ if (!string.IsNullOrWhiteSpace(sentryDsn))
 }
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);
+
+// Verify-and-heal the static `locations` reference table at startup (see SeedGuard: prod once ran for days
+// with an empty table and silently skipped every incident). Idempotent; safe to run in both API and Worker.
+builder.Services.AddHostedService<Fogos.Infrastructure.Seeding.SeedGuard>();
+
 builder.Services.AddFogosAuth();
 builder.Services.AddFogosRateLimiting(builder.Configuration);
 

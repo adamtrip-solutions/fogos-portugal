@@ -12,6 +12,11 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddFogosInfrastructure(builder.Configuration);
 
+// Verify-and-heal the static `locations` reference table BEFORE any Quartz job or queue consumer runs
+// (hosted services start in registration order, so this must precede AddQuartzHostedService below). Prod
+// once ran for days with an empty table and silently skipped every incident — see SeedGuard. Idempotent.
+builder.Services.AddHostedService<Fogos.Infrastructure.Seeding.SeedGuard>();
+
 // Pipeline infrastructure: Redis Streams dispatchers, external sources.
 builder.Services.AddFogosPipeline(builder.Configuration);
 

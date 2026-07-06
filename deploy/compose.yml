@@ -136,6 +136,9 @@ services:
       PORT: "3000"
       # Server-side calls to the API stay on the internal network (no CORS, like dev).
       FOGOS_API_URL: ${FOGOS_API_URL:-http://api:8080}
+      # First-party API key (minted via AdminCli `keys issue --tier first-party`).
+      # Optional — unset falls back to anonymous rate limits.
+      FOGOS_API_KEY: ${FOGOS_API_KEY:-}
     healthcheck:
       test:
         - CMD

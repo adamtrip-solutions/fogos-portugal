@@ -20,6 +20,9 @@ public sealed class AlertOptions
     /// <summary>Purge subscriptions older than this with no poll activity in the same window.</summary>
     public int PurgeAfterDays { get; set; } = 90;
 
+    /// <summary>Maximum number of alert subscriptions a single signed-in user may own.</summary>
+    public int MaxSubscriptionsPerUser { get; set; } = 10;
+
     // ── Portugal bounding box (mainland + islands) ───────────────────────────────
     public double MinLatitude { get; set; } = 29.5;
     public double MaxLatitude { get; set; } = 42.5;

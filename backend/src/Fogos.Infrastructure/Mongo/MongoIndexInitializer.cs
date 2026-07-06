@@ -119,6 +119,7 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
         await context.ApiClients.Indexes.CreateManyAsync(
         [
             Unique(Builders<ApiClient>.IndexKeys.Ascending("keyHash"), "keyHash"),
+            Model(Builders<ApiClient>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
         ], ct);
 
         await context.Users.Indexes.CreateManyAsync(
@@ -131,6 +132,7 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
         [
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("kind").Ascending("dico"), "kind_dico"),
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("createdAt"), "createdAt"),
+            Model(Builders<AlertSubscription>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
         ], ct);
 
         await context.AlertEvents.Indexes.CreateManyAsync(

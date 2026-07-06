@@ -52,11 +52,11 @@ public static class KeyCommands
         var publicContext = HasFlag(args, "--public-context");
         var origins = ParseList(GetOption(args, "--origins"));
 
-        var plaintext = KeyGenerator.NewPlaintext();
+        var plaintext = ApiKeyGenerator.NewPlaintext();
         var client = new ApiClient
         {
             Name = name,
-            KeyHash = KeyGenerator.Hash(plaintext),
+            KeyHash = ApiKeyGenerator.Hash(plaintext),
             Tier = tier,
             Scopes = scopes,
             PublicContext = publicContext,

@@ -42,6 +42,15 @@ public sealed class ApiClient
     /// <summary>Marks credentials whose limiter partitions per caller IP.</summary>
     public bool PublicContext { get; set; }
 
+    /// <summary>
+    /// The local <c>users</c> id that self-issued this key (self-service portal). Null for keys minted by
+    /// the admin CLI. Non-unique-indexed for the owner's key listing and per-user cap.
+    /// </summary>
+    public string? OwnerUserId { get; set; }
+
+    /// <summary>The first characters of the plaintext key (display-only), so the owner can tell keys apart.</summary>
+    public string? KeyPrefix { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
 

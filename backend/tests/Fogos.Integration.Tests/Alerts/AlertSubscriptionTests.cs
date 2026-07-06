@@ -2,8 +2,15 @@ using System.Text.Json;
 using Fogos.Domain.Alerts;
 using Fogos.Domain.Locations;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Options;
+using Fogos.Infrastructure.Scheduling;
+using Fogos.Integration.Tests.Incidents;
+using Fogos.Worker.Jobs.Alerts;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using StackExchange.Redis;
 
 namespace Fogos.Integration.Tests.Alerts;
 
@@ -96,6 +103,34 @@ public sealed class AlertSubscriptionTests(ContainerFixture fixture)
 
         using var second = await fixture.GraphQLAsync(deleteMutation, new { id });
         Assert.False(second.RootElement.GetProperty("data").GetProperty("deleteAlertSubscription").GetBoolean());
+    }
+
+    [SkippableFact]
+    public async Task Purge_removes_stale_anonymous_subscriptions_but_keeps_owned_ones()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await ResetAsync();
+
+        var services = fixture.Factory.Services;
+        var ctx = services.GetRequiredService<MongoContext>();
+        var redis = services.GetRequiredService<IConnectionMultiplexer>();
+        var now = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
+        var stale = now - TimeSpan.FromDays(120);
+
+        // Stale + anonymous → purged.
+        var anon = new AlertSubscription { Kind = AlertSubscriptionKind.Concelho, Dico = "1106", CreatedAt = stale };
+        // Stale but owned → kept.
+        var owned = new AlertSubscription { Kind = AlertSubscriptionKind.Concelho, Dico = "1106", OwnerUserId = "user_owner", CreatedAt = stale };
+        await ctx.AlertSubscriptions.InsertManyAsync([anon, owned]);
+
+        var job = new AlertSubscriptionPurgeJob(
+            new RedisSingleFlightLock(redis), NullLogger<AlertSubscriptionPurgeJob>.Instance, ctx,
+            new TestClock { UtcNow = now }, Options.Create(new AlertOptions()));
+        await job.RunAsync(CancellationToken.None);
+
+        var remaining = await ctx.AlertSubscriptions.Find(FilterDefinition<AlertSubscription>.Empty).ToListAsync();
+        Assert.Single(remaining);
+        Assert.Equal(owned.Id, remaining[0].Id);
     }
 
     private static string? ErrorCode(JsonDocument doc) =>

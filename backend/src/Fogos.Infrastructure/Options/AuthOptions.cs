@@ -15,4 +15,7 @@ public sealed class AuthOptions
 
     /// <summary>An RSA private key: either a PEM string, or a filesystem path to a PEM file.</summary>
     public string? RsaPrivateKeyPem { get; set; }
+
+    /// <summary>Maximum number of active (non-revoked) self-service API keys a single user may hold.</summary>
+    public int MaxApiKeysPerUser { get; set; } = 3;
 }

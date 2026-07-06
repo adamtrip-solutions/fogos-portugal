@@ -120,6 +120,19 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message: string }>
 }
 
+// Server-only: attaches the first-party API key (minted via AdminCli, hashed in
+// api_clients) so SSR calls are rate-limited as first-party rather than anonymous.
+// The header is omitted entirely when FOGOS_API_KEY is unset — dev without a key
+// keeps working (RateLimit is disabled in the API's Development env). Never read
+// this from browser code: process.env is server-only and this module only runs
+// inside createServerFn handlers.
+function apiHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra }
+  const key = process.env.FOGOS_API_KEY
+  if (key) headers['X-API-Key'] = key
+  return headers
+}
+
 async function graphql<T>(
   query: string,
   variables?: Record<string, unknown>,
@@ -128,7 +141,7 @@ async function graphql<T>(
 
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ query, variables }),
   })
 
@@ -241,6 +254,7 @@ export const fetchKmlVersion = createServerFn({ method: 'GET' })
     const base = process.env.FOGOS_API_URL ?? 'http://localhost:5077'
     const res = await fetch(
       `${base}/v3/incidents/${data.id}/kml-versions/${data.versionId}`,
+      { headers: apiHeaders() },
     )
     if (!res.ok) {
       throw new Error(`Fogos API responded with ${res.status}`)

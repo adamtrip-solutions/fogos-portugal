@@ -1,6 +1,7 @@
 using Fogos.Domain.Events;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Time;
+using Fogos.Infrastructure.Incidents;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Ops;
 using Fogos.Infrastructure.Queue;
@@ -25,6 +26,7 @@ public sealed class IncidentIngestService(
     IEventDispatcher dispatcher,
     IClock clock,
     IOpsNotifier ops,
+    IncidentStatusHistoryStore statusHistory,
     ILogger<IncidentIngestService> logger)
 {
     public async Task<IngestOutcome> IngestAsync(IReadOnlyList<RawIncident> raws, CancellationToken ct = default)
@@ -66,7 +68,7 @@ public sealed class IncidentIngestService(
 
             if (stored is null)
             {
-                await InsertAsync(mapped, ct); // sets LastSeenInFeedAt in the inserted doc
+                await InsertAsync(mapped, raw, ct); // sets LastSeenInFeedAt in the inserted doc
                 created++;
             }
             else
@@ -87,13 +89,17 @@ public sealed class IncidentIngestService(
         return new IngestOutcome(created, updated, skipped, seen);
     }
 
-    private async Task InsertAsync(Incident mapped, CancellationToken ct)
+    private async Task InsertAsync(Incident mapped, RawIncident raw, CancellationToken ct)
     {
         var now = clock.UtcNow;
         mapped.CreatedAt = now;
         mapped.UpdatedAt = now;
         mapped.LastSeenInFeedAt = now;
         await mongo.Incidents.InsertOneAsync(mapped, cancellationToken: ct);
+        // Seed the status timeline with a single observation of the initial status. This is not a
+        // transition, so it is written directly (no IncidentStatusChanged) — webhooks/social must not fire.
+        // ObservedStatusAt overrides the stamp for ICNF side-door fires that arrive already extinguished.
+        await statusHistory.AppendAsync(mapped, raw.ObservedStatusAt, ct);
         await dispatcher.DispatchAsync(new IncidentCreated(mapped.Id), ct: ct);
     }
 

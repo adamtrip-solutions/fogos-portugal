@@ -73,6 +73,9 @@ public static class ServiceCollectionExtensions
         // Single write path for KML perimeter versioning (used by the attachKml mutation and ICNF ingest).
         services.AddSingleton<Incidents.KmlVersionStore>();
 
+        // Single write path for the status-history timeline (initial observation on ingest + witnessed transitions).
+        services.AddSingleton<Incidents.IncidentStatusHistoryStore>();
+
         // Dedup-guarded write path for alert events (used by the alert-matching worker handlers).
         services.AddSingleton<Alerts.AlertEventStore>();
 

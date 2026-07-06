@@ -69,6 +69,30 @@ internal static class IncidentFixtures
         """;
     }
 
+    /// <summary>faztable with a single already-extinguished occurrence ("Extinto" → Conclusão, code 8).</summary>
+    public static string IcnfConcludedTable(string id, DateTimeOffset startedAt)
+    {
+        var dh = TimeZoneInfo.ConvertTime(startedAt, Fogos.Domain.Time.FogosClock.Lisbon).ToString("dd-MM-yyyy HH:mm:ss");
+        return "resultado = [" +
+               "['head','','','','','','','','','','','','',''],['head2','','','','','','','','','','','','','']," +
+               $"['{id}','x','{dh}','','','','','','','','','','Extinto','']];";
+    }
+
+    /// <summary>Occurrence XML for an already-extinguished fire: an alert time plus a DHFIM extinction datetime (Lisbon-local).</summary>
+    public static string IcnfConcludedFireXml(string id, DateTimeOffset alertAt, DateTimeOffset extinguishedAt)
+    {
+        var at = TimeZoneInfo.ConvertTime(alertAt, Fogos.Domain.Time.FogosClock.Lisbon);
+        var fim = TimeZoneInfo.ConvertTime(extinguishedAt, Fogos.Domain.Time.FogosClock.Lisbon);
+        return $"""
+        <RESULT><CODIGO>
+            <DATAALERTA>{at:dd-MM-yyyy}</DATAALERTA><HORAALERTA>{at:HH:mm}</HORAALERTA>
+            <DHFIM>{fim:dd-MM-yyyy HH:mm:ss}</DHFIM>
+            <DISTRITO>SANTAREM</DISTRITO><CONCELHO>OUREM</CONCELHO><FREGUESIA>FREIXIANDA</FREGUESIA>
+            <LOCAL>Casal do Mato</LOCAL><INE>1408</INE><LAT>39.66</LAT><LON>-8.45</LON>
+        </CODIGO></RESULT>
+        """;
+    }
+
     /// <summary>Enrichment XML with burn area, cause, source, and a KML url — triggers all three first-seen signals.</summary>
     public static string IcnfEnrichmentXml() => """
         <RESULT><CODIGO>

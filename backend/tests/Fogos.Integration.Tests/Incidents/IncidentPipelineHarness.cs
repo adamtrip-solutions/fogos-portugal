@@ -56,7 +56,8 @@ internal sealed class IncidentPipelineHarness : IDisposable
         Processed = new RedisProcessedMarker(Redis, Options.Create(new QueueOptions()));
 
         Resolver = new LocationResolver(Mongo, Ops, new Fogos.Infrastructure.Geo.ConcelhoLocator());
-        Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, NullLogger<IncidentIngestService>.Instance);
+        StatusHistoryStore = new Fogos.Infrastructure.Incidents.IncidentStatusHistoryStore(Mongo, Clock);
+        Ingest = new IncidentIngestService(Mongo, Resolver, Dispatcher, Clock, Ops, StatusHistoryStore, NullLogger<IncidentIngestService>.Instance);
         Enrichment = new IcnfEnrichmentService(Icnf.Client(), Mongo, Dispatcher, Clock, new Fogos.Infrastructure.Incidents.KmlVersionStore(Mongo, Clock), NullLogger<IcnfEnrichmentService>.Instance);
         Important = new ImportantFireChecker(Mongo, Locks, Clock, NullLogger<ImportantFireChecker>.Instance);
 
@@ -67,6 +68,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
     public ISingleFlightLock Locks { get; }
     public IProcessedMarker Processed { get; }
     public LocationResolver Resolver { get; }
+    public Fogos.Infrastructure.Incidents.IncidentStatusHistoryStore StatusHistoryStore { get; }
     public IncidentIngestService Ingest { get; }
     public IcnfEnrichmentService Enrichment { get; }
     public ImportantFireChecker Important { get; }
@@ -127,7 +129,7 @@ internal sealed class IncidentPipelineHarness : IDisposable
     {
         var nearest = new AssignNearestWeatherStationHandler(Mongo);
         var history = new IncidentHistoryHandler(Mongo, Clock);
-        var statusHistory = new IncidentStatusHistoryHandler(Mongo, Clock);
+        var statusHistory = new IncidentStatusHistoryHandler(Mongo, StatusHistoryStore);
         var aeroMedical = new AeroMedicalOpsHandler(Mongo, Clock, Processed, Ops);
         var kickoff = new IcnfKickoffHandler(Mongo, Clock, Dispatcher);
         var icnfProcess = new ProcessIcnfFireDataHandler(Enrichment);

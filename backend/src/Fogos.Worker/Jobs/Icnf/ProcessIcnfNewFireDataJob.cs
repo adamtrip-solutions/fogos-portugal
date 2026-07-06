@@ -151,10 +151,21 @@ public sealed class ProcessIcnfNewFireDataJob(
 
         var (naturezaCode, natureza) = IcnfNatureza.Resolve(occ);
 
+        // Map-safety: an ICNF fire can arrive already extinguished (a closed status from birth). Stamping its
+        // initial status-history observation "now" would flood the web map (which shows finished fires for 3h
+        // after statusChangedAt), so we override the stamp with the real extinction time from the XML.
+        DateTimeOffset? observedStatusAt = null;
+        if (IncidentStatusCatalog.TryNormalize(row.StatusLabel, out var initialStatus)
+            && IncidentStatusCatalog.ConcludedCodes.Contains(initialStatus.Code))
+        {
+            observedStatusAt = ParseExtinction(occ); // null → ingest falls back to ingestion time
+        }
+
         var raw = new RawIncident
         {
             Id = row.Id,
             OccurredAt = occurredAt,
+            ObservedStatusAt = observedStatusAt,
             NaturezaCode = naturezaCode,
             Natureza = natureza,
             StatusLabel = row.StatusLabel,
@@ -218,5 +229,24 @@ public sealed class ProcessIcnfNewFireDataJob(
         if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var loose))
             return clock.FromLisbon(loose);
         return clock.UtcNow;
+    }
+
+    /// <summary>
+    /// The fire's real extinction instant: DHFIM (a full Lisbon-local datetime) preferred, falling back to the
+    /// DATAEXTINCAO + HORAEXTINCAO pair. Returns null when neither is present/parseable — the caller then lets
+    /// the ingest service default the stamp to ingestion time (rule 2).
+    /// </summary>
+    private DateTimeOffset? ParseExtinction(IcnfOccurrence occ)
+    {
+        if (!string.IsNullOrWhiteSpace(occ.Dhfim)
+            && DateTime.TryParseExact(occ.Dhfim.Trim(), DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dhfim))
+            return clock.FromLisbon(dhfim);
+
+        var raw = $"{occ.DataExtincao} {occ.HoraExtincao}".Trim();
+        if (raw.Length > 0
+            && DateTime.TryParseExact(raw, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var ext))
+            return clock.FromLisbon(ext);
+
+        return null;
     }
 }

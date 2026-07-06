@@ -8,6 +8,14 @@ public sealed record IcnfOccurrence
 {
     public string? DataAlerta { get; init; }
     public string? HoraAlerta { get; init; }
+
+    /// <summary>Extinction datetime (Lisbon-local <c>dd-MM-yyyy HH:mm:ss</c>); primary source for the real close time.</summary>
+    public string? Dhfim { get; init; }
+
+    /// <summary>Extinction date, the fallback pair for <see cref="Dhfim"/> when it is absent.</summary>
+    public string? DataExtincao { get; init; }
+    public string? HoraExtincao { get; init; }
+
     public string? Distrito { get; init; }
     public string? Concelho { get; init; }
     public string? Freguesia { get; init; }
@@ -77,6 +85,9 @@ public static class IcnfOccurrenceXml
         {
             DataAlerta = S("DATAALERTA"),
             HoraAlerta = S("HORAALERTA"),
+            Dhfim = S("DHFIM"),
+            DataExtincao = S("DATAEXTINCAO"),
+            HoraExtincao = S("HORAEXTINCAO"),
             Distrito = S("DISTRITO"),
             Concelho = S("CONCELHO"),
             Freguesia = S("FREGUESIA"),

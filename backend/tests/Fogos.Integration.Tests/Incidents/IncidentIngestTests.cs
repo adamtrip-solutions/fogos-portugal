@@ -65,6 +65,56 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Insert_seeds_one_status_observation_at_now_without_a_transition_event()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await SeedGeographyAsync(h);
+
+        var raw = NewFireRaw("OBS1", "Em Curso");
+        var outcome = await h.Ingest.IngestAsync([raw]);
+        Assert.Equal(1, outcome.Created);
+
+        // Exactly one observation, stamped at ingestion time, carrying the initial status.
+        var seed = Assert.Single(await StatusRows(h, "OBS1"));
+        Assert.Equal(IncidentStatusCatalog.EmCurso, seed.Code);
+        Assert.Equal(h.Clock.UtcNow, seed.At);
+
+        // The seed is an observation, not a transition: only IncidentCreated hits the stream, never IncidentStatusChanged.
+        var types = (await h.Redis.GetDatabase().StreamRangeAsync(QueueKeys.Stream("default")))
+            .Select(e => (string)e[RedisEventDispatcher.TypeField]!).ToList();
+        Assert.Contains(nameof(IncidentCreated), types);
+        Assert.DoesNotContain(nameof(IncidentStatusChanged), types);
+        await h.DrainAsync("default"); // clear the shared stream
+    }
+
+    [SkippableFact]
+    public async Task Witnessed_transition_appends_after_the_seed_without_duplicating_it()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        using var h = new IncidentPipelineHarness(fixture);
+        await SeedGeographyAsync(h);
+
+        await h.Ingest.IngestAsync([NewFireRaw("OBS2", "Em Curso")]);
+        await h.DrainAsync("default"); // run create-side handlers, clear the stream
+
+        // A later sweep witnesses a real transition Em Curso (5) → Em Resolução (7).
+        h.Clock.UtcNow = h.Clock.UtcNow.AddMinutes(30);
+        var outcome = await h.Ingest.IngestAsync([NewFireRaw("OBS2", "Em Resolução")]);
+        Assert.Equal(1, outcome.Updated);
+        await h.DrainAsync("default"); // routes IncidentStatusChanged → the history handler
+
+        var rows = await h.Mongo.IncidentStatusHistory
+            .Find(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, "OBS2"))
+            .Sort(Builders<IncidentStatusChange>.Sort.Ascending(x => x.At)).ToListAsync();
+        Assert.Equal(2, rows.Count); // seed + transition, no dupe of the seed
+        Assert.Equal(IncidentStatusCatalog.EmCurso, rows[0].Code);
+        Assert.Equal(IncidentStatusCatalog.EmResolucao, rows[1].Code);
+        // statusChangedAt = latest entry, non-null from birth and advanced by the transition.
+        Assert.Equal(h.Clock.UtcNow, rows[1].At);
+    }
+
+    [SkippableFact]
     public async Task Aero_medical_ops_alert_fires_once_and_is_idempotent_across_redelivery()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
@@ -303,6 +353,25 @@ public sealed class IncidentIngestTests(ContainerFixture fixture)
 
     private static Task<Incident> Find(IncidentPipelineHarness h, string id) =>
         h.Mongo.Incidents.Find(Builders<Incident>.Filter.Eq(x => x.Id, id)).FirstAsync();
+
+    private static Task<List<IncidentStatusChange>> StatusRows(IncidentPipelineHarness h, string id) =>
+        h.Mongo.IncidentStatusHistory
+            .Find(Builders<IncidentStatusChange>.Filter.Eq(x => x.IncidentId, id)).ToListAsync();
+
+    private Infrastructure.Ingest.RawIncident NewFireRaw(string id, string statusLabel) =>
+        new()
+        {
+            Id = id,
+            OccurredAt = new DateTimeOffset(2026, 8, 1, 13, 0, 0, TimeSpan.Zero),
+            NaturezaCode = "3101",
+            Natureza = "Incêndio Florestal",
+            StatusLabel = statusLabel,
+            Concelho = "Ourém",
+            Freguesia = "Freixianda",
+            Lat = 39.66,
+            Lng = -8.45,
+            Resources = new Resources { Man = 10, Terrain = 4, Aerial = 1 },
+        };
 
     private static Incident Fire(string id, int statusCode, int man, int terrain, int aerial, DateTimeOffset occurredAt,
         bool active = true, bool important = false, DateTimeOffset? lastSeenInFeedAt = null) =>

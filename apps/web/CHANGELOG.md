@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.6.0...web-v1.7.0) (2026-07-06)
+
+
+### Features
+
+* /conta — Clerk sign-in, API-key self-service, alert management (accounts 3/3) ([#47](https://github.com/adamtrip-solutions/fogos-portugal/issues/47)) ([7bf1dac](https://github.com/adamtrip-solutions/fogos-portugal/commit/7bf1dacda73e51e860425191b116db539dec0694))
+* **web:** anchor the resource chart at zero on the alert time ([#44](https://github.com/adamtrip-solutions/fogos-portugal/issues/44)) ([388e648](https://github.com/adamtrip-solutions/fogos-portugal/commit/388e64864de7c008158c6dcfa670315c0ac1d748))
+* **web:** hide the Conta nav entry while Clerk is unconfigured ([#49](https://github.com/adamtrip-solutions/fogos-portugal/issues/49)) ([b2d4439](https://github.com/adamtrip-solutions/fogos-portugal/commit/b2d4439b39191fb2f28be96dabdef9b38c115982))
+
+
+### Bug Fixes
+
+* every incident gets a status timeline from creation ([#46](https://github.com/adamtrip-solutions/fogos-portugal/issues/46)) ([4ae1a35](https://github.com/adamtrip-solutions/fogos-portugal/commit/4ae1a3553a38ef298531bb1e2ecd6497190c9286))
+
 ## [1.6.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.5.0...web-v1.6.0) (2026-07-06)
 
 

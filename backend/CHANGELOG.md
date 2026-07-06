@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.2.0...api-v2.3.0) (2026-07-06)
+
+
+### Features
+
+* **api:** self-service API keys and account-owned alert subscriptions ([#48](https://github.com/adamtrip-solutions/fogos-portugal/issues/48)) ([e4da159](https://github.com/adamtrip-solutions/fogos-portugal/commit/e4da159000c8a6af1aeffbb9070c9ffeb5e6eceb))
+* Clerk-backed user identity as a second Bearer issuer (accounts 1/3) ([#45](https://github.com/adamtrip-solutions/fogos-portugal/issues/45)) ([5b5fca4](https://github.com/adamtrip-solutions/fogos-portugal/commit/5b5fca4b26cd7df7af017c5e09a2953eb341cb53))
+
+
+### Bug Fixes
+
+* every incident gets a status timeline from creation ([#46](https://github.com/adamtrip-solutions/fogos-portugal/issues/46)) ([4ae1a35](https://github.com/adamtrip-solutions/fogos-portugal/commit/4ae1a3553a38ef298531bb1e2ecd6497190c9286))
+* **worker:** real natureza and canonical DICO for ICNF-created incidents ([#42](https://github.com/adamtrip-solutions/fogos-portugal/issues/42)) ([c73ddcb](https://github.com/adamtrip-solutions/fogos-portugal/commit/c73ddcb464d9c37f2ccbccfbbe16de3a4622b35e))
+
 ## [2.2.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.1.0...api-v2.2.0) (2026-07-06)
 
 

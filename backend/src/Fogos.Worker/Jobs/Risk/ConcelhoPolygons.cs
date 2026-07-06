@@ -1,8 +1,7 @@
-using System.Collections.Concurrent;
 using System.Globalization;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Fogos.Infrastructure.Geo;
 
 namespace Fogos.Worker.Jobs.Risk;
 
@@ -18,10 +17,11 @@ public sealed record ConcelhoInfo(string Dico, string Concelho, string Distrito)
 /// </summary>
 public sealed class ConcelhoPolygons
 {
-    private const string ResourceSuffix = "Jobs.Risk.ConcelhoPolygons.geojson";
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-PT");
 
-    private static readonly Lazy<string> RawJson = new(LoadRaw, LazyThreadSafetyMode.ExecutionAndPublication);
+    // The polygon GeoJSON now lives in Fogos.Infrastructure (Geo/ConcelhoPolygons.geojson) so the ingest
+    // coordinate fallback (ConcelhoLocator) and this RCM assembler share one embedded copy of the file.
+    private static readonly Lazy<string> RawJson = new(() => ConcelhoLocator.RawGeoJson, LazyThreadSafetyMode.ExecutionAndPublication);
     private static readonly Lazy<IReadOnlyList<ConcelhoInfo>> ConcelhoList =
         new(LoadConcelhos, LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -65,15 +65,5 @@ public sealed class ConcelhoPolygons
                 props.GetProperty("Distrito").GetString()!));
         }
         return list;
-    }
-
-    private static string LoadRaw()
-    {
-        var assembly = typeof(ConcelhoPolygons).Assembly;
-        var name = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(ResourceSuffix, StringComparison.Ordinal))
-            ?? throw new InvalidOperationException($"Embedded concelho polygon resource '*{ResourceSuffix}' not found.");
-        using var stream = assembly.GetManifestResourceStream(name)!;
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
     }
 }

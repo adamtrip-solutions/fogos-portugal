@@ -36,6 +36,14 @@ public sealed class Incident
 
     public GeoPoint? Coordinates { get; set; }
 
+    /// <summary>
+    /// True when the district/concelho/DICO were inferred from the incident's coordinates (polygon fallback)
+    /// because the concelho name missed the geocoding table, or set to the "Desconhecido"/"0000" sentinel as a
+    /// last resort. False for names resolved against the authoritative <c>locations</c> table. Flips back to
+    /// false in place once the table is seeded and the name path resolves the same incident.
+    /// </summary>
+    public bool LocationInferred { get; set; }
+
     // ── What ────────────────────────────────────────────────────────────────
     public required IncidentStatus Status { get; set; }
     public required IncidentKind Kind { get; set; }

@@ -56,6 +56,9 @@ public static class PipelineServiceCollectionExtensions
 
         services.AddSingleton<Fr24CreditMeter>();
 
+        // Coordinate → concelho fallback for the ingest location resolver (loads the embedded polygon set once).
+        services.AddSingleton<Geo.ConcelhoLocator>();
+
         // ── Scheduling (single-flight lock jobs opt into) ─────────────────────────────────────
         services.AddSingleton<Scheduling.ISingleFlightLock, Scheduling.RedisSingleFlightLock>();
 

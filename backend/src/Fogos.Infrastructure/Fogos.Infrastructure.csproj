@@ -5,6 +5,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Concelho polygon set (278 mainland concelhos, extracted from legacy ProcessRCM.php): shared by the
+         ingest coordinate fallback (ConcelhoLocator) and the RCM GeoJSON assembly in Fogos.Worker. -->
+    <EmbeddedResource Include="Geo\ConcelhoPolygons.geojson" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="4.0.100.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />

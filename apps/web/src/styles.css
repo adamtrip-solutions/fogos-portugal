@@ -146,3 +146,36 @@
     overflow: hidden;
   }
 }
+
+/* ── Route view transitions ─────────────────────────────────────────────
+   Only Links that opt in (viewTransition: true) trigger these; search-param
+   navigations (map ?incident=, table filters) stay instant. No-op in
+   browsers without the View Transitions API. */
+::view-transition-old(root) {
+  animation: vt-page-out 140ms ease-in both;
+}
+::view-transition-new(root) {
+  animation: vt-page-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes vt-page-out {
+  to { opacity: 0; }
+}
+@keyframes vt-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+/* Chrome holds still; the active-pill morph gets its own snappier timing. */
+::view-transition-group(app-nav) {
+  animation-duration: 220ms;
+}
+::view-transition-group(nav-active) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

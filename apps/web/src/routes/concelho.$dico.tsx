@@ -62,6 +62,7 @@ function Concelho() {
             </p>
             <Link
               to="/"
+              viewTransition
               className="mt-3 inline-block text-sm font-medium text-orange-600 hover:underline dark:text-orange-400"
             >
               Voltar ao mapa

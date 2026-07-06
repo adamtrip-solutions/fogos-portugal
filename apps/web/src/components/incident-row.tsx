@@ -25,6 +25,7 @@ export function IncidentRow({ incident }: { incident: IncidentListItem }) {
       <Link
         to="/"
         search={{ incident: incident.id }}
+        viewTransition
         className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/70 px-4 py-3 shadow-sm transition-colors hover:bg-white/90 dark:border-white/10 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
       >
         <span

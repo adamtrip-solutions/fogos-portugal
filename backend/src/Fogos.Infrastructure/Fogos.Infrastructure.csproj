@@ -8,6 +8,10 @@
     <!-- Concelho polygon set (278 mainland concelhos, extracted from legacy ProcessRCM.php): shared by the
          ingest coordinate fallback (ConcelhoLocator) and the RCM GeoJSON assembly in Fogos.Worker. -->
     <EmbeddedResource Include="Geo\ConcelhoPolygons.geojson" />
+    <!-- Static administrative reference table (29 distritos + 308 concelhos): the SAME physical file the
+         Importer's `seed` verb reads, linked (not copied) so SeedGuard can verify-and-heal `locations` at
+         startup without a second copy drifting from the Importer's. -->
+    <EmbeddedResource Include="..\..\dev\seed\locations.json" Link="Seeding\locations.json" />
   </ItemGroup>
 
   <ItemGroup>

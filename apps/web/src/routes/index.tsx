@@ -80,7 +80,7 @@ function Home() {
 
   // "Só ativos" is a shortcut over the same bucket state: pressed exactly when
   // the selection is {dispatch, ongoing}. Toggling on narrows to those two;
-  // toggling off restores all four.
+  // toggling off restores all five.
   const activeOnly = bucketsEqual(buckets, ACTIVE_BUCKETS)
   const setActiveOnly = useCallback((next: boolean) => {
     setBuckets(new Set(next ? ACTIVE_BUCKETS : STATUS_BUCKETS))

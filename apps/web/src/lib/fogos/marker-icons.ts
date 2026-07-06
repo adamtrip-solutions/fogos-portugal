@@ -11,13 +11,15 @@ import type { Theme } from '../theme.ts'
  * `pixelRatio: 2` so a 60px canvas reads as 30 logical px on the map.
  *
  * Icon geometry is copied verbatim from lucide-react v0.577.0
- * (node_modules/lucide-react/dist/esm/icons/{siren,flame,droplet,check}.js).
+ * (node_modules/lucide-react/dist/esm/icons/{siren,flame,droplet,eye,check}.js).
  * Lucide icons are 24x24 STROKE icons: stroke-width 2, round caps/joins, no
- * fill. All four use only <path> nodes, so Path2D covers them. We do NOT import
- * lucide-react here — the canvas path data is inlined below.
+ * fill. All use only <path> nodes here (eye's <circle cx=12 cy=12 r=3> pupil is
+ * re-expressed as the equivalent SVG-arc path), so Path2D covers them. We do
+ * NOT import lucide-react here — the canvas path data is inlined below.
  */
 
-// bucket -> lucide icon: dispatch=siren, ongoing=flame, resolving=droplet, done=check.
+// bucket -> lucide icon: dispatch=siren, ongoing=flame, resolving=droplet,
+// vigilancia=eye, done=check.
 const ICON_PATHS: Record<StatusBucket, string[]> = {
   // siren
   dispatch: [
@@ -38,11 +40,22 @@ const ICON_PATHS: Record<StatusBucket, string[]> = {
   resolving: [
     'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z',
   ],
+  // eye (pupil <circle> re-expressed as an SVG-arc path)
+  vigilancia: [
+    'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0',
+    'M15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0',
+  ],
   // check
   done: ['M20 6 9 17l-5-5'],
 }
 
-const BUCKETS: StatusBucket[] = ['dispatch', 'ongoing', 'resolving', 'done']
+const BUCKETS: StatusBucket[] = [
+  'dispatch',
+  'ongoing',
+  'resolving',
+  'vigilancia',
+  'done',
+]
 
 const PIXEL_RATIO = 2
 const LOGICAL_BASE = 30
@@ -131,7 +144,7 @@ function addBadge(
 }
 
 /**
- * Ensures all 8 badge images exist on the map for `theme`, idempotently.
+ * Ensures all 10 badge images exist on the map for `theme`, idempotently.
  * If the theme changed since last time, stale images are removed first so the
  * ring color regenerates. Call on map `load`.
  */
@@ -161,7 +174,8 @@ export function addMissingMarkerImage(
   id: string,
   theme: Theme,
 ): void {
-  const match = /^badge-(dispatch|ongoing|resolving|done)(-important)?$/.exec(id)
+  const match =
+    /^badge-(dispatch|ongoing|resolving|vigilancia|done)(-important)?$/.exec(id)
   if (!match) return
   themeForMap.set(map, theme)
   addBadge(map, match[1] as StatusBucket, match[2] != null, theme)

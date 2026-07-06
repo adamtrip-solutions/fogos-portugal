@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.0.1...api-v2.1.0) (2026-07-06)
+
+
+### Features
+
+* **api:** infer incident location from coordinates when concelho lookup misses ([#29](https://github.com/adamtrip-solutions/fogos-portugal/issues/29)) ([4571736](https://github.com/adamtrip-solutions/fogos-portugal/commit/4571736deb7d97e2057ab023819d5c95867774bc))
+
 ## [2.0.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.0.0...api-v2.0.1) (2026-07-06)
 
 

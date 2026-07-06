@@ -19,6 +19,13 @@ public sealed class IncidentFilter
     /// <summary>occurredAt at/after the start of this Lisbon day.</summary>
     public DateOnly? After { get; set; }
 
+    /// <summary>
+    /// Applies to <c>updatedAt</c> (any change, incl. enrichment), unlike
+    /// <c>after</c>/<c>before</c>/<c>day</c> which target <c>occurredAt</c>:
+    /// updatedAt at/after the start of this Lisbon day.
+    /// </summary>
+    public DateOnly? UpdatedAfter { get; set; }
+
     public string? Concelho { get; set; }
     public string? District { get; set; }
     public string? Dico { get; set; }
@@ -68,6 +75,9 @@ public static class IncidentFilterMapper
 
         if (filter?.After is { } after)
             conds.Add(fb.Gte(x => x.OccurredAt, DayStart(after, clock)));
+
+        if (filter?.UpdatedAfter is { } updatedAfter)
+            conds.Add(fb.Gte(x => x.UpdatedAt, DayStart(updatedAfter, clock)));
 
         // "before" is inclusive of the named calendar day.
         if (filter?.Before is { } before)

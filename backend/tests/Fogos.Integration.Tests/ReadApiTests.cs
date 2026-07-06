@@ -159,6 +159,39 @@ public sealed class ReadApiTests(ContainerFixture fixture)
     }
 
     [SkippableFact]
+    public async Task IncidentFilter_updatedAfter_windows_on_updatedAt_not_occurredAt()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+
+        var june05 = new DateTimeOffset(2026, 6, 5, 12, 0, 0, TimeSpan.FromHours(1));
+        var june15 = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.FromHours(1));
+        await ctx.Incidents.InsertManyAsync(
+        [
+            // Vouzela case: started long before the cutoff but changed after it
+            // (still Em Resolução) → updatedAfter surfaces it, unlike `after`.
+            SeedData.Incident("STALE_START", occurredAt: june05, updatedAt: june15, statusCode: IncidentStatusCatalog.EmResolucao, district: "Viseu"),
+            // Started after the cutoff but last changed before it → excluded.
+            SeedData.Incident("STALE_UPDATE", occurredAt: june15, updatedAt: june05, statusCode: IncidentStatusCatalog.EmCurso, district: "Viseu"),
+            // Both fresh → in the window.
+            SeedData.Incident("FRESH_BOTH", occurredAt: june15, updatedAt: june15, statusCode: IncidentStatusCatalog.EmCurso, district: "Porto"),
+        ]);
+
+        // updatedAfter windows on updatedAt, not occurredAt: STALE_START (old
+        // occurredAt) is in; STALE_UPDATE (old updatedAt) is out.
+        var byUpdated = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ updatedAfter:\"2026-06-10\" }){ nodes { id } } }"));
+        Assert.Equal(new[] { "FRESH_BOTH", "STALE_START" }, byUpdated.Order().ToArray());
+
+        // Combined updatedAfter + statusCodes AND-composes: only the EmCurso (5)
+        // incident inside the window remains (STALE_START is EmResolução).
+        var combined = await Ids(await fixture.GraphQLAsync(
+            "{ incidents(filter:{ updatedAfter:\"2026-06-10\", statusCodes:[5] }){ nodes { id } } }"));
+        Assert.Equal(new[] { "FRESH_BOTH" }, combined.Order().ToArray());
+    }
+
+    [SkippableFact]
     public async Task Ten_incidents_with_photos_and_weather_resolve_without_error()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);

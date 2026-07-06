@@ -19,6 +19,22 @@ public static class AuthServiceCollectionExtensions
         services.AddSingleton<RefreshTokenStore>();
         services.AddSingleton<IFogosCallerAccessor, FogosCallerAccessor>();
 
+        // Clerk identity: a second Bearer issuer (session-JWT validator) plus lazy local provisioning.
+        // Both are inert until Clerk:Authority is configured.
+        services.AddSingleton<ClerkTokenValidator>();
+        services.AddSingleton<UserProvisioningService>();
+
+        // JWKS fetches run while the validator holds its refresh lock, so a hanging response must
+        // never wedge Clerk validation — bound the client tightly (2s per attempt, two retries,
+        // 5s total) instead of the 100s unnamed-client default.
+        services.AddHttpClient(ClerkTokenValidator.HttpClientName)
+            .AddStandardResilienceHandler(o =>
+            {
+                o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(2);
+                o.Retry.MaxRetryAttempts = 2;
+                o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(5);
+            });
+
         services.AddAuthorization(options =>
         {
             foreach (var scope in ApiScopes.All)

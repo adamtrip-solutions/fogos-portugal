@@ -8,6 +8,7 @@ using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Stats;
+using Fogos.Domain.Users;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Domain.Webhooks;
@@ -61,6 +62,7 @@ public sealed class MongoContext
     public IMongoCollection<Hotspots> Hotspots => Database.GetCollection<Hotspots>("hotspots");
     public IMongoCollection<Location> Locations => Database.GetCollection<Location>("locations");
     public IMongoCollection<ApiClient> ApiClients => Database.GetCollection<ApiClient>("api_clients");
+    public IMongoCollection<User> Users => Database.GetCollection<User>("users");
     public IMongoCollection<HistoryTotal> HistoryTotals => Database.GetCollection<HistoryTotal>("history_totals");
 
     /// <summary>Rows that fit no importer mapping land here with a reason — nothing silently dropped.</summary>

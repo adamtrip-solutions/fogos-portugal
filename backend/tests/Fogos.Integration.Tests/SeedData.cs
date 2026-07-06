@@ -5,6 +5,7 @@ using Fogos.Domain.Geo;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
+using Fogos.Domain.Users;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Mongo;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,7 @@ public static class SeedData
         await ctx.WeatherStations.DeleteManyAsync(FilterDefinition<WeatherStation>.Empty);
         await ctx.WeatherHourly.DeleteManyAsync(FilterDefinition<WeatherObservation>.Empty);
         await ctx.ApiClients.DeleteManyAsync(FilterDefinition<ApiClient>.Empty);
+        await ctx.Users.DeleteManyAsync(FilterDefinition<User>.Empty);
     }
 
     /// <summary>The SHA-256 hex hash used for API-key lookup (mirrors <c>ApiKeyResolver.Hash</c>).</summary>

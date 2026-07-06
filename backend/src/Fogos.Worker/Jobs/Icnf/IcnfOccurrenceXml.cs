@@ -21,6 +21,13 @@ public sealed record IcnfOccurrence
     public double? AreaAgricola { get; init; }
     public double? AreaMato { get; init; }
 
+    // ── ICNF TIPO flags (0/1) — the occurrence's declared fire nature (see IcnfNatureza) ──────────
+    public bool Incendio { get; init; }
+    public bool Agricola { get; init; }
+    public bool Fogacho { get; init; }
+    public bool Queimada { get; init; }
+    public bool FalsoAlarme { get; init; }
+
     public string? FonteAlerta { get; init; }
     public string? Causa { get; init; }
     public string? TipoCausa { get; init; }
@@ -61,6 +68,9 @@ public static class IcnfOccurrenceXml
         double? D(string name) =>
             double.TryParse(S(name), NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : null;
 
+        // Legacy boolval((int)$data->FLAG): "1" is true, anything else (absent, "0", blank) is false.
+        bool B(string name) => int.TryParse(S(name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v != 0;
+
         var kmlUrl = S("AREASFICHEIROS_GTF") ?? S("AREASFICHEIROS_GNR");
 
         return new IcnfOccurrence
@@ -78,6 +88,11 @@ public static class IcnfOccurrenceXml
             AreaPovoamento = D("AREAPOV"),
             AreaAgricola = D("AREAAGRIC"),
             AreaMato = D("AREAMATO"),
+            Incendio = B("INCENDIO"),
+            Agricola = B("AGRICOLA"),
+            Fogacho = B("FOGACHO"),
+            Queimada = B("QUEIMADA"),
+            FalsoAlarme = B("FALSOALARME"),
             FonteAlerta = S("FONTEALERTA"),
             Causa = S("CAUSA"),
             TipoCausa = S("TIPOCAUSA"),

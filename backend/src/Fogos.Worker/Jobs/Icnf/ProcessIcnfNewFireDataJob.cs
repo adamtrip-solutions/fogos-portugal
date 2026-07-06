@@ -17,8 +17,10 @@ namespace Fogos.Worker.Jobs.Icnf;
 
 /// <summary>
 /// Ports <c>ProcessICNFNewFireData</c> (every 5 min): parse the ICNF occurrences table, and for each
-/// unseen occurrence fetch its XML and create a hardcoded-natureza "3103" (Mato) fire with <c>-1</c>
-/// resource sentinels (the ICNF-only marker — no ANEPC means data). Creation runs through
+/// unseen occurrence fetch its XML and create a fire with <c>-1</c> resource sentinels (the ICNF-only
+/// marker — no ANEPC means data). Natureza comes from the occurrence's TIPO flags (<see cref="IcnfNatureza"/>,
+/// still Fire-classified) instead of the old hardcoded "3103"/Mato, and the INE code is normalized to a
+/// canonical 4-char DICO (<see cref="IcnfDico"/>) instead of stored verbatim. Creation runs through
 /// <see cref="IncidentIngestService"/> so the same events fire. For incidents we already track,
 /// only ICNF-only ones get their status bumped forward (mirrors the legacy guard).
 /// </summary>
@@ -147,18 +149,20 @@ public sealed class ProcessIcnfNewFireDataJob(
         if (occurredAt < clock.UtcNow.AddDays(-lookbackDays))
             return CreateOutcome.TooOld;
 
+        var (naturezaCode, natureza) = IcnfNatureza.Resolve(occ);
+
         var raw = new RawIncident
         {
             Id = row.Id,
             OccurredAt = occurredAt,
-            NaturezaCode = "3103",
-            Natureza = "Mato",
+            NaturezaCode = naturezaCode,
+            Natureza = natureza,
             StatusLabel = row.StatusLabel,
             Concelho = occ.Concelho ?? "",
             Freguesia = occ.Freguesia,
             Localidade = occ.Local,
             PreResolvedDistrict = occ.Distrito,
-            PreResolvedDico = occ.Ine,
+            PreResolvedDico = IcnfDico.FromIne(occ.Ine),
             Lat = occ.Lat,
             Lng = occ.Lon,
             // -1 sentinels mark an ICNF-only incident (no ANEPC means data). Kept as-is (legacy contract).

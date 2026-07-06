@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { Check, Droplet, Flame, Siren } from 'lucide-react'
+import { Check, Droplet, Eye, Flame, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import { STATUS_BUCKET_COLOR } from '#/lib/fogos/format.ts'
+import { STATUS_BUCKET_LABEL, STATUS_BUCKET_COLOR } from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
 import { useIsMobile } from '#/lib/use-is-mobile.ts'
 
 const ROWS: Array<{ bucket: StatusBucket; Icon: LucideIcon; label: string }> = [
-  { bucket: 'dispatch', Icon: Siren, label: 'Despacho' },
-  { bucket: 'ongoing', Icon: Flame, label: 'Em curso' },
-  { bucket: 'resolving', Icon: Droplet, label: 'Em resolução' },
-  { bucket: 'done', Icon: Check, label: 'Concluído' },
+  { bucket: 'dispatch', Icon: Siren, label: STATUS_BUCKET_LABEL.dispatch },
+  { bucket: 'ongoing', Icon: Flame, label: STATUS_BUCKET_LABEL.ongoing },
+  { bucket: 'resolving', Icon: Droplet, label: STATUS_BUCKET_LABEL.resolving },
+  { bucket: 'vigilancia', Icon: Eye, label: STATUS_BUCKET_LABEL.vigilancia },
+  { bucket: 'done', Icon: Check, label: STATUS_BUCKET_LABEL.done },
 ]
 
 const CARD_CLASS =

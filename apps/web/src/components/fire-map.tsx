@@ -22,7 +22,11 @@ import type {
   RasterLayerSpecification,
   SymbolLayerSpecification,
 } from 'react-map-gl/maplibre'
-import { colorWithHash, isActiveStatus, statusBucket } from '#/lib/fogos/format.ts'
+import {
+  isActiveStatus,
+  statusBucket,
+  statusColorForCode,
+} from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
 import {
   addMissingMarkerImage,
@@ -221,7 +225,7 @@ function buildFeatureCollection(incidents: IncidentListItem[]): FireCollection {
         },
         properties: {
           id: incident.id,
-          color: colorWithHash(incident.status.color),
+          color: statusColorForCode(incident.status.code),
           bucket: statusBucket(incident.status.code),
           active: isActiveStatus(incident.status.code),
           important: incident.important,
@@ -543,7 +547,7 @@ export function FireMap({
   }
 
   const badgeLayout: SymbolLayerSpecification['layout'] = {
-    // bucket + important -> one of the 8 registered image names.
+    // bucket + important -> one of the 10 registered image names.
     'icon-image': [
       'concat',
       'badge-',
@@ -555,12 +559,15 @@ export function FireMap({
     'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 1.0, 12, 1.15],
     'icon-allow-overlap': true,
     'icon-ignore-placement': true,
-    // No clustering: when badges overlap, draw active (and important) fires on
-    // top of concluded ones. Higher sort key renders later, i.e. on top.
+    // No clustering: when badges overlap, draw the more relevant fire on top.
+    // Higher sort key renders later, i.e. on top. Active (and important) fires
+    // stay on top; among the finished-ish states, resolving (still on the
+    // ground) beats vigilância, which beats concluded.
     'symbol-sort-key': [
       '+',
-      ['case', ['get', 'active'], 2, 0],
-      ['case', ['get', 'important'], 1, 0],
+      ['case', ['get', 'active'], 6, 0],
+      ['case', ['get', 'important'], 3, 0],
+      ['match', ['get', 'bucket'], 'resolving', 2, 'vigilancia', 1, 0],
     ],
   }
 

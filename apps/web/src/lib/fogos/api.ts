@@ -196,10 +196,10 @@ function lisbonDateDaysAgo(days: number): string {
 // in resolução/vigilância visible for as long as anything is happening to them
 // — they only surface through this query, since the activeIncidents feed covers
 // codes 3–6 only — and lets closed fires drop out of the fetch 3 days after
-// their last change (the map narrows further to a 12h display window).
-// Accepted quirk: late ICNF enrichment bumps updatedAt, so an old concluded
-// fire can resurface as a gray dot for up to 12h per bump. Deliberate — the
-// owner prefers more information.
+// their last change (the map narrows further to WINDOW_HOURS for finished
+// fires). Accepted quirk: late ICNF enrichment bumps updatedAt, so an old
+// concluded fire can resurface as a gray dot for one WINDOW_HOURS span per
+// bump. Deliberate — the owner prefers more information.
 //
 // The connection sorts by occurredAt desc while this filter is updatedAt-based,
 // so under heavy load (>500 touched records in the window) the page cap would
@@ -478,7 +478,7 @@ export interface IncidentsFilter {
 
 /**
  * Resolve the page's search params into the GraphQL `IncidentFilter`. Buckets
- * only constrain `statusCodes` when a strict subset is selected (all four = no
+ * only constrain `statusCodes` when a strict subset is selected (all five = no
  * constraint); `kind`/`all` are never set so the default fire-only view stands.
  */
 export function buildIncidentsFilter(params: {

@@ -21,10 +21,10 @@ import {
   STATUS_BUCKETS,
   STATUS_BUCKET_COLOR,
   STATUS_BUCKET_LABEL,
-  colorWithHash,
   formatRelative,
   incidentTitle,
   locationParts,
+  statusColorForCode,
 } from '#/lib/fogos/format.ts'
 import type { StatusBucket } from '#/lib/fogos/format.ts'
 import type { IncidentListItem } from '#/lib/fogos/types.ts'
@@ -36,7 +36,7 @@ import { Skeleton } from '#/components/ui/skeleton.tsx'
 
 interface OcorrenciasSearch {
   window: IncidentsWindow
-  /** Comma-joined bucket keys; omitted when all four are selected (default). */
+  /** Comma-joined bucket keys; omitted when all five are selected (default). */
   status?: string
   district?: string
 }
@@ -51,7 +51,7 @@ function parseBuckets(raw: unknown): StatusBucket[] {
   return STATUS_BUCKETS.filter((b) => chosen.has(b))
 }
 
-/** Canonical `status` value: undefined when empty or all four (= default). */
+/** Canonical `status` value: undefined when empty or all five (= default). */
 function normalizeStatus(raw: unknown): string | undefined {
   const picked = parseBuckets(raw)
   if (picked.length === 0 || picked.length === STATUS_BUCKETS.length) {
@@ -453,7 +453,7 @@ function IncidentTableRow({ incident }: { incident: IncidentListItem }) {
           <span
             aria-hidden
             className="size-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: colorWithHash(incident.status.color) }}
+            style={{ backgroundColor: statusColorForCode(incident.status.code) }}
           />
           <span className="text-foreground">{incident.status.label}</span>
         </span>

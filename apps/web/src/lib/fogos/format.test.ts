@@ -71,14 +71,21 @@ describe('status code 13 (feed-drop close-out)', () => {
     expect(isOngoingStatus(5)).toBe(true)
   })
 
-  it('reads green (Encerrada family), not gray', () => {
+  it('reads gray (Concluído family), like Encerrada', () => {
     expect(statusColorForCode(13)).toBe(statusColorForCode(10))
-    expect(statusColorForCode(13)).toBe('#6ABF59')
+    expect(statusColorForCode(13)).toBe('#BDBDBD')
   })
 
-  it('buckets as resolving, mirroring Encerrada', () => {
-    expect(statusBucket(13)).toBe('resolving')
+  it('buckets as done, mirroring Encerrada', () => {
+    expect(statusBucket(13)).toBe('done')
     expect(statusBucket(13)).toBe(statusBucket(10))
+  })
+})
+
+describe('statusColorForCode (bucket palette)', () => {
+  it('keeps Em Resolução green and paints Vigilância blue', () => {
+    expect(statusColorForCode(7)).toBe('#6ABF59')
+    expect(statusColorForCode(9)).toBe('#1E88E5')
   })
 })
 

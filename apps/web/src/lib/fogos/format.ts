@@ -23,28 +23,28 @@ export function colorWithHash(color: string): string {
 
 const STATUS_RED = '#B81E1F' // em curso
 const STATUS_ORANGE = '#FF6E02' // despacho
-const STATUS_GREEN = '#6ABF59' // resolução / vigilância / encerrada
-const STATUS_GRAY = '#BDBDBD' // conclusão / falso alarme
+const STATUS_GREEN = '#6ABF59' // em resolução (dominado, ainda no terreno)
+const STATUS_BLUE = '#1E88E5' // vigilância (extinto, sob vigilância)
+const STATUS_GRAY = '#BDBDBD' // concluído / falso alarme / encerrada
 
-/** Timeline entries carry only a status code, so map it to the palette. */
+/**
+ * Presentation color for ANY status rendering (map layers, badges, dots,
+ * timeline): the bucket palette, never the API's `status.color`, so every
+ * surface agrees with the map badges/legend/chips.
+ */
 export function statusColorForCode(code: number): string {
-  if (code === 3 || code === 4) return STATUS_ORANGE
-  if (code === 5 || code === 6) return STATUS_RED
-  // Backend catalog: 7 (Em Resolução), 9 (Vigilância), 10 (Encerrada) and
-  // 13 (Encerrada sem atualização) are green; 8 (Conclusão) and 11/12 (falso
-  // alarme/alerta) are gray.
-  if (code === 7 || code === 9 || code === 10 || code === 13) return STATUS_GREEN
-  return STATUS_GRAY
+  return STATUS_BUCKET_COLOR[statusBucket(code)]
 }
 
 /**
  * Coarse status grouping shared by the map badges and the legend, so both
- * agree on icon + color. Single source of truth for the 4 buckets.
+ * agree on icon + color. Single source of truth for the 5 buckets.
  */
 export const STATUS_BUCKETS = [
   'dispatch',
   'ongoing',
   'resolving',
+  'vigilancia',
   'done',
 ] as const
 export type StatusBucket = (typeof STATUS_BUCKETS)[number]
@@ -54,6 +54,7 @@ export const STATUS_BUCKET_LABEL: Record<StatusBucket, string> = {
   dispatch: 'Despacho',
   ongoing: 'Em curso',
   resolving: 'Em resolução',
+  vigilancia: 'Vigilância',
   done: 'Concluído',
 }
 
@@ -65,17 +66,19 @@ export const STATUS_BUCKET_LABEL: Record<StatusBucket, string> = {
 export const STATUS_BUCKET_CODES: Record<StatusBucket, number[]> = {
   dispatch: [3, 4],
   ongoing: [5, 6],
-  resolving: [7, 9, 10, 13],
-  done: [8, 11, 12],
+  resolving: [7],
+  vigilancia: [9],
+  done: [8, 10, 11, 12, 13],
 }
 
 export function statusBucket(code: number): StatusBucket {
   if (code === 3 || code === 4) return 'dispatch' // laranja #FF6E02
   if (code === 5 || code === 6) return 'ongoing' // vermelho #B81E1F
-  // 13 (Encerrada sem atualização) shares Encerrada's green family; it's finished
-  // (not ongoing, so it time-windows out like 10) but reads green, not gray.
-  if (code === 7 || code === 9 || code === 10 || code === 13) return 'resolving' // verde #6ABF59
-  return 'done' // cinzento #BDBDBD (8, 11, 12, unknown)
+  if (code === 7) return 'resolving' // verde #6ABF59 — dominado, ainda no terreno
+  if (code === 9) return 'vigilancia' // azul #1E88E5 — extinto, sob vigilância
+  // 8/10/11/12/13 (conclusão, encerrada, falso alarme/alerta, encerrada sem
+  // atualização) are all finished; they read gray and time-window out.
+  return 'done' // cinzento #BDBDBD (8, 10, 11, 12, 13, unknown)
 }
 
 /** Bucket → palette color; mirrors the STATUS_* constants above. */
@@ -83,6 +86,7 @@ export const STATUS_BUCKET_COLOR: Record<StatusBucket, string> = {
   dispatch: STATUS_ORANGE,
   ongoing: STATUS_RED,
   resolving: STATUS_GREEN,
+  vigilancia: STATUS_BLUE,
   done: STATUS_GRAY,
 }
 
@@ -161,7 +165,7 @@ export function locationParts(
  * Finished fires only show for this long after their last update; ongoing
  * ones (see isOngoingStatus) always show. "Só ativos" narrows to active fires.
  */
-export const WINDOW_HOURS = 12
+export const WINDOW_HOURS = 3
 
 export function countLabel(count: number, activeOnly = false): string {
   if (activeOnly) {

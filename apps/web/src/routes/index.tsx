@@ -137,18 +137,18 @@ function Home() {
   const activeList = active.data ?? []
 
   // Base view: ongoing fires (active/em resolução/vigilância) always show,
-  // whatever their age; finished ones only while their last update is within
+  // whatever their age; finished ones only while their last change is within
   // the window. The activeIncidents version wins the dedup.
   const baseList = useMemo<IncidentListItem[]>(() => {
     const cutoff = Date.now() - WINDOW_HOURS * 60 * 60 * 1000
     const byId = new Map<string, IncidentListItem>()
     for (const inc of recent.data ?? []) {
-      // Finished fires are windowed by when they were CONCLUDED (the last
-      // status change), falling back to the start time when no transition was
-      // recorded. Never updatedAt — enrichment (ICNF, weather) bumps it.
-      const finishedAt = inc.statusChangedAt ?? inc.occurredAt
+      // Finished fires are windowed by their last change (updatedAt), matching
+      // the server-side updatedAfter fetch but on a tighter rolling window.
+      // Enrichment (ICNF, weather) counts as activity here on purpose, so a
+      // late-enriched concluded fire can briefly resurface (owner's choice).
       const keep =
-        isOngoingStatus(inc.status.code) || Date.parse(finishedAt) >= cutoff
+        isOngoingStatus(inc.status.code) || Date.parse(inc.updatedAt) >= cutoff
       if (keep) byId.set(inc.id, inc)
     }
     for (const inc of activeList) byId.set(inc.id, inc)

@@ -93,8 +93,8 @@ const INCIDENT_DETAIL_QUERY = /* GraphQL */ `
 `
 
 const RECENT_INCIDENTS_QUERY = /* GraphQL */ `
-  query Recent($after: Date!, $cursor: String) {
-    incidents(filter: { after: $after }, first: 100, after: $cursor) {
+  query Recent($filter: IncidentFilter, $cursor: String) {
+    incidents(filter: $filter, first: 100, after: $cursor) {
       pageInfo { hasNextPage endCursor }
       nodes {
         id
@@ -191,29 +191,55 @@ function lisbonDateDaysAgo(days: number): string {
   return lisbonDateFmt.format(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
 }
 
-// Recent incidents: fires that STARTED on/after (now − 3 days)'s Lisbon
-// calendar day. Wider than the display window on purpose — multi-day fires
-// still in resolution/vigilância only surface through this query (the
-// activeIncidents feed covers codes 3–6 only); the view filters client-side.
-// Paginates up to 5 pages (500 incidents), newest first.
+// Recent incidents: fires whose record CHANGED on/after (now − 3 days)'s Lisbon
+// calendar day (updatedAt, not occurredAt). This keeps long-running fires still
+// in resolução/vigilância visible for as long as anything is happening to them
+// — they only surface through this query, since the activeIncidents feed covers
+// codes 3–6 only — and lets closed fires drop out of the fetch 3 days after
+// their last change (the map narrows further to a 12h display window).
+// Accepted quirk: late ICNF enrichment bumps updatedAt, so an old concluded
+// fire can resurface as a gray dot for up to 12h per bump. Deliberate — the
+// owner prefers more information.
+//
+// The connection sorts by occurredAt desc while this filter is updatedAt-based,
+// so under heavy load (>500 touched records in the window) the page cap would
+// truncate the OLDEST-STARTED fires first — exactly the long-runners. The
+// second fetch below pins recently-touched statusCodes 7/9 (Em Resolução/
+// Vigilância) so those can never be truncation victims; the merge dedupes by
+// id. The tail keeps the same updatedAfter bound ON PURPOSE: nothing ever
+// closes a 7/9 fire that ANEPC drops from the feed (close-out only sweeps
+// active 3–6), so an unbounded tail would accumulate stale green dots forever.
+async function fetchIncidentFeed(
+  filter: Record<string, unknown>,
+  maxPages: number,
+): Promise<IncidentListItem[]> {
+  const nodes: IncidentListItem[] = []
+  let cursor: string | null = null
+
+  for (let page = 0; page < maxPages; page++) {
+    const data: RecentIncidentsPage = await graphql<RecentIncidentsPage>(
+      RECENT_INCIDENTS_QUERY,
+      { filter, cursor },
+    )
+    nodes.push(...data.incidents.nodes)
+    if (!data.incidents.pageInfo.hasNextPage) break
+    cursor = data.incidents.pageInfo.endCursor
+  }
+
+  return nodes
+}
+
 export const fetchRecentIncidents = createServerFn({ method: 'GET' }).handler(
   async () => {
     const after = lisbonDateDaysAgo(3)
+    const [changed, ongoingTail] = await Promise.all([
+      fetchIncidentFeed({ updatedAfter: after }, 5),
+      fetchIncidentFeed({ updatedAfter: after, statusCodes: [7, 9] }, 2),
+    ])
 
-    const nodes: IncidentListItem[] = []
-    let cursor: string | null = null
-
-    for (let page = 0; page < 5; page++) {
-      const data: RecentIncidentsPage = await graphql<RecentIncidentsPage>(
-        RECENT_INCIDENTS_QUERY,
-        { after, cursor },
-      )
-      nodes.push(...data.incidents.nodes)
-      if (!data.incidents.pageInfo.hasNextPage) break
-      cursor = data.incidents.pageInfo.endCursor
-    }
-
-    return nodes
+    const byId = new Map<string, IncidentListItem>()
+    for (const inc of [...changed, ...ongoingTail]) byId.set(inc.id, inc)
+    return [...byId.values()]
   },
 )
 

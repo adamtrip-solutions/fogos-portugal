@@ -40,7 +40,7 @@ public sealed record RawIncident
     /// <summary>ICNF supplies district + DICO directly (INE); skip the concelho→level-2→level-1 lookup.</summary>
     public string? PreResolvedDistrict { get; init; }
 
-    /// <summary>ICNF INE code (used directly as the DICO when <see cref="PreResolvedDistrict"/> is set).</summary>
+    /// <summary>Canonical 4-char DICO (ICNF INE normalized upstream) used directly when <see cref="PreResolvedDistrict"/> is set.</summary>
     public string? PreResolvedDico { get; init; }
 
     public double? Lat { get; init; }

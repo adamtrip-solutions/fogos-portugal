@@ -163,6 +163,76 @@ public sealed class IncidentMapperUnitTests
         Assert.Equal("https://icnf/x.kml", occ.KmlUrl);
     }
 
+    [Fact]
+    public void Icnf_occurrence_xml_parses_tipo_flags()
+    {
+        var xml = """
+        <RESULT><CODIGO>
+            <INE>60322</INE><INCENDIO>0</INCENDIO><AGRICOLA>1</AGRICOLA>
+            <FOGACHO>0</FOGACHO><QUEIMADA>0</QUEIMADA><FALSOALARME>0</FALSOALARME>
+        </CODIGO></RESULT>
+        """;
+        var occ = IcnfOccurrenceXml.Parse(xml)!;
+        Assert.True(occ.Agricola);
+        Assert.False(occ.Incendio);
+        Assert.False(occ.Fogacho);
+        Assert.False(occ.Queimada);
+        Assert.False(occ.FalsoAlarme);
+    }
+
+    // Natureza mapping from the ICNF TIPO flags (IcnfNatureza priority table). Only Fire-classified
+    // catalog codes are emitted so ICNF-only fires keep showing up in the fire feeds.
+    [Fact]
+    public void Icnf_natureza_maps_flags_by_priority()
+    {
+        // Agricola beats Incendio when both set (priority 2 over 4/5).
+        Assert.Equal("3105", IcnfNatureza.Resolve(Occ(agricola: true, incendio: true)).Code);
+        // Queimada falls back to agricultural (3107 Queimadas would classify as OtherFire).
+        Assert.Equal("3105", IcnfNatureza.Resolve(Occ(queimada: true)).Code);
+        // Incendio with burnt povoamento → 3101; without → 3103.
+        Assert.Equal("3101", IcnfNatureza.Resolve(Occ(incendio: true, areaPov: 10)).Code);
+        Assert.Equal("3103", IcnfNatureza.Resolve(Occ(incendio: true)).Code);
+        // Fogacho alone has no distinct Fire natureza → Mato.
+        Assert.Equal("3103", IcnfNatureza.Resolve(Occ(fogacho: true)).Code);
+        // FalsoAlarme pins to the Mato default and wins the priority over other flags.
+        Assert.Equal("3103", IcnfNatureza.Resolve(Occ(falsoAlarme: true, agricola: true)).Code);
+        // Nothing set → the legacy "3103" default.
+        Assert.Equal("3103", IcnfNatureza.Resolve(Occ()).Code);
+        // Every emitted code is Fire-classified.
+        foreach (var code in new[] { "3101", "3103", "3105" })
+            Assert.Equal(IncidentKind.Fire, NaturezaCatalog.Classify(code));
+    }
+
+    [Theory]
+    [InlineData("60322", "0603")]   // len 5: district "6" → "06", concelho "03"
+    [InlineData("61501", "0615")]   // Soure
+    [InlineData("11105", "0111")]   // Mealhada
+    [InlineData("100110", "1001")]  // len 6: Alcobaça
+    [InlineData("1408", "1408")]    // len 4: already a valid 2+2 dico
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("  ", null)]
+    [InlineData("abc", null)]       // non-numeric
+    [InlineData("60x22", null)]     // non-numeric
+    [InlineData("123", null)]       // too short
+    [InlineData("1234567", null)]   // too long
+    public void Icnf_ine_normalizes_to_dico(string? ine, string? expected)
+    {
+        Assert.Equal(expected, IcnfDico.FromIne(ine));
+    }
+
+    private static IcnfOccurrence Occ(
+        bool incendio = false, bool agricola = false, bool fogacho = false,
+        bool queimada = false, bool falsoAlarme = false, double? areaPov = null) => new()
+    {
+        Incendio = incendio,
+        Agricola = agricola,
+        Fogacho = fogacho,
+        Queimada = queimada,
+        FalsoAlarme = falsoAlarme,
+        AreaPovoamento = areaPov,
+    };
+
     private static RawIncident Raw() => new()
     {
         Id = "1",

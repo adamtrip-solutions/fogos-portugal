@@ -440,6 +440,7 @@ function PanelContent({
         <EvolutionSection
           history={detail.statusHistory}
           responseTimes={detail.responseTimes}
+          occurredAt={detail.occurredAt}
         />
       )}
 
@@ -695,9 +696,11 @@ function hasAnyResponseTime(rt: ResponseTimes): boolean {
 function EvolutionSection({
   history,
   responseTimes,
+  occurredAt,
 }: {
   history: IncidentDetail['statusHistory']
   responseTimes: ResponseTimes | null
+  occurredAt: string
 }) {
   const showResponse = responseTimes != null && hasAnyResponseTime(responseTimes)
   if (history.length === 0 && !showResponse) return null
@@ -705,11 +708,18 @@ function EvolutionSection({
   const ordered = [...history].sort(
     (a, b) => Date.parse(b.at) - Date.parse(a.at),
   )
+  // The incident's start ("Alerta") is not a stored observation — render it client-side as a muted
+  // first entry at occurredAt, below the real ones (the list runs newest → oldest). Skip it when the
+  // earliest real observation already sits at the exact same instant.
+  const earliest = ordered[ordered.length - 1]
+  const showStart =
+    !earliest || Date.parse(earliest.at) !== Date.parse(occurredAt)
+
   return (
     <section className="space-y-3">
       <SectionTitle>Evolução</SectionTitle>
       {showResponse && <ResponseTimesRow responseTimes={responseTimes} />}
-      {ordered.length > 0 && (
+      {(ordered.length > 0 || showStart) && (
         <ol className="space-y-3">
           {ordered.map((entry, i) => (
             <li key={`${entry.at}-${i}`} className="flex items-start gap-3">
@@ -727,6 +737,19 @@ function EvolutionSection({
               </div>
             </li>
           ))}
+          {showStart && (
+            <li className="flex items-start gap-3 opacity-70">
+              <span className="mt-1 size-2.5 shrink-0 rounded-full bg-muted-foreground/30" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Alerta
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  {formatTimelineStamp(occurredAt)}
+                </p>
+              </div>
+            </li>
+          )}
         </ol>
       )}
     </section>

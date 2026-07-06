@@ -16,6 +16,13 @@ public sealed record RawIncident
     /// <summary>Occurrence start instant (UTC), already parsed from the source's epoch/string form.</summary>
     public DateTimeOffset OccurredAt { get; init; }
 
+    /// <summary>
+    /// Overrides the initial status-history stamp written on insert (defaults to ingestion time when null).
+    /// Set by the ICNF new-fire job for fires that arrive already extinguished, so the timeline — and the
+    /// map-safety window keyed off <c>statusChangedAt</c> — reflects the real extinction time, not "now".
+    /// </summary>
+    public DateTimeOffset? ObservedStatusAt { get; init; }
+
     /// <summary>Raw ANEPC natureza code as a string (feed sends an int; we never do arithmetic on it).</summary>
     public string NaturezaCode { get; init; } = "";
 

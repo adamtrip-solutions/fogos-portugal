@@ -91,6 +91,16 @@ public static class IncidentStatusCatalog
     public static readonly IReadOnlySet<int> InactiveCodes = new HashSet<int> { 7, 8, 9, 10, 11, 12, 13 };
 
     /// <summary>
+    /// Terminal "the fire is out" codes: Conclusão (8), Encerrada (10), Falso Alarme (11), Falso Alerta (12),
+    /// Encerrada sem atualização (13). A subset of <see cref="InactiveCodes"/> — deliberately excludes 7
+    /// (Em Resolução) and 9 (Vigilância), which are inactive but not yet extinguished. Used to detect ICNF
+    /// side-door creations that arrive already concluded, so their status-history observation is stamped at
+    /// the real extinction time rather than ingestion time (map-safety).
+    /// </summary>
+    public static readonly IReadOnlySet<int> ConcludedCodes =
+        new HashSet<int> { Conclusao, Encerrada, FalsoAlarme, FalsoAlerta, EncerradaSemAtualizacao };
+
+    /// <summary>
     /// CheckImportantFireIncident deliberately used a wider window (1–6) than ActiveCodes.
     /// Preserved as-is: important detection must consider pre-dispatch codes.
     /// </summary>

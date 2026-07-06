@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.0.0...api-v2.0.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **api:** skip malformed Discord ops webhook URLs instead of erroring per alert ([#25](https://github.com/adamtrip-solutions/fogos-portugal/issues/25)) ([50bc193](https://github.com/adamtrip-solutions/fogos-portugal/commit/50bc193749ae82357d8779b70efbf49cc6abc938))
+
 ## [2.0.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v1.0.0...api-v2.0.0) (2026-07-05)
 
 

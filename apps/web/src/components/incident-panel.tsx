@@ -182,6 +182,7 @@ function PlaceLine({
             <Link
               to="/concelho/$dico"
               params={{ dico }}
+              viewTransition
               className="font-medium text-foreground underline-offset-2 hover:underline"
             >
               {part.value}

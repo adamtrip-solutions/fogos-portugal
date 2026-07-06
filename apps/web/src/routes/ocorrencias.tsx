@@ -464,6 +464,7 @@ function IncidentTableRow({ incident }: { incident: IncidentListItem }) {
         <Link
           to="/"
           search={{ incident: incident.id }}
+          viewTransition
           className="font-medium text-foreground underline-offset-2 hover:underline"
         >
           {incidentTitle(incident)}

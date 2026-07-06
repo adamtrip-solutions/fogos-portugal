@@ -148,6 +148,7 @@ function DrawerLink({
   return (
     <Link
       to={to}
+      viewTransition
       activeOptions={{ exact }}
       onClick={onNavigate}
       className={ITEM_BASE}

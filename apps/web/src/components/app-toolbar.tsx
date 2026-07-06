@@ -24,7 +24,7 @@ const SEG_BASE =
 const SEG_INACTIVE =
   'text-zinc-600 hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10'
 const SEG_ACTIVE =
-  'bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900'
+  'bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900 [view-transition-name:nav-active]'
 
 function Divider({ className = '' }: { className?: string }) {
   return (
@@ -68,6 +68,7 @@ function LeftPill({
       </button>
       <Link
         to="/"
+        viewTransition
         className="flex items-center gap-2.5 rounded-xl pl-1 pr-1.5 md:pr-2.5"
       >
         <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 shadow-sm">
@@ -91,11 +92,12 @@ function LeftPill({
 
 function NavSegment() {
   return (
-    <div className="hidden items-center gap-1 md:flex">
+    <div className="hidden items-center gap-1 md:flex [view-transition-name:app-nav]">
       {NAV_LINKS.map(({ to, label, Icon, exact }) => (
         <Link
           key={to}
           to={to}
+          viewTransition
           activeOptions={{ exact }}
           className={SEG_BASE}
           activeProps={{ className: SEG_ACTIVE }}

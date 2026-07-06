@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.3.0...web-v1.4.0) (2026-07-06)
+
+
+### Features
+
+* incidents table page + map fire filters ([#34](https://github.com/adamtrip-solutions/fogos-portugal/issues/34)) ([4a9b4c1](https://github.com/adamtrip-solutions/fogos-portugal/commit/4a9b4c1bb65978d27dd2be5455b121d9abb13280))
+* map feed keyed on updatedAt (long-running fires stay visible) ([#35](https://github.com/adamtrip-solutions/fogos-portugal/issues/35)) ([ed4aef9](https://github.com/adamtrip-solutions/fogos-portugal/commit/ed4aef934c6812f476676c09ea9d1c82277d2594))
+
 ## [1.3.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.2.1...web-v1.3.0) (2026-07-06)
 
 

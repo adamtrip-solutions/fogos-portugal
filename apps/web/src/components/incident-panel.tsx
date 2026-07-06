@@ -35,7 +35,6 @@ import { useIsMobile } from '#/lib/use-is-mobile.ts'
 import { incidentQuery, kmlVersionQuery } from '#/lib/fogos/api.ts'
 import {
   badgeNeedsDarkText,
-  colorWithHash,
   compassBearing,
   criticalReasonLabel,
   formatAbsolute,
@@ -314,8 +313,8 @@ function PanelContent({
   // Render instantly from the list item; enrich when the detail lands.
   const base = detail ?? incident
   const status = base.status
-  const badgeColor = colorWithHash(status.color)
-  const darkText = badgeNeedsDarkText(status.color)
+  const badgeColor = statusColorForCode(status.code)
+  const darkText = badgeNeedsDarkText(badgeColor)
 
   const place = locationParts(base.freguesia, base.concelho, base.district)
   const concelhoEntry = base.concelho ? concelhoByName(base.concelho) : null

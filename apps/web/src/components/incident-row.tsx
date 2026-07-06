@@ -2,10 +2,10 @@ import { Link } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
 
 import {
-  colorWithHash,
   formatRelative,
   incidentTitle,
   locationParts,
+  statusColorForCode,
 } from '#/lib/fogos/format.ts'
 import type { IncidentListItem } from '#/lib/fogos/types.ts'
 
@@ -29,7 +29,7 @@ export function IncidentRow({ incident }: { incident: IncidentListItem }) {
       >
         <span
           className="mt-0.5 size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: colorWithHash(incident.status.color) }}
+          style={{ backgroundColor: statusColorForCode(incident.status.code) }}
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">

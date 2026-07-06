@@ -23,6 +23,10 @@ public sealed class IncidentFilter
     public string? District { get; set; }
     public string? Dico { get; set; }
     public IReadOnlyList<IncidentKind>? Kind { get; set; }
+
+    /// <summary>Match incidents whose <c>status.code</c> is in this list. Empty/null = no constraint.</summary>
+    public IReadOnlyList<int>? StatusCodes { get; set; }
+
     public string? NaturezaCode { get; set; }
     public string? SubRegion { get; set; }
     public bool? Active { get; set; }
@@ -58,6 +62,9 @@ public static class IncidentFilterMapper
             conds.Add(fb.Gte(x => x.OccurredAt, DayStart(day, clock)));
             conds.Add(fb.Lt(x => x.OccurredAt, DayStart(day.AddDays(1), clock)));
         }
+
+        if (filter?.StatusCodes is { Count: > 0 } statusCodes)
+            conds.Add(fb.In(x => x.Status.Code, statusCodes));
 
         if (filter?.After is { } after)
             conds.Add(fb.Gte(x => x.OccurredAt, DayStart(after, clock)));

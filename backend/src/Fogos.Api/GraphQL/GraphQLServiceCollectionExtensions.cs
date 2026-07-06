@@ -113,12 +113,18 @@ public static class GraphQLServiceCollectionExtensions
                 o.EnforceCostLimits = true;
             })
             // Resolve caller identity from the websocket connect payload and enforce subscription caps.
-            .AddSocketSessionInterceptor(sp => new SubscriptionSessionInterceptor(
-                sp.GetRequiredService<Fogos.Api.Auth.JwtService>(),
-                sp.GetRequiredService<Fogos.Api.Auth.ApiKeyResolver>(),
-                sp.GetRequiredService<Fogos.Infrastructure.RateLimiting.SubscriptionLimiter>(),
-                sp.GetRequiredService<Fogos.Api.Auth.ClientIpResolver>(),
-                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Fogos.Infrastructure.Options.RateLimitOptions>>()))
+            // HC16 invokes this factory with the schema service provider, which cannot see the
+            // app-registered singletons the interceptor depends on — resolve them from the root provider.
+            .AddSocketSessionInterceptor(sp =>
+            {
+                var root = sp.GetRootServiceProvider();
+                return new SubscriptionSessionInterceptor(
+                    root.GetRequiredService<Fogos.Api.Auth.JwtService>(),
+                    root.GetRequiredService<Fogos.Api.Auth.ApiKeyResolver>(),
+                    root.GetRequiredService<Fogos.Infrastructure.RateLimiting.SubscriptionLimiter>(),
+                    root.GetRequiredService<Fogos.Api.Auth.ClientIpResolver>(),
+                    root.GetRequiredService<Microsoft.Extensions.Options.IOptions<Fogos.Infrastructure.Options.RateLimitOptions>>());
+            })
             .AddRedisSubscriptions(sp => sp.GetRequiredService<IConnectionMultiplexer>());
 
         return services;

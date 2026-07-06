@@ -7,6 +7,7 @@ using HotChocolate.AspNetCore.Subscriptions;
 using HotChocolate.AspNetCore.Subscriptions.Protocols;
 using HotChocolate.Execution;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace Fogos.Api.GraphQL.RateLimiting;
 
@@ -118,8 +119,8 @@ public sealed class SubscriptionSessionInterceptor(
         var ip = ipResolver.Resolve(session.Connection.HttpContext);
 
         ConnectPayload? parsed = null;
-        try { parsed = payload.As<ConnectPayload>(); }
-        catch { /* no/invalid payload → anonymous */ }
+        try { parsed = payload.Payload?.Deserialize<ConnectPayload>(); }
+        catch (JsonException) { /* no/invalid payload → anonymous */ }
 
         var bearer = parsed?.Authorization;
         if (!string.IsNullOrWhiteSpace(bearer) && bearer.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))

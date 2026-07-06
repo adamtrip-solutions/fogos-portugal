@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clerk/tanstack-react-start": "^1.4.12",
     "@deck.gl/core": "^9.3.6",
     "@deck.gl/extensions": "^9.3.6",
     "@deck.gl/layers": "^9.3.6",

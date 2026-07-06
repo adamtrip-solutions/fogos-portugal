@@ -17,6 +17,8 @@ public sealed class DiscordOpsNotifier(
     public const string HttpClientName = "discord-ops";
     private const int MaxContentLength = 1900;
 
+    private int _invalidWebhookWarned;
+
     private OpsOptions Options => options.Value;
 
     public Task InfoAsync(string message, CancellationToken ct = default) =>
@@ -32,6 +34,21 @@ public sealed class DiscordOpsNotifier(
     {
         if (string.IsNullOrWhiteSpace(webhook))
             return;
+
+        // Operator-supplied config: a non-URL value (missing scheme, stray inline comment in the
+        // env file, leftover placeholder) must not log an exception on every ops alert forever.
+        // IsWellFormedUriString on top of TryCreate: TryCreate happily escapes stray spaces and
+        // reads a trailing "# comment" as a fragment, which a real webhook URL never has.
+        if (!Uri.IsWellFormedUriString(webhook, UriKind.Absolute) ||
+            !Uri.TryCreate(webhook, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            if (Interlocked.Exchange(ref _invalidWebhookWarned, 1) == 0)
+                logger.LogError(
+                    "A Discord ops webhook is configured but is not an absolute http(s) URL; " +
+                    "posts to it are disabled. Fix the Ops__Discord*Webhook value.");
+            return;
+        }
 
         try
         {

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { ChartColumn, CircleUser, Flame, List, Map, Menu } from 'lucide-react'
+
+import { accountsEnabledQuery } from '#/lib/fogos/account-api.ts'
 
 import { countLabel } from '#/lib/fogos/format.ts'
 import { AppDrawer } from '#/components/app-drawer.tsx'
@@ -92,9 +95,17 @@ function LeftPill({
 }
 
 function NavSegment() {
+  // "Conta" only exists while Clerk is configured (CLERK_SECRET_KEY set) —
+  // until then accounts are entirely off and the entry would dead-end on a
+  // "não disponível" card. staleTime is Infinity, so this costs one server-fn
+  // call per session.
+  const accountsEnabled = useQuery(accountsEnabledQuery()).data ?? false
+  const links = accountsEnabled
+    ? NAV_LINKS
+    : NAV_LINKS.filter((l) => l.to !== '/conta')
   return (
     <div className="hidden items-center gap-1 md:flex [view-transition-name:app-nav]">
-      {NAV_LINKS.map(({ to, label, Icon, exact }) => (
+      {links.map(({ to, label, Icon, exact }) => (
         <Link
           key={to}
           to={to}

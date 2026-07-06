@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
   BookOpen,
@@ -13,6 +14,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 import { Separator } from '#/components/ui/separator.tsx'
+import { accountsEnabledQuery } from '#/lib/fogos/account-api.ts'
 
 /** Release version injected at build time from package.json (vite define). */
 const APP_VERSION = `v${__APP_VERSION__}`
@@ -51,6 +53,10 @@ interface AppDrawerProps {
  */
 export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
   const close = () => onOpenChange(false)
+  const accountsEnabled = useQuery(accountsEnabledQuery()).data ?? false
+  const navLinks = accountsEnabled
+    ? NAV_LINKS
+    : NAV_LINKS.filter((l) => l.to !== '/conta')
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -81,9 +87,9 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 pb-3">
-            {/* Primary nav */}
+            {/* Primary nav — "Conta" hidden while Clerk is unconfigured. */}
             <nav className="space-y-1">
-              {NAV_LINKS.map(({ to, label, Icon, exact }) => (
+              {navLinks.map(({ to, label, Icon, exact }) => (
                 <DrawerLink
                   key={to}
                   to={to}

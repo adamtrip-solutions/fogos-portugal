@@ -139,6 +139,11 @@ services:
       # First-party API key (minted via AdminCli `keys issue --tier first-party`).
       # Optional — unset falls back to anonymous rate limits.
       FOGOS_API_KEY: ${FOGOS_API_KEY:-}
+      # Clerk (user accounts / /conta). Both keys are server-runtime only — the
+      # publishable key reaches the browser via clerkMiddleware, never a build-time
+      # VITE_ value. Default-empty ⇒ accounts off, anonymous flows untouched.
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
     healthcheck:
       test:
         - CMD

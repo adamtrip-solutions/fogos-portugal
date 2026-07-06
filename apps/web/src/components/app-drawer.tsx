@@ -3,6 +3,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
   BookOpen,
   ChartColumn,
+  CircleUser,
   Code,
   Flame,
   Info,
@@ -19,6 +20,7 @@ const APP_VERSION = `v${__APP_VERSION__}`
 const NAV_LINKS = [
   { to: '/', label: 'Mapa', Icon: Map, exact: true },
   { to: '/estatisticas', label: 'Estatísticas', Icon: ChartColumn, exact: false },
+  { to: '/conta', label: 'Conta', Icon: CircleUser, exact: false },
 ] as const
 
 const PAGE_LINKS = [

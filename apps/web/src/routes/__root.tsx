@@ -5,6 +5,7 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { ClerkProvider } from '@clerk/tanstack-react-start'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
@@ -85,7 +86,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        {/* Clerk publishes its state via the global clerkMiddleware (src/start.ts);
+            ClerkProvider reads it here so the publishable key stays server-runtime,
+            never a VITE_ build value. With keys unset it stays inert (signed-out). */}
+        <ClerkProvider>{children}</ClerkProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',

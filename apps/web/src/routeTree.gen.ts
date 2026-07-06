@@ -13,6 +13,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as OcorrenciasRouteImport } from './routes/ocorrencias'
 import { Route as EstatisticasRouteImport } from './routes/estatisticas'
 import { Route as CreditosRouteImport } from './routes/creditos'
+import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConcelhoDicoRouteImport } from './routes/concelho.$dico'
@@ -36,6 +37,11 @@ const EstatisticasRoute = EstatisticasRouteImport.update({
 const CreditosRoute = CreditosRouteImport.update({
   id: '/creditos',
   path: '/creditos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContaRoute = ContaRouteImport.update({
+  id: '/conta',
+  path: '/conta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRoute = ApiRouteImport.update({
@@ -62,6 +68,7 @@ const ApiWeatherTilesRoute = ApiWeatherTilesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api'
+    | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/api'
+    | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/api'
+    | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiRoute: typeof ApiRouteWithChildren
+  ContaRoute: typeof ContaRoute
   CreditosRoute: typeof CreditosRoute
   EstatisticasRoute: typeof EstatisticasRoute
   OcorrenciasRoute: typeof OcorrenciasRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/creditos'
       fullPath: '/creditos'
       preLoaderRoute: typeof CreditosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conta': {
+      id: '/conta'
+      path: '/conta'
+      fullPath: '/conta'
+      preLoaderRoute: typeof ContaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api': {
@@ -207,6 +227,7 @@ const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiRoute: ApiRouteWithChildren,
+  ContaRoute: ContaRoute,
   CreditosRoute: CreditosRoute,
   EstatisticasRoute: EstatisticasRoute,
   OcorrenciasRoute: OcorrenciasRoute,
@@ -218,10 +239,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

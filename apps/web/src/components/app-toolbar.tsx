@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChartColumn, Flame, List, Map, Menu } from 'lucide-react'
+import { ChartColumn, CircleUser, Flame, List, Map, Menu } from 'lucide-react'
 
 import { countLabel } from '#/lib/fogos/format.ts'
 import { AppDrawer } from '#/components/app-drawer.tsx'
@@ -39,6 +39,7 @@ const NAV_LINKS = [
   { to: '/', label: 'Mapa', Icon: Map, exact: true },
   { to: '/ocorrencias', label: 'Ocorrências', Icon: List, exact: false },
   { to: '/estatisticas', label: 'Estatísticas', Icon: ChartColumn, exact: false },
+  { to: '/conta', label: 'Conta', Icon: CircleUser, exact: false },
 ] as const
 
 // ── Pills ────────────────────────────────────────────────────────────────────

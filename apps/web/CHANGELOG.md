@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.5.0...web-v1.6.0) (2026-07-06)
+
+
+### Features
+
+* **web:** view transitions between pages ([#39](https://github.com/adamtrip-solutions/fogos-portugal/issues/39)) ([ed52773](https://github.com/adamtrip-solutions/fogos-portugal/commit/ed527738c53eefff40b75e7fc9568dee78a76f97))
+
+
+### Bug Fixes
+
+* **web:** key finished-fire visibility on conclusion time, not updatedAt ([#40](https://github.com/adamtrip-solutions/fogos-portugal/issues/40)) ([c9c2c2c](https://github.com/adamtrip-solutions/fogos-portugal/commit/c9c2c2cc7d8ca79ed41458ef05df40d32bdce1c1))
+
 ## [1.5.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.4.0...web-v1.5.0) (2026-07-06)
 
 

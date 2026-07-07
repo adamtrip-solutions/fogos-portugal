@@ -2,11 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { HeartHandshake, TriangleAlert } from 'lucide-react'
 
 import { ContentPage, InfoCard } from '#/components/content-page.tsx'
+import { pageMeta } from '#/lib/seo.ts'
 
 export const Route = createFileRoute('/sobre')({
-  head: () => ({
-    meta: [{ title: 'Sobre o projeto — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'Sobre o projeto — FogosPortugal',
+      description:
+        'Sobre o FogosPortugal: um mapa aberto e gratuito para acompanhar os incêndios rurais em Portugal de forma rápida, clara e sem registos.',
+      path: '/sobre',
+    }),
   component: Sobre,
 })
 

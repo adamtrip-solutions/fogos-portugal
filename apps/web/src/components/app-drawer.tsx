@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
+  Activity,
   BookOpen,
   ChartColumn,
   CircleUser,
@@ -9,6 +10,7 @@ import {
   Flame,
   Info,
   Map,
+  TriangleAlert,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -23,6 +25,13 @@ const NAV_LINKS = [
   { to: '/', label: 'Mapa', Icon: Map, exact: true },
   { to: '/estatisticas', label: 'Estatísticas', Icon: ChartColumn, exact: false },
   { to: '/conta', label: 'Conta', Icon: CircleUser, exact: false },
+] as const
+
+// Live-context pages, sitting between the primary nav and the content pages.
+// Parallel branches add Risco + Aeronaves here later — leave room, don't add them.
+const INFO_LINKS = [
+  { to: '/situacao', label: 'Situação', Icon: Activity },
+  { to: '/avisos', label: 'Avisos', Icon: TriangleAlert },
 ] as const
 
 const PAGE_LINKS = [
@@ -96,6 +105,22 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
                   label={label}
                   Icon={Icon}
                   exact={exact}
+                  onNavigate={close}
+                />
+              ))}
+            </nav>
+
+            <Separator className="my-3 bg-black/10 dark:bg-white/10" />
+
+            {/* Live-context pages */}
+            <nav className="space-y-1">
+              {INFO_LINKS.map(({ to, label, Icon }) => (
+                <DrawerLink
+                  key={to}
+                  to={to}
+                  label={label}
+                  Icon={Icon}
+                  exact={false}
                   onNavigate={close}
                 />
               ))}

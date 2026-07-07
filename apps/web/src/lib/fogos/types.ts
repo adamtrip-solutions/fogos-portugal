@@ -280,6 +280,41 @@ export interface ConcelhoProfile {
   yearBurnAreaHa: number
 }
 
+// ── Situation reports (twice-daily nationwide) ───────────────────────────────
+
+/**
+ * One twice-daily nationwide situation report. `slot` is `morning` (09:00
+ * Lisbon) or `evening` (20:00 Lisbon); `body` is plain-text European Portuguese
+ * with `\r\n` line breaks — preserve them when rendering.
+ */
+export interface SituationReport {
+  id: string
+  at: string
+  slot: string
+  body: string
+  activeFires: number
+  totalMan: number
+  totalTerrain: number
+  totalAerial: number
+  /** Top active fires by mobilized assets (incident ids), for deep-linking. */
+  topIncidentIds: string[]
+}
+
+// ── Broadcast warnings ───────────────────────────────────────────────────────
+
+/** GraphQL enum name for a warning's origin. */
+export type WarningKind = 'MANUAL' | 'AGIF' | 'SITE' | (string & {})
+
+/** Unified broadcast warning (manual operator / AGIF / official site banner). */
+export interface Warning {
+  id: string
+  kind: WarningKind
+  message: string
+  url: string | null
+  issuedBy: string | null
+  createdAt: string
+}
+
 /** Shape returned by the `incident(id)` detail query. */
 export interface IncidentDetail {
   id: string

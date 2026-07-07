@@ -7,13 +7,10 @@ import { concelhoByDico } from '#/lib/fogos/concelhos.ts'
 import { OG_DEFAULT_IMAGE, SITE_ORIGIN, ldJson, pageMeta } from '#/lib/seo.ts'
 import { formatInteger, formatSignedPercent, yoyRatio } from '#/lib/fogos/stats.ts'
 import { formatHectares } from '#/lib/fogos/format.ts'
-import type {
-  ConcelhoProfile,
-  ConcelhoRiskDay,
-  WeatherWarning,
-} from '#/lib/fogos/types.ts'
+import type { ConcelhoProfile, WeatherWarning } from '#/lib/fogos/types.ts'
 import { IncidentRow } from '#/components/incident-row.tsx'
 import { PageHeader } from '#/components/page-header.tsx'
+import { RiskStrip } from '#/components/risk-strip.tsx'
 import { StatTile } from '#/components/stat-tile.tsx'
 
 export const Route = createFileRoute('/concelho/$dico')({
@@ -80,19 +77,6 @@ export const Route = createFileRoute('/concelho/$dico')({
       .catch(() => null),
 })
 
-// Fire-risk level → color + PT-friendly semantics (IPMA 1–5 scale).
-const RISK_STYLE: Record<number, { bg: string; label: string }> = {
-  1: { bg: '#6ABF59', label: 'Reduzido' },
-  2: { bg: '#C6D82F', label: 'Moderado' },
-  3: { bg: '#F5B301', label: 'Elevado' },
-  4: { bg: '#FF6E02', label: 'Muito elevado' },
-  5: { bg: '#B81E1F', label: 'Máximo' },
-}
-
-function riskStyle(level: number) {
-  return RISK_STYLE[level] ?? { bg: '#BDBDBD', label: '—' }
-}
-
 const WARNING_COLOR: Record<string, string> = {
   yellow: '#F5B301',
   orange: '#FF6E02',
@@ -156,7 +140,14 @@ function Profile({ profile }: { profile: ConcelhoProfile }) {
       </div>
 
       {/* Risk strip */}
-      {profile.risk.length > 0 && <RiskStrip risk={profile.risk} />}
+      {profile.risk.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-foreground">
+            Risco de incêndio
+          </h2>
+          <RiskStrip risk={profile.risk} />
+        </section>
+      )}
 
       {/* YoY tiles */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -208,42 +199,6 @@ function Profile({ profile }: { profile: ConcelhoProfile }) {
         </section>
       )}
     </div>
-  )
-}
-
-function RiskStrip({ risk }: { risk: ConcelhoRiskDay[] }) {
-  const dayFmt = new Intl.DateTimeFormat('pt-PT', { weekday: 'short', day: 'numeric' })
-  return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold text-foreground">
-        Risco de incêndio
-      </h2>
-      <div className="grid grid-cols-5 gap-2">
-        {risk.slice(0, 5).map((r) => {
-          const style = riskStyle(r.level)
-          return (
-            <div
-              key={r.date}
-              className="flex flex-col items-center gap-1.5 rounded-xl border border-black/5 bg-white/70 p-2 text-center dark:border-white/10 dark:bg-zinc-900/60"
-            >
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {dayFmt.format(new Date(`${r.date}T00:00:00`))}
-              </span>
-              <span
-                className="flex size-9 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ backgroundColor: style.bg }}
-                title={r.label}
-              >
-                {r.level}
-              </span>
-              <span className="text-[10px] leading-tight text-muted-foreground">
-                {r.label || style.label}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </section>
   )
 }
 

@@ -1,9 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import type { FeatureCollection, Geometry } from 'geojson'
 
 import { STATUS_BUCKETS, STATUS_BUCKET_CODES } from './format.ts'
 import type { StatusBucket } from './format.ts'
+import { concelhoByDico } from './concelhos.ts'
 import type {
   ConcelhoProfile,
   IncidentDetail,
@@ -496,6 +498,104 @@ export const concelhoProfileQuery = (dico: string) =>
     queryFn: () => fetchConcelhoProfile({ data: dico }),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
+  })
+
+// ── Fire risk map (/risco) ───────────────────────────────────────────────────
+
+/** Forecast horizon for the national fire-risk map. */
+export type RiskDay = 'TODAY' | 'TOMORROW' | 'AFTER'
+
+/** Normalised per-concelho feature properties served to the /risco map. */
+export interface RiskFeatureProps {
+  /** Zero-padded 4-char DICO code. */
+  dico: string
+  /** Title-cased concelho name. */
+  name: string
+  /** 1–5 fire-risk level, or 0 when the horizon has no value for the concelho. */
+  level: number
+}
+
+export type RiskFeatureCollection = FeatureCollection<Geometry, RiskFeatureProps>
+
+/** The national fire-risk payload for one horizon. */
+export interface FireRiskCountry {
+  /** Date the forecast applies to (YYYY-MM-DD), or null when none is stored. */
+  forecastDate: string | null
+  /** Per-concelho polygons with normalised risk levels, or null when no run. */
+  geoJson: RiskFeatureCollection | null
+}
+
+const FIRE_RISK_COUNTRY_QUERY = /* GraphQL */ `
+  query FireRiskCountry($day: RiskDay!) {
+    fireRisk(day: $day) {
+      forecastDate
+      geoJson
+    }
+  }
+`
+
+/** Title-case a raw uppercase concelho name (pt-PT), e.g. ÁGUEDA → Águeda. */
+function titleCaseConcelho(raw: string): string {
+  return raw
+    .toLocaleLowerCase('pt-PT')
+    .replace(/(^|[\s\-])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('pt-PT'))
+}
+
+/**
+ * Flatten the stored horizon GeoJSON — whose per-concelho features carry
+ * `properties.DICO`/`Concelho` and an optional `properties.data.rcm` (1–5) — into
+ * the lean `{ dico, name, level }` shape the map colours by, dropping the raw
+ * RCM object. Names are resolved from the canonical concelho set (the polygon
+ * set is exactly those 278 mainland concelhos), falling back to a title-cased
+ * copy of the embedded name.
+ */
+function normalizeRiskGeoJson(raw: string): RiskFeatureCollection {
+  const parsed = JSON.parse(raw) as {
+    features?: Array<{
+      geometry: Geometry
+      properties?: {
+        DICO?: string
+        Concelho?: string
+        data?: { rcm?: number } | null
+      }
+    }>
+  }
+  const features = (parsed.features ?? []).map((f) => {
+    const dico = f.properties?.DICO ?? ''
+    const level =
+      typeof f.properties?.data?.rcm === 'number' ? f.properties.data.rcm : 0
+    const name =
+      concelhoByDico(dico)?.name ??
+      titleCaseConcelho(f.properties?.Concelho ?? '')
+    return {
+      type: 'Feature' as const,
+      geometry: f.geometry,
+      properties: { dico, name, level },
+    }
+  })
+  return { type: 'FeatureCollection', features }
+}
+
+export const fetchFireRiskCountry = createServerFn({ method: 'GET' })
+  .validator((day: RiskDay) => day)
+  .handler(async ({ data: day }): Promise<FireRiskCountry> => {
+    const data = await graphql<{
+      fireRisk: { forecastDate: string | null; geoJson: string | null }
+    }>(FIRE_RISK_COUNTRY_QUERY, { day })
+    const { forecastDate, geoJson } = data.fireRisk
+    return {
+      forecastDate,
+      geoJson: geoJson ? normalizeRiskGeoJson(geoJson) : null,
+    }
+  })
+
+export const fireRiskCountryQuery = (day: RiskDay) =>
+  queryOptions({
+    queryKey: ['fire-risk-country', day] as const,
+    queryFn: () => fetchFireRiskCountry({ data: day }),
+    // Forecasts refresh a few times a day; a generous stale window is plenty.
+    staleTime: 30 * 60_000,
+    refetchInterval: 30 * 60_000,
   })
 
 // ── Incidents table page (/ocorrencias) ──────────────────────────────────────

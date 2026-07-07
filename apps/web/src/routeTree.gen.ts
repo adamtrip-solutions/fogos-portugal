@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SobreRouteImport } from './routes/sobre'
+import { Route as SituacaoRouteImport } from './routes/situacao'
 import { Route as OcorrenciasRouteImport } from './routes/ocorrencias'
 import { Route as EstatisticasRouteImport } from './routes/estatisticas'
 import { Route as CreditosRouteImport } from './routes/creditos'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as AvisosRouteImport } from './routes/avisos'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConcelhoDicoRouteImport } from './routes/concelho.$dico'
@@ -22,6 +24,11 @@ import { Route as ApiWeatherTilesRouteImport } from './routes/api/weather-tiles'
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
   path: '/sobre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SituacaoRoute = SituacaoRouteImport.update({
+  id: '/situacao',
+  path: '/situacao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OcorrenciasRoute = OcorrenciasRouteImport.update({
@@ -42,6 +49,11 @@ const CreditosRoute = CreditosRouteImport.update({
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvisosRoute = AvisosRouteImport.update({
+  id: '/avisos',
+  path: '/avisos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRoute = ApiRouteImport.update({
@@ -68,10 +80,12 @@ const ApiWeatherTilesRoute = ApiWeatherTilesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
+  '/situacao': typeof SituacaoRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -79,10 +93,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
+  '/situacao': typeof SituacaoRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -91,10 +107,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api': typeof ApiRouteWithChildren
+  '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
   '/creditos': typeof CreditosRoute
   '/estatisticas': typeof EstatisticasRoute
   '/ocorrencias': typeof OcorrenciasRoute
+  '/situacao': typeof SituacaoRoute
   '/sobre': typeof SobreRoute
   '/api/weather-tiles': typeof ApiWeatherTilesRoute
   '/concelho/$dico': typeof ConcelhoDicoRoute
@@ -104,10 +122,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api'
+    | '/avisos'
     | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
+    | '/situacao'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -115,10 +135,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/api'
+    | '/avisos'
     | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
+    | '/situacao'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -126,10 +148,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/api'
+    | '/avisos'
     | '/conta'
     | '/creditos'
     | '/estatisticas'
     | '/ocorrencias'
+    | '/situacao'
     | '/sobre'
     | '/api/weather-tiles'
     | '/concelho/$dico'
@@ -138,10 +162,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiRoute: typeof ApiRouteWithChildren
+  AvisosRoute: typeof AvisosRoute
   ContaRoute: typeof ContaRoute
   CreditosRoute: typeof CreditosRoute
   EstatisticasRoute: typeof EstatisticasRoute
   OcorrenciasRoute: typeof OcorrenciasRoute
+  SituacaoRoute: typeof SituacaoRoute
   SobreRoute: typeof SobreRoute
   ConcelhoDicoRoute: typeof ConcelhoDicoRoute
 }
@@ -153,6 +179,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre'
       fullPath: '/sobre'
       preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/situacao': {
+      id: '/situacao'
+      path: '/situacao'
+      fullPath: '/situacao'
+      preLoaderRoute: typeof SituacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ocorrencias': {
@@ -181,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/conta'
       fullPath: '/conta'
       preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/avisos': {
+      id: '/avisos'
+      path: '/avisos'
+      fullPath: '/avisos'
+      preLoaderRoute: typeof AvisosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api': {
@@ -227,10 +267,12 @@ const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiRoute: ApiRouteWithChildren,
+  AvisosRoute: AvisosRoute,
   ContaRoute: ContaRoute,
   CreditosRoute: CreditosRoute,
   EstatisticasRoute: EstatisticasRoute,
   OcorrenciasRoute: OcorrenciasRoute,
+  SituacaoRoute: SituacaoRoute,
   SobreRoute: SobreRoute,
   ConcelhoDicoRoute: ConcelhoDicoRoute,
 }
@@ -239,10 +281,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

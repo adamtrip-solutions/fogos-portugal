@@ -8,6 +8,9 @@ import type {
   IncidentDetail,
   IncidentListItem,
   SeasonStats,
+  SituationReport,
+  Warning,
+  WarningKind,
 } from './types.ts'
 
 const ACTIVE_INCIDENTS_QUERY = /* GraphQL */ `
@@ -529,4 +532,72 @@ export const incidentsPageQuery = (filter: IncidentsFilter) =>
     // Not live-critical: refetching an infinite query refetches every loaded
     // page, so no refetchInterval here (unlike the map feeds).
     staleTime: 30_000,
+  })
+
+// ── Situation reports (/situacao) ────────────────────────────────────────────
+
+const SITUATION_REPORTS_QUERY = /* GraphQL */ `
+  query SituationReports($first: Int!) {
+    situationReports(first: $first) {
+      id
+      at
+      slot
+      body
+      activeFires
+      totalMan
+      totalTerrain
+      totalAerial
+      topIncidentIds
+    }
+  }
+`
+
+export const fetchSituationReports = createServerFn({ method: 'GET' })
+  .validator((first: number) => first)
+  .handler(async ({ data: first }) => {
+    const data = await graphql<{ situationReports: SituationReport[] }>(
+      SITUATION_REPORTS_QUERY,
+      { first },
+    )
+    return data.situationReports
+  })
+
+export const situationReportsQuery = (first: number) =>
+  queryOptions({
+    queryKey: ['situation-reports', first] as const,
+    queryFn: () => fetchSituationReports({ data: first }),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  })
+
+// ── Broadcast warnings (/avisos) ─────────────────────────────────────────────
+
+const WARNINGS_QUERY = /* GraphQL */ `
+  query Warnings($kind: WarningKind) {
+    warnings(kind: $kind) {
+      id
+      kind
+      message
+      url
+      issuedBy
+      createdAt
+    }
+  }
+`
+
+export const fetchWarnings = createServerFn({ method: 'GET' })
+  .validator((kind: WarningKind | null) => kind)
+  .handler(async ({ data: kind }) => {
+    const data = await graphql<{ warnings: Warning[] }>(WARNINGS_QUERY, {
+      kind: kind ?? null,
+    })
+    return data.warnings
+  })
+
+export const warningsQuery = (kind: WarningKind | null = null) =>
+  queryOptions({
+    queryKey: ['warnings', kind ?? 'all'] as const,
+    queryFn: () => fetchWarnings({ data: kind }),
+    staleTime: 60_000,
+    refetchInterval: 2 * 60_000,
   })

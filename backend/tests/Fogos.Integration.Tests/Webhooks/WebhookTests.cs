@@ -148,8 +148,10 @@ public sealed class WebhookTests(ContainerFixture fixture)
 
     private async Task<string> SeedKeyAsync()
     {
+        // First-party tier: issued (Registered, scope-less) keys are read-only and can no longer
+        // register webhooks — the resolver logic under test needs a mutation-capable machine client.
         var plaintext = "wh-" + Guid.NewGuid().ToString("N");
-        await SeedData.InsertApiKeyAsync(fixture, plaintext, ApiTier.Registered, name: "webhook client");
+        await SeedData.InsertApiKeyAsync(fixture, plaintext, ApiTier.FirstParty, name: "webhook client");
         return plaintext;
     }
 

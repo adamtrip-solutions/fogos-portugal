@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.Configure<OpsOptions>(configuration.GetSection(OpsOptions.SectionName));
         services.Configure<AlertOptions>(configuration.GetSection(AlertOptions.SectionName));
         services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));
+        services.Configure<WebPushOptions>(configuration.GetSection(WebPushOptions.SectionName));
 
         services.AddSingleton<IMongoClient>(sp =>
         {
@@ -67,6 +68,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Reads.LocationReads>();
         services.AddSingleton<Reads.IgnitionClusterReads>();
         services.AddSingleton<Reads.AlertReads>();
+        services.AddSingleton<Reads.DeviceReads>();
         services.AddSingleton<Reads.WebhookReads>();
         services.AddSingleton<Reads.AccountReads>();
         services.AddSingleton<Reads.SituationReportReads>();
@@ -79,6 +81,18 @@ public static class ServiceCollectionExtensions
 
         // Dedup-guarded write path for alert events (used by the alert-matching worker handlers).
         services.AddSingleton<Alerts.AlertEventStore>();
+
+        // Web Push delivery: the device write path + sender + the delivery service the matchers call after
+        // a won dedupe insert. The named client has a fixed per-send timeout and no retry handler (a failed
+        // send bumps the device's FailureCount, mirroring the webhook client).
+        services.AddSingleton<Notifications.DeviceStore>();
+        services.AddSingleton<Notifications.WebPushSender>();
+        services.AddSingleton<Notifications.AlertDeliveryService>();
+        services.AddHttpClient(Notifications.WebPushSender.HttpClientName, (sp, client) =>
+        {
+            var o = sp.GetRequiredService<IOptions<WebPushOptions>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+        });
 
         return services;
     }

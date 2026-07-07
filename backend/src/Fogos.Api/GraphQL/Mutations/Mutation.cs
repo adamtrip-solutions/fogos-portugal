@@ -3,6 +3,7 @@ using Fogos.Api.Auth;
 using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
+using Fogos.Domain.Devices;
 using Fogos.Domain.Events;
 using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
@@ -11,6 +12,7 @@ using Fogos.Domain.Time;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Webhooks;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.RateLimiting;
@@ -243,6 +245,7 @@ public sealed class Mutation
         LocationReads locations,
         AlertSubscriptionGate gate,
         AccountReads accounts,
+        DeviceReads devices,
         IClock clock,
         IFogosCallerAccessor callerAccessor,
         IOptions<AlertOptions> options,
@@ -265,8 +268,108 @@ public sealed class Mutation
         };
         await ValidateAndApplyAsync(subscription, input, locations, o, ct);
 
+        // Optional Web Push binding: the device must exist and be enabled (capability check by its GUID id).
+        if (!string.IsNullOrEmpty(input.DeviceId))
+        {
+            var device = await devices.GetByIdAsync(input.DeviceId, ct);
+            if (device is null || device.Disabled)
+                throw Fail("Dispositivo desconhecido.", "DEVICE_NOT_FOUND");
+            subscription.DeviceId = device.Id;
+        }
+
         await mongo.AlertSubscriptions.InsertOneAsync(subscription, cancellationToken: ct);
         return subscription;
+    }
+
+    /// <summary>
+    /// Registers (or refreshes) a browser's Web Push subscription as a <c>devices</c> document, returning the
+    /// device's capability id (a random GUID the browser persists). Anonymous-allowed and per-IP rate-limited
+    /// exactly like <see cref="CreateAlertSubscription"/>. The endpoint must be an absolute https URL on an
+    /// allow-listed push host (SSRF guard) and the keys base64url-decodable. Upsert by endpoint: re-registering
+    /// refreshes the keys, clears any failure/disabled state, and adopts the signed-in owner when it was
+    /// anonymous. Errors <c>WEB_PUSH_DISABLED</c> when no VAPID key is configured.
+    /// </summary>
+    public async Task<RegisteredDevice> RegisterWebPushDevice(
+        RegisterWebPushDeviceInput input,
+        MongoContext mongo,
+        DeviceRegistrationGate gate,
+        IClock clock,
+        IFogosCallerAccessor callerAccessor,
+        IOptions<WebPushOptions> options,
+        CancellationToken ct)
+    {
+        var o = options.Value;
+        if (!o.IsConfigured)
+            throw Fail("As notificações Web Push não estão configuradas.", "WEB_PUSH_DISABLED");
+
+        var caller = callerAccessor.Caller;
+        if (!await gate.TryAcquireAsync(caller.RemoteIp, ct))
+            throw Fail("Demasiados registos de dispositivo. Tente novamente dentro de momentos.", "RATE_LIMITED");
+
+        var validation = WebPushRegistration.Validate(
+            new WebPushSubscriptionInput(input.Endpoint, input.P256dh, input.Auth), o.AllowedEndpointHosts);
+        if (validation != WebPushValidationError.None)
+            throw validation switch
+            {
+                WebPushValidationError.EndpointHostNotAllowed =>
+                    Fail("O serviço de push não é permitido.", "WEB_PUSH_ENDPOINT_NOT_ALLOWED"),
+                WebPushValidationError.KeyInvalid =>
+                    Fail("As chaves de push são inválidas.", "WEB_PUSH_KEYS_INVALID"),
+                _ => Fail("O endpoint de push é inválido.", "WEB_PUSH_ENDPOINT_INVALID"),
+            };
+
+        var now = clock.UtcNow;
+        var existing = await mongo.Devices
+            .Find(Builders<Device>.Filter.Eq(x => x.PushEndpoint, input.Endpoint))
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is not null)
+        {
+            var update = Builders<Device>.Update
+                .Set(x => x.PushP256dh, input.P256dh)
+                .Set(x => x.PushAuth, input.Auth)
+                .Set(x => x.LastSeenAt, now)
+                .Set(x => x.Disabled, false)
+                .Set(x => x.FailureCount, 0);
+            // Adopt the signed-in owner if the device was registered anonymously.
+            if (caller.IsUser && caller.UserId is { } uid && existing.OwnerUserId is null)
+                update = update.Set(x => x.OwnerUserId, uid);
+
+            await mongo.Devices.UpdateOneAsync(Builders<Device>.Filter.Eq(x => x.Id, existing.Id), update, cancellationToken: ct);
+            return new RegisteredDevice(existing.Id);
+        }
+
+        var device = new Device
+        {
+            Id = Guid.NewGuid().ToString("N"), // capability id — random, NOT an enumerable ObjectId.
+            Platform = DevicePlatform.Web,
+            PushEndpoint = input.Endpoint,
+            PushP256dh = input.P256dh,
+            PushAuth = input.Auth,
+            OwnerUserId = caller.UserId,
+            CreatedAt = now,
+            LastSeenAt = now,
+        };
+        await mongo.Devices.InsertOneAsync(device, cancellationToken: ct);
+        return new RegisteredDevice(device.Id);
+    }
+
+    /// <summary>
+    /// Unsubscribes a browser: deletes the device whose push endpoint is <paramref name="endpoint"/> (the
+    /// endpoint IS the capability — only the owning browser knows it) and cascades — dropping its anonymous
+    /// alert subscriptions and clearing <c>DeviceId</c> on owned ones. Returns false when the endpoint is unknown.
+    /// </summary>
+    public async Task<bool> DeleteWebPushDevice(
+        string endpoint, MongoContext mongo, DeviceStore deviceStore, CancellationToken ct)
+    {
+        var device = await mongo.Devices
+            .Find(Builders<Device>.Filter.Eq(x => x.PushEndpoint, endpoint))
+            .FirstOrDefaultAsync(ct);
+        if (device is null)
+            return false;
+
+        await deviceStore.DeleteWithCascadeAsync(device.Id, ct);
+        return true;
     }
 
     /// <summary>

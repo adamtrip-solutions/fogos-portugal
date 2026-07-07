@@ -3,6 +3,7 @@ using Fogos.Domain.Events;
 using Fogos.Domain.Risk;
 using Fogos.Infrastructure.Alerts;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Reads;
 using MongoDB.Driver;
@@ -13,12 +14,14 @@ namespace Fogos.Worker.Handlers;
 /// On <see cref="RcmProcessed"/>, records a RISK alert event (once per day per subscription, via the
 /// <c>risk:{dico}:{yyyy-MM-dd}</c> dedupe key) for every concelho subscription whose configured threshold
 /// is met by today's <c>rcm_daily</c> level. Idempotent — the hourly RCM run redispatches, but the dedupe
-/// insert keeps it to one event per day.
+/// insert keeps it to one event per day. Push fires on the winning insert (exactly-once) and never fails
+/// the handler.
 /// </summary>
 public sealed class RiskAlertHandler(
     MongoContext mongo,
     AlertReads alerts,
-    AlertEventStore events)
+    AlertEventStore events,
+    AlertDeliveryService delivery)
     : IEventHandler<RcmProcessed>
 {
     public async Task HandleAsync(RcmProcessed evt, CancellationToken ct)
@@ -47,7 +50,8 @@ public sealed class RiskAlertHandler(
 
             var message = AlertCopy.Risk(risk.Concelho, RiskLevels.Label(level));
             var dedupe = $"risk:{sub.Dico}:{day:yyyy-MM-dd}";
-            await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct);
+            if (await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct))
+                await delivery.DeliverAsync(sub, dedupe, AlertEventKind.Risk, message, "/risco", ct);
         }
     }
 }

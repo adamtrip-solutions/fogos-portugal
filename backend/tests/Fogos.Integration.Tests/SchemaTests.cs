@@ -70,6 +70,20 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("type Webhook", sdl);
         Assert.Contains("type SituationReport", sdl);
 
+        // N1 — Web Push device registry + delivery surface.
+        Assert.Contains("webPushPublicKey: String", sdl);
+        Assert.Contains("deviceSubscriptions(deviceId: ID!): [AlertSubscription!]!", sdl);
+        Assert.Contains("registerWebPushDevice(input: RegisterWebPushDeviceInput!): RegisteredDevice!", sdl);
+        Assert.Contains("deleteWebPushDevice(endpoint: String!): Boolean!", sdl);
+        Assert.Contains("input RegisterWebPushDeviceInput", sdl);
+        Assert.Contains("type RegisteredDevice", sdl);
+        Assert.Contains("deviceId: ID", sdl); // on AlertSubscription + CreateAlertSubscriptionInput
+        // The Device entity itself is never exposed as an output type — only RegisteredDevice.id escapes.
+        Assert.DoesNotContain("type Device ", sdl);
+        Assert.DoesNotContain("type Device\n", sdl);
+        Assert.DoesNotContain("pushEndpoint", sdl);
+        Assert.DoesNotContain("pushAuth", sdl);
+
         // Accounts (Clerk) — the signed-in user's own identity; nullable for machine/anonymous callers.
         Assert.Contains("me: Me", sdl);
         Assert.Contains("type Me", sdl);

@@ -4,6 +4,7 @@ using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
 using Fogos.Infrastructure.Alerts;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Reads;
 using Fogos.Integration.Tests.Incidents;
 using Fogos.Worker.Handlers;
@@ -97,6 +98,8 @@ public sealed class AlertMatchHandlerTests(ContainerFixture fixture)
         var services = fixture.Factory.Services;
         var mongo = services.GetRequiredService<MongoContext>();
         var clock = new TestClock { UtcNow = Now };
-        return new AlertMatchHandler(mongo, new AlertReads(mongo), new AlertEventStore(mongo, clock));
+        // Delivery defaults to DryRun and the seeded subscriptions carry no DeviceId, so it is a no-op here.
+        var delivery = services.GetRequiredService<AlertDeliveryService>();
+        return new AlertMatchHandler(mongo, new AlertReads(mongo), new AlertEventStore(mongo, clock), delivery);
     }
 }

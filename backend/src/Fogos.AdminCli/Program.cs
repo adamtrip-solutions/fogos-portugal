@@ -41,6 +41,9 @@ switch (command)
     case "demo-seed":
         return await DemoSeedCommand.RunAsync(host.Services, args);
 
+    case "webpush-keys":
+        return WebPushCommands.Run(args);
+
     default:
         Console.Error.WriteLine("Usage: Fogos.AdminCli <command>");
         Console.Error.WriteLine();
@@ -53,5 +56,8 @@ switch (command)
         Console.Error.WriteLine();
         Console.Error.WriteLine("  demo-seed [--database fogos_demo] [--drop] [--locations <path>]");
         Console.Error.WriteLine("                 populate a demo database with deterministic, live-looking sample data");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("  webpush-keys [--subject mailto:you@example.com]");
+        Console.Error.WriteLine("                 generate a VAPID keypair and print ready-to-paste WebPush__ env lines");
         return 2;
 }

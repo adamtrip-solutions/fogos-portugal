@@ -1,6 +1,7 @@
 using Fogos.Domain.Aircraft;
 using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
+using Fogos.Domain.Devices;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
 using Fogos.Domain.Reports;
@@ -133,6 +134,14 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("kind").Ascending("dico"), "kind_dico"),
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("createdAt"), "createdAt"),
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
+            Model(Builders<AlertSubscription>.IndexKeys.Ascending("deviceId"), "deviceId"),
+        ], ct);
+
+        await context.Devices.Indexes.CreateManyAsync(
+        [
+            Unique(Builders<Device>.IndexKeys.Ascending("pushEndpoint"), "pushEndpoint"),
+            Model(Builders<Device>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
+            Model(Builders<Device>.IndexKeys.Ascending("disabled").Ascending("lastSeenAt"), "disabled_lastSeenAt"),
         ], ct);
 
         await context.AlertEvents.Indexes.CreateManyAsync(

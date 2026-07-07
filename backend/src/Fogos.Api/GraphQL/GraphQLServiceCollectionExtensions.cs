@@ -75,6 +75,7 @@ public static class GraphQLServiceCollectionExtensions
             {
                 d.Name("AlertSubscription");
                 d.Field(x => x.Id).ID();
+                d.Field(x => x.DeviceId).ID();
                 d.Ignore(x => x.OwnerUserId);
             }))
             // Situation report: surrogate id is an ID.

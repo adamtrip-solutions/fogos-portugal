@@ -1,4 +1,5 @@
 using Fogos.Domain.Alerts;
+using HotChocolate.Types;
 
 namespace Fogos.Api.GraphQL.Mutations;
 
@@ -15,6 +16,25 @@ public sealed record CreateAlertSubscriptionInput
     public double? Longitude { get; init; }
     public double? RadiusKm { get; init; }
     public int? RiskThreshold { get; init; }
+
+    /// <summary>
+    /// Optional <c>devices</c> id (a registered Web Push device) to deliver this subscription's alerts to.
+    /// When present the device must exist and not be disabled; works for anonymous and signed-in callers.
+    /// </summary>
+    [ID]
+    public string? DeviceId { get; init; }
+}
+
+/// <summary>
+/// Registers a browser's Web Push subscription as a device. The endpoint is the push-service URL the worker
+/// POSTs to; p256dh/auth are the subscription's encryption keys (base64url). All three come straight from
+/// the browser's <c>PushSubscription</c>.
+/// </summary>
+public sealed record RegisterWebPushDeviceInput
+{
+    public required string Endpoint { get; init; }
+    public required string P256dh { get; init; }
+    public required string Auth { get; init; }
 }
 
 /// <summary>

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.4.0...api-v2.5.0) (2026-07-07)
+
+
+### Features
+
+* **api:** API keys are read-only — central mutation guard ([#64](https://github.com/adamtrip-solutions/fogos-portugal/issues/64)) ([9de0c00](https://github.com/adamtrip-solutions/fogos-portugal/commit/9de0c004becd6a628b905e8f3a65593238f2ceb2))
+* automatic IPMA avisos — remove the manual warning channel ([#61](https://github.com/adamtrip-solutions/fogos-portugal/issues/61)) ([a4211e6](https://github.com/adamtrip-solutions/fogos-portugal/commit/a4211e6f17ef8cba9a65c5931c38e8d60fedd84b))
+
 ## [2.4.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.3.1...api-v2.4.0) (2026-07-07)
 
 

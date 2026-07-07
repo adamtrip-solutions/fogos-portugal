@@ -9,6 +9,7 @@ import {
   CircleUser,
   Code,
   Flame,
+  Gauge,
   Info,
   Map,
   TriangleAlert,
@@ -29,10 +30,10 @@ const NAV_LINKS = [
 ] as const
 
 // Live-context pages, sitting between the primary nav and the content pages.
-// Parallel branches add Risco + Aeronaves here later — leave room, don't add them.
 const INFO_LINKS = [
   { to: '/situacao', label: 'Situação', Icon: Activity },
   { to: '/avisos', label: 'Avisos', Icon: TriangleAlert },
+  { to: '/risco', label: 'Risco', Icon: Gauge },
   { to: '/alertas', label: 'Alertas', Icon: Bell },
 ] as const
 

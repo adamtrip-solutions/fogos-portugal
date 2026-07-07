@@ -1,6 +1,7 @@
 using Fogos.Domain.Aircraft;
 using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
+using Fogos.Domain.Devices;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Locations;
@@ -56,6 +57,7 @@ public sealed class MongoContext
 
     public IMongoCollection<AlertSubscription> AlertSubscriptions => Database.GetCollection<AlertSubscription>("alert_subscriptions");
     public IMongoCollection<AlertEvent> AlertEvents => Database.GetCollection<AlertEvent>("alert_events");
+    public IMongoCollection<Device> Devices => Database.GetCollection<Device>("devices");
     public IMongoCollection<WebhookEndpoint> WebhookEndpoints => Database.GetCollection<WebhookEndpoint>("webhook_endpoints");
     public IMongoCollection<SituationReport> SituationReports => Database.GetCollection<SituationReport>("situation_reports");
 

@@ -40,6 +40,12 @@ public sealed class AlertSubscription
     /// </summary>
     public string? OwnerUserId { get; set; }
 
+    /// <summary>
+    /// The <c>devices</c> id this subscription delivers to (Web Push), or null for poll-only / legacy
+    /// subscriptions. Non-unique index; IgnoreIfNull (global convention) so existing documents are untouched.
+    /// </summary>
+    public string? DeviceId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     /// <summary>Last time the device was seen active — drives the 90-day inactivity purge.</summary>

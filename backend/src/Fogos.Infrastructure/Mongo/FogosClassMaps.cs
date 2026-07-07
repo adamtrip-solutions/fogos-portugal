@@ -1,6 +1,7 @@
 using Fogos.Domain.Aircraft;
 using Fogos.Domain.Alerts;
 using Fogos.Domain.Auth;
+using Fogos.Domain.Devices;
 using Fogos.Domain.Geo;
 using Fogos.Domain.Hotspots;
 using Fogos.Domain.Incidents;
@@ -132,6 +133,14 @@ public static class FogosClassMaps
 
         // ── Alerts / Webhooks / Reports (WP4) ───────────────────────────────────
         BsonClassMap.RegisterClassMap<AlertSubscription>(cm => MapObjectId(cm, c => c.Id));
+
+        // Device _id is a random GUID generated app-side (capability id, deliberately NOT an ObjectId so it
+        // can't be enumerated) — mapped as a plain string, no ObjectId serializer.
+        BsonClassMap.RegisterClassMap<Device>(cm =>
+        {
+            cm.AutoMap();
+            cm.MapIdMember(c => c.Id);
+        });
         BsonClassMap.RegisterClassMap<AlertEvent>(cm => MapObjectId(cm, c => c.Id));
         BsonClassMap.RegisterClassMap<WebhookEndpoint>(cm => MapObjectId(cm, c => c.Id));
         BsonClassMap.RegisterClassMap<SituationReport>(cm => MapObjectId(cm, c => c.Id));

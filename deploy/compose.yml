@@ -88,6 +88,12 @@ services:
       # Clerk identity (second Bearer issuer). Empty Authority = disabled; behaviour unchanged.
       Clerk__Authority: ${CLERK_AUTHORITY:-}
       Clerk__AuthorizedParties__0: ${CLERK_AUTHORIZED_PARTY:-}
+      # Web Push (VAPID). Empty PublicKey = channel dark (registration errors WEB_PUSH_DISABLED); default
+      # Mode DryRun means even a keyed deploy only captures payloads until WEBPUSH_MODE=Live is set.
+      WebPush__Subject: ${WEBPUSH_SUBJECT:-}
+      WebPush__PublicKey: ${WEBPUSH_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${WEBPUSH_PRIVATE_KEY:-}
+      WebPush__Mode: ${WEBPUSH_MODE:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz/ready"]
@@ -124,6 +130,11 @@ services:
       Sources__Fr24__ApiKey: ${FR24_API_KEY:-}
       Sources__Fr24__MonthlyBudget: ${FR24_MONTHLY_BUDGET:-0}
       Sources__Fr24__Mode: ${FR24_MODE:-DryRun}
+      # Web Push (VAPID) — the worker POSTs the encrypted payloads. Same dark-by-default posture as the API.
+      WebPush__Subject: ${WEBPUSH_SUBJECT:-}
+      WebPush__PublicKey: ${WEBPUSH_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${WEBPUSH_PRIVATE_KEY:-}
+      WebPush__Mode: ${WEBPUSH_MODE:-DryRun}
       Sentry__Dsn: ${SENTRY_DSN:-}
     restart: unless-stopped
 

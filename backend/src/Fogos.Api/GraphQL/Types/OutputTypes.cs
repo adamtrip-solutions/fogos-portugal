@@ -116,6 +116,12 @@ public sealed record Webhook(
         new(e.Id, e.Url, e.Events, e.Active, e.ConsecutiveFailures, e.CreatedAt, null);
 }
 
+/// <summary>
+/// The result of registering a Web Push device: just its capability id (a random GUID the browser
+/// persists and later presents to bind subscriptions / list them). The full device is never exposed.
+/// </summary>
+public sealed record RegisteredDevice([property: ID] string Id);
+
 /// <summary>Metadata of a stored KML perimeter version (the raw KML is reached only via REST by id).</summary>
 public sealed record KmlVersionMeta(
     string Id,

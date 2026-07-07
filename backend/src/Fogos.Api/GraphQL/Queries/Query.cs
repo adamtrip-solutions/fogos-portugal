@@ -13,11 +13,13 @@ using Fogos.Domain.Users;
 using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Options;
 using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Storage;
 using HotChocolate;
 using HotChocolate.Authorization;
 using HotChocolate.Types;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace Fogos.Api.GraphQL.Queries;
@@ -169,6 +171,24 @@ public sealed class Query
         CancellationToken ct,
         bool activeOnly = true) =>
         await reads.ListAsync(activeOnly, ct);
+
+    /// <summary>
+    /// The VAPID public key the browser needs to subscribe to Web Push, or null when the channel is not
+    /// configured (the web app then hides the enable-notifications affordance). Anonymous-allowed.
+    /// </summary>
+    public string? WebPushPublicKey(IOptions<WebPushOptions> options)
+    {
+        var key = options.Value.PublicKey;
+        return string.IsNullOrWhiteSpace(key) ? null : key;
+    }
+
+    /// <summary>
+    /// The alert subscriptions bound to a device. The <paramref name="deviceId"/> is a capability (a random
+    /// GUID only the owning browser holds), so no further auth is required.
+    /// </summary>
+    public async Task<IReadOnlyList<AlertSubscription>> DeviceSubscriptions(
+        [ID] string deviceId, DeviceReads devices, CancellationToken ct) =>
+        await devices.SubscriptionsByDeviceAsync(deviceId, ct);
 
     /// <summary>Risk strip for a concelho: today + up to four horizons from the latest RCM run (null levels dropped).</summary>
     private static IReadOnlyList<ConcelhoRiskDay> BuildRiskDays(ConcelhoRisk? risk)

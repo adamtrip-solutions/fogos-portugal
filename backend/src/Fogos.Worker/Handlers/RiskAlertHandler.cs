@@ -3,6 +3,7 @@ using Fogos.Domain.Events;
 using Fogos.Domain.Risk;
 using Fogos.Infrastructure.Alerts;
 using Fogos.Infrastructure.Mongo;
+using Fogos.Infrastructure.Notifications;
 using Fogos.Infrastructure.Queue;
 using Fogos.Infrastructure.Reads;
 using MongoDB.Driver;
@@ -13,12 +14,14 @@ namespace Fogos.Worker.Handlers;
 /// On <see cref="RcmProcessed"/>, records a RISK alert event (once per day per subscription, via the
 /// <c>risk:{dico}:{yyyy-MM-dd}</c> dedupe key) for every concelho subscription whose configured threshold
 /// is met by today's <c>rcm_daily</c> level. Idempotent — the hourly RCM run redispatches, but the dedupe
-/// insert keeps it to one event per day.
+/// insert keeps it to one event per day. Push fires on the winning insert (exactly-once) and never fails
+/// the handler.
 /// </summary>
 public sealed class RiskAlertHandler(
     MongoContext mongo,
     AlertReads alerts,
-    AlertEventStore events)
+    AlertEventStore events,
+    AlertDeliveryService delivery)
     : IEventHandler<RcmProcessed>
 {
     public async Task HandleAsync(RcmProcessed evt, CancellationToken ct)
@@ -38,6 +41,9 @@ public sealed class RiskAlertHandler(
             .GroupBy(r => r.Dico)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Push only for winning inserts (exactly-once) — collected first, then dispatched as one batch
+        // (one dry-run capture per RCM run; bounded parallelism live).
+        var won = new List<AlertDelivery>();
         foreach (var sub in subs)
         {
             if (!byDico.TryGetValue(sub.Dico!, out var risk) || risk.Today is not int level)
@@ -47,7 +53,11 @@ public sealed class RiskAlertHandler(
 
             var message = AlertCopy.Risk(risk.Concelho, RiskLevels.Label(level));
             var dedupe = $"risk:{sub.Dico}:{day:yyyy-MM-dd}";
-            await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct);
+            if (await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct))
+                won.Add(new AlertDelivery(sub, dedupe, AlertEventKind.Risk, message, "/risco"));
         }
+
+        if (won.Count > 0)
+            await delivery.DeliverManyAsync(won, ct);
     }
 }

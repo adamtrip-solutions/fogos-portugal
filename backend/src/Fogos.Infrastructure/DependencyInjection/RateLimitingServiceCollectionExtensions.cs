@@ -25,6 +25,7 @@ public static class RateLimitingServiceCollectionExtensions
         services.AddSingleton<SubscriptionLimiter>();
         services.AddSingleton<PhotoUploadGates>();
         services.AddSingleton<AlertSubscriptionGate>();
+        services.AddSingleton<DeviceRegistrationGate>();
 
         return services;
     }

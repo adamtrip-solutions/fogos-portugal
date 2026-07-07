@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
   Activity,
+  Bell,
   BookOpen,
   ChartColumn,
   CircleUser,
@@ -32,6 +33,7 @@ const NAV_LINKS = [
 const INFO_LINKS = [
   { to: '/situacao', label: 'Situação', Icon: Activity },
   { to: '/avisos', label: 'Avisos', Icon: TriangleAlert },
+  { to: '/alertas', label: 'Alertas', Icon: Bell },
 ] as const
 
 const PAGE_LINKS = [

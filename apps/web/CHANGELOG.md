@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.7.0...web-v1.8.0) (2026-07-07)
+
+
+### Features
+
+* **web:** deterministic z-priority for overlapping map dots ([#51](https://github.com/adamtrip-solutions/fogos-portugal/issues/51)) ([5b57698](https://github.com/adamtrip-solutions/fogos-portugal/commit/5b576983a885a1a105035f687dbdfe3124407c3d))
+
 ## [1.7.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.6.0...web-v1.7.0) (2026-07-06)
 
 

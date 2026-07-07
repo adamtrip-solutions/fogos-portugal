@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.3.0...api-v2.3.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* **api:** ship the HotChocolate 16 migration ([#53](https://github.com/adamtrip-solutions/fogos-portugal/issues/53)) ([2b585fe](https://github.com/adamtrip-solutions/fogos-portugal/commit/2b585fecbab41920e2066015d700a2965c23b04e))
+
 ## [2.3.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.2.0...api-v2.3.0) (2026-07-06)
 
 

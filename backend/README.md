@@ -14,9 +14,9 @@ See [`docs/MIGRATION-PLAN.md`](../docs/MIGRATION-PLAN.md) for the plan and
 
 - `src/Fogos.Domain` — pure domain: entities, status/natureza catalogs, geo, clock, hashtags.
 - `src/Fogos.Infrastructure` — Mongo (class maps, indexes), Redis, S3-compatible storage, Discord ops.
-- `src/Fogos.Api` — ASP.NET Core host (health today; GraphQL + REST v3 in Phase 1).
-- `src/Fogos.Worker` — Quartz host (jobs land in Phase 3).
-- `src/Fogos.Importer` — console tool: dev seed today, legacy Mongo import in Phase 1.
+- `src/Fogos.Api` — ASP.NET Core host: GraphQL (HotChocolate 16), REST v3 compat, auth, rate limiting.
+- `src/Fogos.Worker` — Quartz host: ingestion, enrichment, and alerting jobs.
+- `src/Fogos.Importer` — console tool: dev seed and legacy Mongo import.
 - `tests/` — domain unit tests, plus importer/integration placeholders.
 
 ## Prerequisites

@@ -57,10 +57,14 @@ export const Route = createFileRoute('/risco')({
     const dia = DAYS.includes(search.dia as RiskDay)
       ? (search.dia as RiskDay)
       : DEFAULT_DAY
-    const concelho =
-      typeof search.concelho === 'string' && search.concelho.trim().length > 0
-        ? search.concelho
-        : undefined
+    // DICO codes are numeric, so the router's URL parser round-trips ?concelho=
+    // as a JS *number* (dropping any leading zero: "0105" → 105). Normalise back
+    // to the canonical zero-padded 4-char string the map, lookup table and the
+    // GraphQL `dico: String!` argument all expect. Accept the string form too so
+    // an already-canonical value survives untouched.
+    const raw =
+      search.concelho == null ? '' : String(search.concelho).trim()
+    const concelho = /^\d{1,4}$/.test(raw) ? raw.padStart(4, '0') : undefined
     return { dia, ...(concelho ? { concelho } : {}) }
   },
   loaderDeps: ({ search }) => ({ dia: search.dia }),

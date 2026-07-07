@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.10.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.9.0...web-v1.10.0) (2026-07-07)
+
+
+### Features
+
+* automatic IPMA avisos — remove the manual warning channel ([#61](https://github.com/adamtrip-solutions/fogos-portugal/issues/61)) ([a4211e6](https://github.com/adamtrip-solutions/fogos-portugal/commit/a4211e6f17ef8cba9a65c5931c38e8d60fedd84b))
+
+
+### Bug Fixes
+
+* **web:** risco map click selects the clicked concelho ([#63](https://github.com/adamtrip-solutions/fogos-portugal/issues/63)) ([70146ae](https://github.com/adamtrip-solutions/fogos-portugal/commit/70146aee5f11f42b0322b5277e03f4e0895cf3e9))
+
 ## [1.9.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.8.0...web-v1.9.0) (2026-07-07)
 
 

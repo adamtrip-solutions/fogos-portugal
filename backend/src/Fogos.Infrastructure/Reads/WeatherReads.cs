@@ -52,6 +52,32 @@ public sealed class WeatherReads(MongoContext context)
             .ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Every IPMA awareness warning still in force at <paramref name="now"/> (ends in the future), sorted
+    /// most-severe first (red &gt; orange &gt; yellow) then earliest start. Ingest already drops greens.
+    /// </summary>
+    public async Task<IReadOnlyList<WeatherWarning>> AllInForceAsync(DateTimeOffset now, CancellationToken ct = default)
+    {
+        var f = Builders<WeatherWarning>.Filter;
+        var inForce = await context.WeatherWarnings
+            .Find(f.Gt(x => x.EndsAt, now))
+            .ToListAsync(ct);
+
+        return inForce
+            .OrderByDescending(w => LevelRank(w.Level))
+            .ThenBy(w => w.StartsAt)
+            .ToList();
+    }
+
+    /// <summary>Severity rank for sorting: red highest, unknown lowest.</summary>
+    private static int LevelRank(string level) => level.ToLowerInvariant() switch
+    {
+        "red" => 3,
+        "orange" => 2,
+        "yellow" => 1,
+        _ => 0,
+    };
+
     public async Task<IReadOnlyDictionary<int, WeatherStation>> StationsByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct = default)
     {
         var items = await context.WeatherStations

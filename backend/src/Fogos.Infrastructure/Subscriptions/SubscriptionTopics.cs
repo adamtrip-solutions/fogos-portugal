@@ -14,7 +14,4 @@ public static class SubscriptionTopics
 
     /// <summary>Active-set delta stream for <c>activeIncidentsChanged</c>.</summary>
     public const string ActiveIncidentsChanged = "activeIncidentsChanged";
-
-    /// <summary>New warnings for <c>warningAdded</c>.</summary>
-    public const string WarningAdded = "warningAdded";
 }

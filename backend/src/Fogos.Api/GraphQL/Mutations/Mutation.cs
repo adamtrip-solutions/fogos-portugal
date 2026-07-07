@@ -9,7 +9,6 @@ using Fogos.Domain.Geo;
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Photos;
 using Fogos.Domain.Time;
-using Fogos.Domain.Warnings;
 using Fogos.Domain.Webhooks;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Notifications;
@@ -195,41 +194,6 @@ public sealed class Mutation
 
         await dispatcher.DispatchAsync(new KmlAttached(updated.Id, isVost), ct: ct);
         return updated;
-    }
-
-    /// <summary>
-    /// Issues a broadcast warning (MANUAL or AGIF). Persists to <c>warnings</c> with the caller as issuer;
-    /// the Mongo change stream fans it out to <c>warningAdded</c> subscribers (so this never publishes that
-    /// topic itself — exactly-once), while <see cref="WarningCreated"/> drives the queue/social side.
-    /// Ports <c>WarningsController::add</c> / <c>::addAgif</c>. SITE warnings are banner data, not creatable here.
-    /// </summary>
-    [Authorize(Policy = ApiScopes.WriteWarnings)]
-    public async Task<Warning> AddWarning(
-        WarningKind kind,
-        WarningInput input,
-        MongoContext mongo,
-        IEventDispatcher dispatcher,
-        IClock clock,
-        IFogosCallerAccessor callerAccessor,
-        CancellationToken ct)
-    {
-        if (kind == WarningKind.Site)
-            throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage("SITE warnings are site-banner data and cannot be created via addWarning.")
-                .SetCode("WARNING_KIND_UNSUPPORTED").Build());
-
-        var warning = new Warning
-        {
-            Kind = kind,
-            Message = input.Message,
-            Url = string.IsNullOrWhiteSpace(input.Url) ? null : input.Url,
-            IssuedBy = callerAccessor.Caller.Name,
-            CreatedAt = clock.UtcNow,
-        };
-
-        await mongo.Warnings.InsertOneAsync(warning, cancellationToken: ct);
-        await dispatcher.DispatchAsync(new WarningCreated(warning.Id, kind), ct: ct);
-        return warning;
     }
 
     /// <summary>

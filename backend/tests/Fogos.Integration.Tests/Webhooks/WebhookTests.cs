@@ -50,7 +50,7 @@ public sealed class WebhookTests(ContainerFixture fixture)
         Assert.Equal("WEBHOOK_EVENTS_INVALID", ErrorCode(badEvent));
 
         // Valid registration returns the secret.
-        using var ok = await fixture.GraphQLAsync(key, register, new { url = "https://example.test/hook", events = new[] { "incident.created", "warning.created" } });
+        using var ok = await fixture.GraphQLAsync(key, register, new { url = "https://example.test/hook", events = new[] { "incident.created", "report.created" } });
         var created = ok.RootElement.GetProperty("data").GetProperty("registerWebhook");
         var id = created.GetProperty("id").GetString();
         Assert.False(string.IsNullOrEmpty(created.GetProperty("secret").GetString()));

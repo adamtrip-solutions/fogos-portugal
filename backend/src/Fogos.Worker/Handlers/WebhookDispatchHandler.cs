@@ -32,7 +32,7 @@ public sealed class WebhookDispatchHandler(
     IOptions<WebhookOptions> options,
     ILogger<WebhookDispatchHandler> logger)
     : IEventHandler<IncidentCreated>, IEventHandler<IncidentEscalating>, IEventHandler<RekindleDetected>,
-      IEventHandler<WarningCreated>, IEventHandler<SituationReportCreated>
+      IEventHandler<SituationReportCreated>
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -44,9 +44,6 @@ public sealed class WebhookDispatchHandler(
 
     public Task HandleAsync(RekindleDetected evt, CancellationToken ct) =>
         DispatchAsync(WebhookEvents.IncidentRekindle, evt.EventId, new { incidentId = evt.IncidentId }, ct);
-
-    public Task HandleAsync(WarningCreated evt, CancellationToken ct) =>
-        DispatchAsync(WebhookEvents.WarningCreated, evt.EventId, new { warningId = evt.WarningId }, ct);
 
     public Task HandleAsync(SituationReportCreated evt, CancellationToken ct) =>
         DispatchAsync(WebhookEvents.ReportCreated, evt.EventId, new { reportId = evt.ReportId }, ct);

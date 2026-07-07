@@ -1,8 +1,6 @@
 using Fogos.Api.GraphQL.DataLoaders;
 using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Incidents;
-using Fogos.Domain.Warnings;
-using Fogos.Infrastructure.Reads;
 using Fogos.Infrastructure.Subscriptions;
 using HotChocolate;
 using HotChocolate.Execution;
@@ -49,19 +47,6 @@ public sealed class Subscription
         var updated = await LoadManyAsync(loader, message.UpdatedIds, ct);
         return new ActiveIncidentsDelta(message.At, added, updated, message.RemovedIds);
     }
-
-    // ── warningAdded ───────────────────────────────────────────────────────────
-    public ValueTask<ISourceStream<string>> SubscribeToWarningAddedAsync(
-        [Service] ITopicEventReceiver receiver,
-        CancellationToken ct) =>
-        receiver.SubscribeAsync<string>(SubscriptionTopics.WarningAdded, ct);
-
-    [Subscribe(With = nameof(SubscribeToWarningAddedAsync))]
-    public async Task<Warning> WarningAdded(
-        [EventMessage] string warningId,
-        WarningReads reads,
-        CancellationToken ct) =>
-        (await reads.GetByIdAsync(warningId, ct))!;
 
     private static async Task<IReadOnlyList<Incident>> LoadManyAsync(
         IncidentByIdDataLoader loader,

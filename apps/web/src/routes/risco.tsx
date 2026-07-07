@@ -14,6 +14,7 @@ import {
   fireRiskCountryQuery,
 } from '#/lib/fogos/api.ts'
 import type { RiskDay, RiskFeatureCollection } from '#/lib/fogos/api.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { concelhoByDico, searchConcelhos } from '#/lib/fogos/concelhos.ts'
 import type { ConcelhoEntry } from '#/lib/fogos/concelhos.ts'
 import { useTheme } from '#/lib/theme.ts'
@@ -45,7 +46,12 @@ const DAY_PILLS: Array<{ label: string; value: RiskDay }> = [
 
 export const Route = createFileRoute('/risco')({
   head: () => ({
-    meta: [{ title: 'Risco de incêndio — FogosPortugal' }],
+    ...pageMeta({
+      title: 'Risco de incêndio — FogosPortugal',
+      description:
+        'Previsão do risco de incêndio rural por concelho (IPMA/RCM): mapa nacional para hoje, amanhã e depois, com detalhe a cinco dias por concelho.',
+      path: '/risco',
+    }),
   }),
   validateSearch: (search: Record<string, unknown>): RiscoSearch => {
     const dia = DAYS.includes(search.dia as RiskDay)

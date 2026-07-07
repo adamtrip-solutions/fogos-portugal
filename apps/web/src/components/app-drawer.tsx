@@ -12,6 +12,7 @@ import {
   Gauge,
   Info,
   Map,
+  Plane,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ const INFO_LINKS = [
   { to: '/situacao', label: 'Situação', Icon: Activity },
   { to: '/avisos', label: 'Avisos', Icon: TriangleAlert },
   { to: '/risco', label: 'Risco', Icon: Gauge },
+  { to: '/aeronaves', label: 'Aeronaves', Icon: Plane },
   { to: '/alertas', label: 'Alertas', Icon: Bell },
 ] as const
 

@@ -7,7 +7,9 @@ import { STATUS_BUCKETS, STATUS_BUCKET_CODES } from './format.ts'
 import type { StatusBucket } from './format.ts'
 import { concelhoByDico } from './concelhos.ts'
 import type {
+  AircraftPosition,
   ConcelhoProfile,
+  FleetAircraft,
   IncidentDetail,
   IncidentListItem,
   RegisteredDevice,
@@ -899,4 +901,67 @@ export const deleteDeviceAlertSubscription = createServerFn({ method: 'POST' })
       forwardedClientIpHeaders(),
     )
     return data.deleteAlertSubscription
+  })
+
+// ── Aircraft fleet (/aeronaves) ──────────────────────────────────────────────
+
+const AIRCRAFT_FLEET_QUERY = /* GraphQL */ `
+  query Fleet {
+    aircraft {
+      tracked { icao registration name kind type base operator }
+      position { position { latitude longitude } altitude sampledAt }
+      active
+      currentIncidentId
+    }
+  }
+`
+
+// The whole tracked fleet with each aircraft's latest position. Server-only
+// (the API has no CORS); the page polls this every 30s for a live view.
+export const fetchAircraftFleet = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const data = await graphql<{ aircraft: FleetAircraft[] }>(
+      AIRCRAFT_FLEET_QUERY,
+    )
+    return data.aircraft
+  },
+)
+
+export const aircraftFleetQuery = () =>
+  queryOptions({
+    queryKey: ['aircraft-fleet'] as const,
+    queryFn: () => fetchAircraftFleet(),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+  })
+
+const AIRCRAFT_TRACK_QUERY = /* GraphQL */ `
+  query Track($icao: String!, $limit: Int!) {
+    aircraftTrack(icao: $icao, limit: $limit) {
+      position { latitude longitude }
+      altitude
+      sampledAt
+    }
+  }
+`
+
+// Recent track points for one aircraft (newest-first from the API). Used to draw
+// the selected aircraft's flight path on the map.
+export const fetchAircraftTrack = createServerFn({ method: 'GET' })
+  .validator((icao: string) => icao)
+  .handler(async ({ data: icao }) => {
+    const data = await graphql<{ aircraftTrack: AircraftPosition[] }>(
+      AIRCRAFT_TRACK_QUERY,
+      { icao, limit: 40 },
+    )
+    return data.aircraftTrack
+  })
+
+export const aircraftTrackQuery = (icao: string) =>
+  queryOptions({
+    queryKey: ['aircraft-track', icao] as const,
+    queryFn: () => fetchAircraftTrack({ data: icao }),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   })

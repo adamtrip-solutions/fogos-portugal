@@ -307,6 +307,46 @@ export interface RegisteredDevice {
   id: string
 }
 
+// ── Aircraft fleet (live tracking) ───────────────────────────────────────────
+
+/**
+ * A single flight position sample (GraphQL `AircraftPosition`, surfaced from the
+ * domain `FlightPosition`). The API exposes no heading/track field — only the
+ * coordinates, altitude and the sample instant.
+ */
+export interface AircraftPosition {
+  position: Coordinates
+  /** Metres, when the provider reported it. */
+  altitude: number | null
+  sampledAt: string
+}
+
+/** Tracked-fleet metadata (the firefighting-aircraft whitelist). */
+export interface TrackedAircraftMeta {
+  icao: string
+  /** Tail registration — non-null on the API. */
+  registration: string
+  name: string | null
+  /** plane / helicopter. */
+  kind: string | null
+  /** Aircraft model/type, e.g. "CL-415". */
+  type: string | null
+  base: string | null
+  operator: string | null
+}
+
+/**
+ * Shape returned by the `aircraft(activeOnly)` fleet query: tracked metadata
+ * joined with its latest position, the `active` flag (position within the last
+ * 10 min) and the id of the incident it is currently attached to, if any.
+ */
+export interface FleetAircraft {
+  tracked: TrackedAircraftMeta
+  position: AircraftPosition | null
+  active: boolean
+  currentIncidentId: string | null
+}
+
 /** Shape returned by the `incident(id)` detail query. */
 export interface IncidentDetail {
   id: string

@@ -2,11 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Rss } from 'lucide-react'
 
 import { ContentPage, InfoCard } from '#/components/content-page.tsx'
+import { pageMeta } from '#/lib/seo.ts'
 
 export const Route = createFileRoute('/api')({
-  head: () => ({
-    meta: [{ title: 'API pública — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'API pública — FogosPortugal',
+      description:
+        'Documentação da API pública do FogosPortugal para aceder de forma programática aos dados de incêndios, ocorrências e risco em Portugal.',
+      path: '/api',
+    }),
   component: ApiPage,
 })
 

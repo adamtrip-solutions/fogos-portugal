@@ -15,6 +15,7 @@ import {
 } from '#/lib/fogos/stats.ts'
 import { formatDuration, formatHectares } from '#/lib/fogos/format.ts'
 import type { SeasonStats } from '#/lib/fogos/types.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { PageHeader } from '#/components/page-header.tsx'
 import { StatTile } from '#/components/stat-tile.tsx'
 import {
@@ -28,6 +29,13 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 export const Route = createFileRoute('/estatisticas')({
   component: Estatisticas,
+  head: () =>
+    pageMeta({
+      title: 'Estatísticas de incêndios — FogosPortugal',
+      description:
+        'Estatísticas da época de incêndios em Portugal: ignições, área ardida, causas e evolução face ao ano anterior, com dados oficiais.',
+      path: '/estatisticas',
+    }),
   loader: ({ context }) =>
     context.queryClient
       .ensureQueryData(seasonStatsQuery(CURRENT_YEAR))

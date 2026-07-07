@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Loader2, MapPin, TriangleAlert } from 'lucide-react'
 
 import { concelhoProfileQuery } from '#/lib/fogos/api.ts'
+import { concelhoByDico } from '#/lib/fogos/concelhos.ts'
+import { OG_DEFAULT_IMAGE, SITE_ORIGIN, ldJson, pageMeta } from '#/lib/seo.ts'
 import { formatInteger, formatSignedPercent, yoyRatio } from '#/lib/fogos/stats.ts'
 import { formatHectares } from '#/lib/fogos/format.ts'
 import type {
@@ -16,6 +18,62 @@ import { StatTile } from '#/components/stat-tile.tsx'
 
 export const Route = createFileRoute('/concelho/$dico')({
   component: Concelho,
+  // Meta is built synchronously from the canonical concelho list (concelhos.ts),
+  // never blocking on the async profile loader — so titles/descriptions render
+  // even when the API is unavailable. An unknown DICO gets a generic title + noindex.
+  head: ({ params }) => {
+    const path = `/concelho/${params.dico}`
+    const concelho = concelhoByDico(params.dico)
+
+    if (!concelho) {
+      return pageMeta({
+        title: 'Concelho — FogosPortugal',
+        description:
+          'Ocorrências de incêndio, risco de incêndio e histórico por concelho em Portugal, em tempo real com dados da Proteção Civil.',
+        path,
+        noindex: true,
+      })
+    }
+
+    const title = `Incêndios em ${concelho.name} — FogosPortugal`
+    const description = `Ocorrências de incêndio, risco de incêndio e histórico no concelho de ${concelho.name}, distrito de ${concelho.district}, em tempo real com dados da Proteção Civil.`
+    const base = pageMeta({ title, description, path, image: OG_DEFAULT_IMAGE })
+
+    return {
+      meta: [
+        ...base.meta,
+        ldJson({
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Início', item: SITE_ORIGIN },
+            {
+              '@type': 'ListItem',
+              position: 2,
+              name: 'Concelhos',
+              item: `${SITE_ORIGIN}/ocorrencias`,
+            },
+            {
+              '@type': 'ListItem',
+              position: 3,
+              name: concelho.name,
+              item: `${SITE_ORIGIN}${path}`,
+            },
+          ],
+        }),
+        ldJson({
+          '@context': 'https://schema.org',
+          '@type': 'Place',
+          name: concelho.name,
+          containedInPlace: {
+            '@type': 'AdministrativeArea',
+            name: concelho.district,
+          },
+        }),
+      ],
+      links: base.links,
+    }
+  },
   loader: ({ context, params }) =>
     context.queryClient
       .ensureQueryData(concelhoProfileQuery(params.dico))

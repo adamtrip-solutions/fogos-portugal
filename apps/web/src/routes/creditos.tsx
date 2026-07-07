@@ -2,11 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ExternalLink, Heart } from 'lucide-react'
 
 import { ContentPage, InfoCard } from '#/components/content-page.tsx'
+import { pageMeta } from '#/lib/seo.ts'
 
 export const Route = createFileRoute('/creditos')({
-  head: () => ({
-    meta: [{ title: 'Créditos e fontes — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'Créditos e fontes — FogosPortugal',
+      description:
+        'Fontes de dados e créditos do FogosPortugal: Proteção Civil, IPMA e os serviços que tornam possível acompanhar os incêndios em Portugal.',
+      path: '/creditos',
+    }),
   component: Creditos,
 })
 

@@ -44,6 +44,7 @@ import {
   searchConcelhos,
 } from '#/lib/fogos/concelhos.ts'
 import type { ConcelhoEntry } from '#/lib/fogos/concelhos.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { PageHeader } from '#/components/page-header.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 
@@ -60,9 +61,14 @@ interface ContaSearch {
 }
 
 export const Route = createFileRoute('/conta')({
-  head: () => ({
-    meta: [{ title: 'A minha conta — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'A minha conta — FogosPortugal',
+      description:
+        'Gestão da conta FogosPortugal: chaves de API e subscrição de alertas personalizados de incêndio.',
+      path: '/conta',
+      noindex: true,
+    }),
   validateSearch: (search: Record<string, unknown>): ContaSearch => ({
     tab: search.tab === 'alertas' ? 'alertas' : 'chaves',
   }),

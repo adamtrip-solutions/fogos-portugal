@@ -23,6 +23,7 @@ import { radarFramesOptions, useRadarAnimation } from '#/lib/weather/radar.ts'
 import { windFieldOptions } from '#/lib/weather/wind.ts'
 import type { WeatherLayerKey } from '#/lib/weather/catalog.ts'
 import { useTheme } from '#/lib/theme.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { AppToolbar } from '#/components/app-toolbar.tsx'
 import { FireFilterControl } from '#/components/fire-filter-control.tsx'
 import { FireMap } from '#/components/fire-map.tsx'
@@ -43,6 +44,13 @@ function bucketsEqual(
 
 export const Route = createFileRoute('/')({
   component: Home,
+  head: () =>
+    pageMeta({
+      title: 'Mapa de incêndios em Portugal — FogosPortugal',
+      description:
+        'Mapa em tempo real dos incêndios ativos em Portugal: fogos em curso, meios no terreno e estado das ocorrências, com dados da Proteção Civil.',
+      path: '/',
+    }),
   // `?incident=ID` preselects an incident (used by concelho-page / alert links).
   validateSearch: (search: Record<string, unknown>): IndexSearch => ({
     incident: normalizeIncidentParam(search.incident),

@@ -17,6 +17,7 @@ import {
   incidentsPageQuery,
 } from '#/lib/fogos/api.ts'
 import type { IncidentsWindow } from '#/lib/fogos/api.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import {
   STATUS_BUCKETS,
   STATUS_BUCKET_COLOR,
@@ -125,6 +126,13 @@ function filterFor(search: OcorrenciasSearch) {
 
 export const Route = createFileRoute('/ocorrencias')({
   component: Ocorrencias,
+  head: () =>
+    pageMeta({
+      title: 'Ocorrências de incêndio — FogosPortugal',
+      description:
+        'Lista de ocorrências de incêndio em Portugal, com pesquisa e filtros por estado, distrito e período. Dados atualizados da Proteção Civil.',
+      path: '/ocorrencias',
+    }),
   validateSearch: (search: Record<string, unknown>): OcorrenciasSearch => {
     const window = WINDOWS.includes(search.window as IncidentsWindow)
       ? (search.window as IncidentsWindow)

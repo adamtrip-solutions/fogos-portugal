@@ -10,13 +10,18 @@ import {
   statusColorForCode,
 } from '#/lib/fogos/format.ts'
 import type { IncidentListItem, SituationReport } from '#/lib/fogos/types.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { PageHeader } from '#/components/page-header.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 
 export const Route = createFileRoute('/situacao')({
-  head: () => ({
-    meta: [{ title: 'Situação atual — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'Situação atual — FogosPortugal',
+      description:
+        'Ponto de situação nacional dos incêndios em Portugal: fogos ativos, operacionais e meios no terreno, atualizado ao longo do dia com dados oficiais.',
+      path: '/situacao',
+    }),
   component: Situacao,
   loader: ({ context }) =>
     context.queryClient

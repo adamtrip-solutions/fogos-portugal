@@ -60,6 +60,12 @@ public sealed class SubscriptionSessionInterceptor(
         if (http.Items[CallerKey] is not FogosCaller caller || http.Items[PartitionKey] is not string partition)
             return;
 
+        // Stamp the connect-payload identity into the operation's global state so request-pipeline
+        // guards (ApiKeyReadOnlyGuard) see the same caller that authenticated the socket — the HTTP
+        // upgrade request rarely carries credential headers, so the HttpContext-based accessor would
+        // otherwise report socket-executed operations as anonymous.
+        requestBuilder.SetGlobalState(FogosCallerAccessor.ItemKey, caller);
+
         var cap = _options.For(caller.Tier).Subscriptions;
         if (_options.Enabled && !await limiter.TryAcquireAsync(partition, cap))
         {

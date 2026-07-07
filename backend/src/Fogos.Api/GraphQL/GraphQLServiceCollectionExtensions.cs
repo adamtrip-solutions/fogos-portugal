@@ -5,6 +5,7 @@ using Fogos.Api.GraphQL.Subscriptions;
 using Fogos.Api.GraphQL.Types;
 using Fogos.Domain.Aircraft;
 using Fogos.Domain.Geo;
+using HotChocolate.Execution;
 using HotChocolate.Types;
 using StackExchange.Redis;
 
@@ -106,6 +107,13 @@ public static class GraphQLServiceCollectionExtensions
             // which land in a later phase; the @authorize directive resolves against the caller principal
             // via the ASP.NET authorization bridge (DefaultAuthorizationHandler).
             .AddAuthorization()
+            // Issued API keys are read-only: reject mutation operations from scope-less machine callers.
+            // Inserted into the default request pipeline right after the operation resolver (the compiled
+            // operation is authoritative there), which covers HTTP and graphql-ws executions alike.
+            .UseRequest(
+                next => context => ApiKeyReadOnlyGuard.InvokeAsync(context, next),
+                key: ApiKeyReadOnlyGuard.MiddlewareKey,
+                after: WellKnownRequestMiddleware.OperationResolverMiddleware)
             .AddCostAnalyzer()
             .ModifyCostOptions(o =>
             {

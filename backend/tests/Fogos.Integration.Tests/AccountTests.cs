@@ -79,7 +79,13 @@ public sealed class AccountTests(ContainerFixture fixture)
         Assert.Equal(1, keys.GetArrayLength());
         Assert.Equal(keyId, keys[0].GetProperty("id").GetString());
 
-        // The plaintext authenticates as a Registered client over X-API-Key: register a webhook (client-gated).
+        // The plaintext authenticates as a Registered machine client over X-API-Key — queries work,
+        // but issued keys are read-only, so a mutation is rejected centrally. (An anonymous caller
+        // would get UNAUTHENTICATED from the resolver instead; the distinct code proves the key
+        // authenticated as a machine client.)
+        using var reads = await fixture.GraphQLAsync(plaintext, "{ activeIncidents { id } }");
+        Assert.False(reads.RootElement.TryGetProperty("errors", out _), reads.RootElement.ToString());
+
         const string registerWebhook = """
             mutation($url: String!, $events: [String!]!) {
               registerWebhook(url: $url, events: $events) { id url }
@@ -87,10 +93,21 @@ public sealed class AccountTests(ContainerFixture fixture)
             """;
         using var wh = await fixture.GraphQLAsync(plaintext, registerWebhook,
             new { url = "https://example.com/hook", events = new[] { "incident.created" } });
-        var webhookId = wh.RootElement.GetProperty("data").GetProperty("registerWebhook").GetProperty("id").GetString();
-        Assert.False(string.IsNullOrEmpty(webhookId));
+        Assert.Equal("API_KEY_READ_ONLY", ErrorCode(wh));
 
-        // The webhook (joined by the key's ClientId) surfaces on `me.webhooks`, without the secret.
+        // A webhook owned by the key's client (seeded directly — issued keys cannot register webhooks
+        // themselves anymore) surfaces on `me.webhooks`, without the secret.
+        var ctx = fixture.Factory.Services.GetRequiredService<MongoContext>();
+        var client = await ctx.ApiClients.Find(FilterDefinition<ApiClient>.Empty).SingleAsync();
+        await ctx.WebhookEndpoints.InsertOneAsync(new WebhookEndpoint
+        {
+            ClientId = client.Id,
+            Url = "https://example.com/hook",
+            Secret = "s3cr3t",
+            Events = ["incident.created"],
+            Active = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
         using var me2 = await AsUserAsync(factory, token,
             "{ me { webhooks { id url events active consecutiveFailures createdAt } } }");
         var webhooks = me2.RootElement.GetProperty("data").GetProperty("me").GetProperty("webhooks");

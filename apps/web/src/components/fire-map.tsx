@@ -51,6 +51,16 @@ const DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.
 
 const SOURCE_ID = 'fires'
 
+// Stacking severity when dots overlap — live fires on top, finished at the
+// bottom.
+const BUCKET_RANK: Record<StatusBucket, number> = {
+  done: 0,
+  vigilancia: 1,
+  resolving: 2,
+  dispatch: 3,
+  ongoing: 4,
+}
+
 // Radius (CSS px) of the invisible `fires-hit` circle target around each badge
 // centre. Touch pointers get a larger target than a precise mouse cursor.
 const HIT_RADIUS_MOUSE = 24
@@ -92,6 +102,7 @@ interface FireFeatureProps {
   id: string
   color: string
   bucket: StatusBucket
+  priority: number
   active: boolean
   important: boolean
   escalating: boolean
@@ -213,6 +224,7 @@ function buildFeatureCollection(incidents: IncidentListItem[]): FireCollection {
     .filter((i) => i.coordinates != null)
     .map((incident) => {
       const numericId = Number(incident.id)
+      const bucket = statusBucket(incident.status.code)
       const feature: FireFeature = {
         type: 'Feature',
         id: Number.isSafeInteger(numericId) ? numericId : undefined,
@@ -226,7 +238,11 @@ function buildFeatureCollection(incidents: IncidentListItem[]): FireCollection {
         properties: {
           id: incident.id,
           color: statusColorForCode(incident.status.code),
-          bucket: statusBucket(incident.status.code),
+          bucket,
+          priority:
+            BUCKET_RANK[bucket] * 4 +
+            (incident.signals.escalating ? 2 : 0) +
+            (incident.important ? 1 : 0),
           active: isActiveStatus(incident.status.code),
           important: incident.important,
           escalating: incident.signals.escalating,
@@ -236,6 +252,15 @@ function buildFeatureCollection(incidents: IncidentListItem[]): FireCollection {
       }
       return feature
     })
+
+  // Sort ascending by priority so the array's source order encodes stacking:
+  // circle layers (halos, hover ring, and especially the invisible `fires-hit`
+  // hit-target) paint in source order, and queryRenderedFeatures /
+  // event.features[0] return the topmost-rendered feature first — so sorting
+  // makes the visually-top dot also be the click/hover winner. Severity
+  // outranks the flags: escalating/important only break ties within a bucket,
+  // so a finished "important" fire can never cover a live one.
+  features.sort((a, b) => a.properties.priority - b.properties.priority)
 
   return { type: 'FeatureCollection', features }
 }
@@ -560,15 +585,10 @@ export function FireMap({
     'icon-allow-overlap': true,
     'icon-ignore-placement': true,
     // No clustering: when badges overlap, draw the more relevant fire on top.
-    // Higher sort key renders later, i.e. on top. Active (and important) fires
-    // stay on top; among the finished-ish states, resolving (still on the
-    // ground) beats vigilância, which beats concluded.
-    'symbol-sort-key': [
-      '+',
-      ['case', ['get', 'active'], 6, 0],
-      ['case', ['get', 'important'], 3, 0],
-      ['match', ['get', 'bucket'], 'resolving', 2, 'vigilancia', 1, 0],
-    ],
+    // Higher sort key renders later, i.e. on top. `priority` is precomputed in
+    // buildFeatureCollection — a single source of truth shared with the
+    // circle-layer paint order — so badges stack exactly like the dots.
+    'symbol-sort-key': ['get', 'priority'],
   }
 
   const badgePaint: SymbolLayerSpecification['paint'] = {

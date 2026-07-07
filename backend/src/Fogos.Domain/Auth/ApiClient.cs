@@ -12,12 +12,11 @@ public enum ApiTier
 public static class ApiScopes
 {
     public const string WriteIncidents = "write:incidents";
-    public const string WriteWarnings = "write:warnings";
     public const string ModeratePhotos = "moderate:photos";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
-        WriteIncidents, WriteWarnings, ModeratePhotos,
+        WriteIncidents, ModeratePhotos,
     };
 }
 

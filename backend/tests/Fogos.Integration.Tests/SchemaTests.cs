@@ -24,6 +24,16 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("fireRisk(day: RiskDay!", sdl);
         Assert.Contains("aircraftTrack(icao: String!", sdl);
 
+        // Avisos are automatic-only: IPMA weather warnings are exposed as a root query; there is no
+        // manual write channel (no addWarning mutation, no warnings query, no warningAdded subscription).
+        Assert.Contains("weatherWarnings: [WeatherWarning!]!", sdl);
+        Assert.Contains("type WeatherWarning", sdl);
+        Assert.DoesNotContain("addWarning", sdl);
+        Assert.DoesNotContain("warningAdded", sdl);
+        Assert.DoesNotContain("warnings(", sdl);
+        Assert.DoesNotContain("type Warning ", sdl);
+        Assert.DoesNotContain("type Warning\n", sdl);
+
         // Incident resolver fields.
         Assert.Contains("statusChangedAt: DateTime", sdl);
         Assert.Contains("signals: IncidentSignals!", sdl);
@@ -117,6 +127,5 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("type Subscription", sdl);
         Assert.Contains("incidentUpdated(id: ID): Incident!", sdl);
         Assert.Contains("activeIncidentsChanged: ActiveIncidentsDelta!", sdl);
-        Assert.Contains("warningAdded: Warning!", sdl);
     }
 }

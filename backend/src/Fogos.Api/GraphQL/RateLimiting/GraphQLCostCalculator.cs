@@ -22,7 +22,7 @@ public static class GraphQLCostCalculator
         ["stats"] = (3, null),
         ["dailyWeather"] = (2, null),
         ["weatherStations"] = (2, null),
-        ["warnings"] = (2, null),
+        ["weatherWarnings"] = (2, null),
         ["temperatureWaves"] = (2, null),
         ["fireRisk"] = (2, null),
         ["incident"] = (1, null),

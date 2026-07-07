@@ -13,8 +13,7 @@ import type {
   RegisteredDevice,
   SeasonStats,
   SituationReport,
-  Warning,
-  WarningKind,
+  WeatherWarning,
 } from './types.ts'
 // Type-only reuse of the account shapes — `import type` is erased at build time,
 // so this never pulls the Clerk server module into the anonymous X-API-Key path.
@@ -718,36 +717,41 @@ export const situationReportsQuery = (first: number) =>
     refetchInterval: 5 * 60_000,
   })
 
-// ── Broadcast warnings (/avisos) ─────────────────────────────────────────────
+// ── Weather warnings (/avisos) ───────────────────────────────────────────────
+//
+// Automatic-only: IPMA meteorological awareness warnings scraped by the Worker.
+// There is no manual warning channel anymore.
 
-const WARNINGS_QUERY = /* GraphQL */ `
-  query Warnings($kind: WarningKind) {
-    warnings(kind: $kind) {
+const WEATHER_WARNINGS_QUERY = /* GraphQL */ `
+  query WeatherWarnings {
+    weatherWarnings {
       id
-      kind
-      message
-      url
-      issuedBy
-      createdAt
+      areaCode
+      awarenessType
+      level
+      levelPt
+      startsAt
+      endsAt
+      text
     }
   }
 `
 
-export const fetchWarnings = createServerFn({ method: 'GET' })
-  .validator((kind: WarningKind | null) => kind)
-  .handler(async ({ data: kind }) => {
-    const data = await graphql<{ warnings: Warning[] }>(WARNINGS_QUERY, {
-      kind: kind ?? null,
-    })
-    return data.warnings
-  })
+export const fetchWeatherWarnings = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const data = await graphql<{ weatherWarnings: WeatherWarning[] }>(
+      WEATHER_WARNINGS_QUERY,
+    )
+    return data.weatherWarnings
+  },
+)
 
-export const warningsQuery = (kind: WarningKind | null = null) =>
+export const weatherWarningsQuery = () =>
   queryOptions({
-    queryKey: ['warnings', kind ?? 'all'] as const,
-    queryFn: () => fetchWarnings({ data: kind }),
+    queryKey: ['weather-warnings'] as const,
+    queryFn: () => fetchWeatherWarnings(),
     staleTime: 60_000,
-    refetchInterval: 2 * 60_000,
+    refetchInterval: 5 * 60_000,
   })
 
 // ── Web Push alerts (/alertas, WP4) ──────────────────────────────────────────

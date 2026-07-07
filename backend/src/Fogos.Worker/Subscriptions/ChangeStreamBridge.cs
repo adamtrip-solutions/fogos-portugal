@@ -1,6 +1,5 @@
 using Fogos.Domain.Incidents;
 using Fogos.Domain.Time;
-using Fogos.Domain.Warnings;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Ops;
 using Fogos.Infrastructure.Reads;
@@ -13,9 +12,9 @@ namespace Fogos.Worker.Subscriptions;
 
 /// <summary>
 /// Bridges MongoDB change streams (requires a replica set) to the HotChocolate Redis
-/// subscription topics shared with the Api. Watches <c>incidents</c> and <c>warnings</c>
-/// with full-document lookup, is resilient to invalidation/errors (recreate after a
-/// backoff, escalate to ops on repeated failure), and tracks the active set for deltas.
+/// subscription topics shared with the Api. Watches <c>incidents</c> with full-document
+/// lookup, is resilient to invalidation/errors (recreate after a backoff, escalate to ops
+/// on repeated failure), and tracks the active set for deltas.
 /// </summary>
 public sealed class ChangeStreamBridge(
     MongoContext context,
@@ -31,14 +30,11 @@ public sealed class ChangeStreamBridge(
     // DB and starts a fresh stream, so a durable token store buys little here; persisting one would only
     // help bridge a full process restart, which the DB re-warm already covers for correctness.
     private BsonDocument? _incidentResumeToken;
-    private BsonDocument? _warningResumeToken;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await WarmActiveSetAsync(stoppingToken);
-        await Task.WhenAll(
-            WatchAsync("incidents", HandleIncidentBatchAsync, stoppingToken),
-            WatchAsync("warnings", HandleWarningBatchAsync, stoppingToken));
+        await WatchAsync("incidents", HandleIncidentBatchAsync, stoppingToken);
     }
 
     private async Task WarmActiveSetAsync(CancellationToken ct)
@@ -176,45 +172,6 @@ public sealed class ChangeStreamBridge(
                 await PublishDeltaAsync(_tracker.Delete(id), id, ct);
                 break;
             }
-        }
-    }
-
-    private async Task HandleWarningBatchAsync(CancellationToken ct)
-    {
-        using var cursor = await OpenWarningCursorAsync(ct);
-        while (await cursor.MoveNextAsync(ct))
-        {
-            foreach (var change in cursor.Current)
-            {
-                _warningResumeToken = change.ResumeToken;
-
-                if (change.OperationType == ChangeStreamOperationType.Invalidate)
-                    return;
-
-                if (change.OperationType == ChangeStreamOperationType.Insert && change.FullDocument is { } warning)
-                    await sender.SendAsync(SubscriptionTopics.WarningAdded, warning.Id, ct);
-            }
-        }
-    }
-
-    private async Task<IChangeStreamCursor<ChangeStreamDocument<Warning>>> OpenWarningCursorAsync(CancellationToken ct)
-    {
-        var options = new ChangeStreamOptions
-        {
-            FullDocument = ChangeStreamFullDocumentOption.UpdateLookup,
-            StartAfter = _warningResumeToken,
-        };
-        try
-        {
-            return await context.Warnings.WatchAsync(options, ct);
-        }
-        catch (Exception ex) when (_warningResumeToken is not null)
-        {
-            // Warnings carry no tracked set to re-warm — just drop the stale token and start fresh.
-            logger.LogWarning(ex, "Warning change-stream resume failed; falling back to a fresh stream");
-            _warningResumeToken = null;
-            return await context.Warnings.WatchAsync(
-                new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup }, ct);
         }
     }
 

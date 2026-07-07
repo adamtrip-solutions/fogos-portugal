@@ -300,21 +300,6 @@ export interface SituationReport {
   topIncidentIds: string[]
 }
 
-// ── Broadcast warnings ───────────────────────────────────────────────────────
-
-/** GraphQL enum name for a warning's origin. */
-export type WarningKind = 'MANUAL' | 'AGIF' | 'SITE' | (string & {})
-
-/** Unified broadcast warning (manual operator / AGIF / official site banner). */
-export interface Warning {
-  id: string
-  kind: WarningKind
-  message: string
-  url: string | null
-  issuedBy: string | null
-  createdAt: string
-}
-
 // ── Web Push (WP4 alerts) ────────────────────────────────────────────────────
 
 /** Result of `registerWebPushDevice`: the device's opaque capability id. */

@@ -63,12 +63,3 @@ public sealed record PositInput
     /// <summary>Situation narrative (legacy <c>posit</c> → incident <c>extra</c>).</summary>
     public string? Notes { get; init; }
 }
-
-/// <summary>Operator broadcast-warning input (legacy WarningsController carried only the message text).</summary>
-public sealed record WarningInput
-{
-    public required string Message { get; init; }
-
-    /// <summary>Optional link appended to the broadcast copy.</summary>
-    public string? Url { get; init; }
-}

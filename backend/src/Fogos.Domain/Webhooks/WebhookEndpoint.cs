@@ -6,12 +6,11 @@ public static class WebhookEvents
     public const string IncidentCreated = "incident.created";
     public const string IncidentEscalating = "incident.escalating";
     public const string IncidentRekindle = "incident.rekindle";
-    public const string WarningCreated = "warning.created";
     public const string ReportCreated = "report.created";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        IncidentCreated, IncidentEscalating, IncidentRekindle, WarningCreated, ReportCreated,
+        IncidentCreated, IncidentEscalating, IncidentRekindle, ReportCreated,
     };
 }
 

@@ -10,7 +10,6 @@ using Fogos.Domain.Reports;
 using Fogos.Domain.Risk;
 using Fogos.Domain.Time;
 using Fogos.Domain.Users;
-using Fogos.Domain.Warnings;
 using Fogos.Domain.Weather;
 using Fogos.Infrastructure.Mongo;
 using Fogos.Infrastructure.Options;
@@ -240,11 +239,15 @@ public sealed class Query
         return new FireRiskResult(day, geo?.ForecastDate, geo?.GeoJson, null);
     }
 
-    public async Task<IReadOnlyList<Warning>> Warnings(
-        WarningReads reads,
-        CancellationToken ct,
-        WarningKind? kind = null) =>
-        await reads.LatestAsync(kind, 100, ct);
+    /// <summary>
+    /// All IPMA meteorological awareness warnings currently in force (end in the future; non-green by
+    /// ingest), most severe first then earliest-starting. Scraped automatically — there is no manual channel.
+    /// </summary>
+    public async Task<IReadOnlyList<WeatherWarning>> WeatherWarnings(
+        WeatherReads reads,
+        IClock clock,
+        CancellationToken ct) =>
+        await reads.AllInForceAsync(clock.UtcNow, ct);
 
     public async Task<IReadOnlyList<Aircraft>> Aircraft(
         AircraftReads reads,

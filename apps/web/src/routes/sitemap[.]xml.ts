@@ -16,7 +16,9 @@ interface SitemapEntry {
 // Public, indexable static routes that exist on this base.
 const STATIC_ENTRIES: Array<SitemapEntry> = [
   { path: '/', changefreq: 'hourly', priority: '1.0' },
+  { path: '/situacao', changefreq: 'hourly', priority: '0.9' },
   { path: '/ocorrencias', changefreq: 'daily', priority: '0.9' },
+  { path: '/avisos', changefreq: 'daily', priority: '0.9' },
   { path: '/estatisticas', changefreq: 'daily', priority: '0.9' },
   { path: '/sobre', changefreq: 'daily', priority: '0.5' },
   { path: '/creditos', changefreq: 'daily', priority: '0.5' },

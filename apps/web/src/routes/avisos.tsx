@@ -6,13 +6,18 @@ import { ExternalLink } from 'lucide-react'
 import { warningsQuery } from '#/lib/fogos/api.ts'
 import { formatRelative } from '#/lib/fogos/format.ts'
 import type { Warning, WarningKind } from '#/lib/fogos/types.ts'
+import { pageMeta } from '#/lib/seo.ts'
 import { PageHeader } from '#/components/page-header.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 
 export const Route = createFileRoute('/avisos')({
-  head: () => ({
-    meta: [{ title: 'Avisos — FogosPortugal' }],
-  }),
+  head: () =>
+    pageMeta({
+      title: 'Avisos — FogosPortugal',
+      description:
+        'Avisos oficiais da ANEPC e da AGIF sobre incêndios rurais e risco em Portugal, com os mais recentes primeiro e ligação à fonte original.',
+      path: '/avisos',
+    }),
   component: Avisos,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(warningsQuery(null)).catch(() => null),

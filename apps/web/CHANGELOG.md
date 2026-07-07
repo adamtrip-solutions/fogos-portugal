@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.8.0...web-v1.9.0) (2026-07-07)
+
+
+### Features
+
+* **web:** fire risk forecast page ([#56](https://github.com/adamtrip-solutions/fogos-portugal/issues/56)) ([92340e6](https://github.com/adamtrip-solutions/fogos-portugal/commit/92340e64cc383baa8de07e99fc6b9541956d5b0b))
+* **web:** push notification alerts page ([#60](https://github.com/adamtrip-solutions/fogos-portugal/issues/60)) ([1915671](https://github.com/adamtrip-solutions/fogos-portugal/commit/1915671eb035db52eb24cf8787d46fb0779f6712))
+* **web:** SEO foundation — per-route metadata, sitemap, structured data ([#58](https://github.com/adamtrip-solutions/fogos-portugal/issues/58)) ([325e939](https://github.com/adamtrip-solutions/fogos-portugal/commit/325e939b8bd3e0f0e86b8e76da58a701f60e54d3))
+* **web:** situação atual e avisos ([#54](https://github.com/adamtrip-solutions/fogos-portugal/issues/54)) ([236caea](https://github.com/adamtrip-solutions/fogos-portugal/commit/236caead466862c08a6de4a05b632d8fb1336746))
+
 ## [1.8.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.7.0...web-v1.8.0) (2026-07-07)
 
 

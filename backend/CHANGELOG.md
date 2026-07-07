@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.3.1...api-v2.4.0) (2026-07-07)
+
+
+### Features
+
+* **api:** Web Push delivery channel for alerts ([#57](https://github.com/adamtrip-solutions/fogos-portugal/issues/57)) ([40d413a](https://github.com/adamtrip-solutions/fogos-portugal/commit/40d413abc2d0f54d067ec6d9cbdf15d28113a029))
+
 ## [2.3.1](https://github.com/adamtrip-solutions/fogos-portugal/compare/api-v2.3.0...api-v2.3.1) (2026-07-07)
 
 

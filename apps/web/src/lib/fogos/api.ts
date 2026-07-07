@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { getRequestHeader } from '@tanstack/react-start/server'
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 
 import { STATUS_BUCKETS, STATUS_BUCKET_CODES } from './format.ts'
@@ -7,11 +8,18 @@ import type {
   ConcelhoProfile,
   IncidentDetail,
   IncidentListItem,
+  RegisteredDevice,
   SeasonStats,
   SituationReport,
   Warning,
   WarningKind,
 } from './types.ts'
+// Type-only reuse of the account shapes — `import type` is erased at build time,
+// so this never pulls the Clerk server module into the anonymous X-API-Key path.
+import type {
+  AlertSubscriptionInput,
+  OwnedAlertSubscription,
+} from './account-api.ts'
 
 const ACTIVE_INCIDENTS_QUERY = /* GraphQL */ `
   query Active {
@@ -122,7 +130,17 @@ const RECENT_INCIDENTS_QUERY = /* GraphQL */ `
 
 interface GraphQLResponse<T> {
   data?: T
-  errors?: Array<{ message: string }>
+  errors?: Array<{ message: string; extensions?: { code?: string } }>
+}
+
+/** GraphQL error carrying the API's error `code` so callers can map it to pt-PT copy. */
+export class FogosApiError extends Error {
+  readonly code?: string
+  constructor(message: string, code?: string) {
+    super(message)
+    this.name = 'FogosApiError'
+    this.code = code
+  }
 }
 
 // Server-only: attaches the first-party API key (minted via AdminCli, hashed in
@@ -141,30 +159,60 @@ function apiHeaders(extra?: Record<string, string>): Record<string, string> {
 async function graphql<T>(
   query: string,
   variables?: Record<string, unknown>,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const endpoint = `${process.env.FOGOS_API_URL ?? 'http://localhost:5077'}/graphql`
 
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: apiHeaders({ 'Content-Type': 'application/json' }),
+    headers: apiHeaders({ 'Content-Type': 'application/json', ...extraHeaders }),
     body: JSON.stringify({ query, variables }),
   })
 
   if (!res.ok) {
-    throw new Error(`Fogos API responded with ${res.status}`)
+    throw new FogosApiError(`Fogos API responded with ${res.status}`)
   }
 
   const json = (await res.json()) as GraphQLResponse<T>
 
   if (json.errors && json.errors.length > 0) {
-    throw new Error(json.errors.map((e) => e.message).join('; '))
+    const first = json.errors[0]
+    throw new FogosApiError(
+      json.errors.map((e) => e.message).join('; '),
+      first.extensions?.code,
+    )
   }
 
   if (!json.data) {
-    throw new Error('Fogos API returned no data')
+    throw new FogosApiError('Fogos API returned no data')
   }
 
   return json.data
+}
+
+// ── Client-IP forwarding (mutating device/subscription calls only) ────────────
+//
+// Server fns proxy browser → web container → API, so without this every visitor
+// would present the web container's single IP and the API's per-IP abuse gates
+// (DeviceRegistrationGate, AlertSubscriptionGate) would throttle the whole site
+// at once. We forward the REAL browser IP so each visitor is gated on their own.
+//
+// ClientIpResolver (backend/src/Fogos.Api/Auth/ClientIpResolver.cs) trusts the
+// configured edge header `CF-Connecting-IP` above everything else — Cloudflare
+// overwrites it at the edge, so a client cannot forge it past there. Prod sits
+// behind a Cloudflare tunnel, so the incoming request to THIS container already
+// carries `cf-connecting-ip`; we fall back to the first hop of `x-forwarded-for`
+// (the original client) when it's absent.
+//
+// TRUST: the API is never reachable directly by browsers (no CORS, internal
+// only), so the only party that can set `CF-Connecting-IP` on a call reaching it
+// is this trusted server hop — exactly what ClientIpResolver assumes.
+function forwardedClientIpHeaders(): Record<string, string> {
+  const cf = getRequestHeader('cf-connecting-ip')?.trim()
+  if (cf) return { 'CF-Connecting-IP': cf }
+  const first = getRequestHeader('x-forwarded-for')?.split(',')[0]?.trim()
+  if (first) return { 'CF-Connecting-IP': first }
+  return {}
 }
 
 // GraphQL calls run only on the server — the API has no CORS.
@@ -600,4 +648,151 @@ export const warningsQuery = (kind: WarningKind | null = null) =>
     queryFn: () => fetchWarnings({ data: kind }),
     staleTime: 60_000,
     refetchInterval: 2 * 60_000,
+  })
+
+// ── Web Push alerts (/alertas, WP4) ──────────────────────────────────────────
+//
+// All of these use the anonymous first-party X-API-Key path (via `graphql`), NOT
+// the Clerk Bearer path in account-api.ts — an /alertas visitor is never signed
+// in. The device id returned by `registerWebPushDevice` is a capability (a random
+// GUID only the owning browser holds), so read/mutate calls that carry it need no
+// further auth. Mutating calls forward the real browser IP (see
+// `forwardedClientIpHeaders`) so the API's per-IP gates throttle per-visitor.
+
+/** Anonymous create-subscription input: the shared shape plus the device to deliver to. */
+export interface DeviceAlertSubscriptionInput extends AlertSubscriptionInput {
+  deviceId: string
+}
+
+const WEB_PUSH_PUBLIC_KEY_QUERY = /* GraphQL */ `
+  query WebPushPublicKey {
+    webPushPublicKey
+  }
+`
+
+// null ⇒ VAPID unconfigured ⇒ the feature is dark (the page shows a disabled card).
+export const fetchWebPushPublicKey = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const data = await graphql<{ webPushPublicKey: string | null }>(
+      WEB_PUSH_PUBLIC_KEY_QUERY,
+    )
+    return data.webPushPublicKey
+  },
+)
+
+export const webPushPublicKeyQuery = () =>
+  queryOptions({
+    queryKey: ['web-push-public-key'] as const,
+    queryFn: () => fetchWebPushPublicKey(),
+    // The VAPID key is fixed for the lifetime of the server process (mirrors
+    // accountsEnabledQuery): fetch once, never refetch.
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  })
+
+const REGISTER_WEB_PUSH_DEVICE_MUTATION = /* GraphQL */ `
+  mutation RegisterWebPushDevice($input: RegisterWebPushDeviceInput!) {
+    registerWebPushDevice(input: $input) { id }
+  }
+`
+
+export const registerWebPushDevice = createServerFn({ method: 'POST' })
+  .validator((input: { endpoint: string; p256dh: string; auth: string }) => input)
+  .handler(async ({ data: input }): Promise<RegisteredDevice> => {
+    const data = await graphql<{ registerWebPushDevice: RegisteredDevice }>(
+      REGISTER_WEB_PUSH_DEVICE_MUTATION,
+      { input },
+      forwardedClientIpHeaders(),
+    )
+    return data.registerWebPushDevice
+  })
+
+const DELETE_WEB_PUSH_DEVICE_MUTATION = /* GraphQL */ `
+  mutation DeleteWebPushDevice($endpoint: String!) {
+    deleteWebPushDevice(endpoint: $endpoint)
+  }
+`
+
+export const deleteWebPushDevice = createServerFn({ method: 'POST' })
+  .validator((endpoint: string) => endpoint)
+  .handler(async ({ data: endpoint }): Promise<boolean> => {
+    const data = await graphql<{ deleteWebPushDevice: boolean }>(
+      DELETE_WEB_PUSH_DEVICE_MUTATION,
+      { endpoint },
+      forwardedClientIpHeaders(),
+    )
+    return data.deleteWebPushDevice
+  })
+
+// Fields mirror account-api's ALERT_SUB_FIELDS so the result matches OwnedAlertSubscription.
+const DEVICE_ALERT_SUB_FIELDS = /* GraphQL */ `
+  id
+  kind
+  dico
+  point { latitude longitude }
+  radiusKm
+  riskThreshold
+  createdAt
+  lastSeenAt
+`
+
+const DEVICE_SUBSCRIPTIONS_QUERY = /* GraphQL */ `
+  query DeviceSubscriptions($deviceId: ID!) {
+    deviceSubscriptions(deviceId: $deviceId) { ${DEVICE_ALERT_SUB_FIELDS} }
+  }
+`
+
+export const fetchDeviceSubscriptions = createServerFn({ method: 'GET' })
+  .validator((deviceId: string) => deviceId)
+  .handler(async ({ data: deviceId }): Promise<OwnedAlertSubscription[]> => {
+    const data = await graphql<{ deviceSubscriptions: OwnedAlertSubscription[] }>(
+      DEVICE_SUBSCRIPTIONS_QUERY,
+      { deviceId },
+    )
+    return data.deviceSubscriptions
+  })
+
+export const deviceSubscriptionsQuery = (deviceId: string) =>
+  queryOptions({
+    queryKey: ['device-subscriptions', deviceId] as const,
+    queryFn: () => fetchDeviceSubscriptions({ data: deviceId }),
+    staleTime: 30_000,
+  })
+
+const CREATE_DEVICE_ALERT_SUB_MUTATION = /* GraphQL */ `
+  mutation CreateDeviceAlertSubscription($input: CreateAlertSubscriptionInput!) {
+    createAlertSubscription(input: $input) { ${DEVICE_ALERT_SUB_FIELDS} }
+  }
+`
+
+export const createDeviceAlertSubscription = createServerFn({ method: 'POST' })
+  .validator((input: DeviceAlertSubscriptionInput) => input)
+  .handler(async ({ data: input }): Promise<OwnedAlertSubscription> => {
+    const data = await graphql<{ createAlertSubscription: OwnedAlertSubscription }>(
+      CREATE_DEVICE_ALERT_SUB_MUTATION,
+      { input },
+      forwardedClientIpHeaders(),
+    )
+    return data.createAlertSubscription
+  })
+
+// Anonymous delete: the API's deleteAlertSubscription removes an unowned (device-
+// bound, OwnerUserId null) subscription for an anonymous caller. This is the
+// X-API-Key twin of account-api.ts's Clerk-path deleteAlertSubscription — that one
+// requires a signed-in owner, so it can't serve the anonymous /alertas flow.
+const DELETE_DEVICE_ALERT_SUB_MUTATION = /* GraphQL */ `
+  mutation DeleteDeviceAlertSubscription($id: ID!) {
+    deleteAlertSubscription(id: $id)
+  }
+`
+
+export const deleteDeviceAlertSubscription = createServerFn({ method: 'POST' })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }): Promise<boolean> => {
+    const data = await graphql<{ deleteAlertSubscription: boolean }>(
+      DELETE_DEVICE_ALERT_SUB_MUTATION,
+      { id },
+      forwardedClientIpHeaders(),
+    )
+    return data.deleteAlertSubscription
   })

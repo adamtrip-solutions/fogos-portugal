@@ -315,6 +315,13 @@ export interface Warning {
   createdAt: string
 }
 
+// ── Web Push (WP4 alerts) ────────────────────────────────────────────────────
+
+/** Result of `registerWebPushDevice`: the device's opaque capability id. */
+export interface RegisteredDevice {
+  id: string
+}
+
 /** Shape returned by the `incident(id)` detail query. */
 export interface IncidentDetail {
   id: string

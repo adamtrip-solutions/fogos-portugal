@@ -12,11 +12,17 @@ import { formatRelative, locationParts } from '#/lib/fogos/format.ts'
 import type { FleetAircraft, IncidentListItem } from '#/lib/fogos/types.ts'
 import { useTheme } from '#/lib/theme.ts'
 import { AircraftMap } from '#/components/aircraft-map.tsx'
+import { pageMeta } from '#/lib/seo.ts'
 import { PageHeader } from '#/components/page-header.tsx'
 
 export const Route = createFileRoute('/aeronaves')({
   head: () => ({
-    meta: [{ title: 'Aeronaves — FogosPortugal' }],
+    ...pageMeta({
+      title: 'Aeronaves — FogosPortugal',
+      description:
+        'Aeronaves de combate a incêndios em Portugal em direto: aviões e helicópteros no ar, últimas posições, trajetos e o incêndio a que estão alocados.',
+      path: '/aeronaves',
+    }),
   }),
   component: Aeronaves,
   // SSR the first fleet fetch (same server-fn pattern as the other pages);

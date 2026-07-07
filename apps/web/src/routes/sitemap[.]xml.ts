@@ -20,6 +20,7 @@ const STATIC_ENTRIES: Array<SitemapEntry> = [
   { path: '/ocorrencias', changefreq: 'daily', priority: '0.9' },
   { path: '/avisos', changefreq: 'daily', priority: '0.9' },
   { path: '/risco', changefreq: 'daily', priority: '0.9' },
+  { path: '/aeronaves', changefreq: 'hourly', priority: '0.7' },
   { path: '/estatisticas', changefreq: 'daily', priority: '0.9' },
   { path: '/sobre', changefreq: 'daily', priority: '0.5' },
   { path: '/creditos', changefreq: 'daily', priority: '0.5' },

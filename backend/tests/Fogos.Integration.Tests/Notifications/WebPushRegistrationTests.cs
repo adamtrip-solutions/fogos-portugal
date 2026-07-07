@@ -5,16 +5,16 @@ using Fogos.Infrastructure.Options;
 namespace Fogos.Integration.Tests.Notifications;
 
 /// <summary>
-/// Pure unit tests (no containers) for Web Push endpoint validation, base64url key handling, and the
-/// title copy mapping.
+/// Pure unit tests (no containers) for Web Push endpoint validation, the exact key-shape checks
+/// (65-byte uncompressed P-256 point / 16-byte auth secret), and the title copy mapping.
 /// </summary>
 public sealed class WebPushRegistrationTests
 {
     private static readonly string[] Allowed = new WebPushOptions().AllowedEndpointHosts;
 
-    // A valid base64url P-256 point / auth secret (shape only — decodability is what's checked).
-    private const string P256 = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkTrsT5Y6Yg";
-    private const string Auth = "k8JV6sjdbhAi";
+    // Spec-shaped keys: p256dh = 0x04 ‖ 64 bytes (uncompressed P-256 point), auth = 16 bytes.
+    private static readonly string P256 = B64Url([0x04, .. Enumerable.Range(1, 64).Select(i => (byte)i)]);
+    private static readonly string Auth = B64Url([.. Enumerable.Range(1, 16).Select(i => (byte)i)]);
 
     [Theory]
     [InlineData("https://fcm.googleapis.com/fcm/send/abc123")]
@@ -50,16 +50,36 @@ public sealed class WebPushRegistrationTests
         Assert.Equal(WebPushValidationError.EndpointHostNotAllowed, result);
     }
 
-    [Theory]
-    [InlineData("", Auth)]                          // empty p256dh
-    [InlineData(P256, "")]                          // empty auth
-    [InlineData("!!!not base64!!!", Auth)]          // undecodable
-    [InlineData(P256, "@@@")]                        // undecodable
-    public void Rejects_non_base64url_keys(string p256, string auth)
+    [Fact]
+    public void Rejects_keys_with_the_wrong_shape()
     {
-        var endpoint = "https://fcm.googleapis.com/fcm/send/abc";
-        var result = WebPushRegistration.Validate(new WebPushSubscriptionInput(endpoint, p256, auth), Allowed);
-        Assert.Equal(WebPushValidationError.KeyInvalid, result);
+        const string endpoint = "https://fcm.googleapis.com/fcm/send/abc";
+
+        WebPushValidationError Check(string p256, string auth) =>
+            WebPushRegistration.Validate(new WebPushSubscriptionInput(endpoint, p256, auth), Allowed);
+
+        // The exact spec shapes pass.
+        Assert.Equal(WebPushValidationError.None, Check(P256, Auth));
+
+        // Empty / undecodable.
+        Assert.Equal(WebPushValidationError.KeyInvalid, Check("", Auth));
+        Assert.Equal(WebPushValidationError.KeyInvalid, Check(P256, ""));
+        Assert.Equal(WebPushValidationError.KeyInvalid, Check("!!!not base64!!!", Auth));
+        Assert.Equal(WebPushValidationError.KeyInvalid, Check(P256, "@@@"));
+
+        // p256dh must be exactly 65 bytes and start with 0x04 (uncompressed point).
+        Assert.Equal(WebPushValidationError.KeyInvalid,
+            Check(B64Url([0x04, .. Enumerable.Range(1, 31).Select(i => (byte)i)]), Auth)); // 32 bytes
+        Assert.Equal(WebPushValidationError.KeyInvalid,
+            Check(B64Url([0x04, .. Enumerable.Range(1, 65).Select(i => (byte)i)]), Auth)); // 66 bytes
+        Assert.Equal(WebPushValidationError.KeyInvalid,
+            Check(B64Url([0x05, .. Enumerable.Range(1, 64).Select(i => (byte)i)]), Auth)); // wrong prefix
+
+        // auth must be exactly 16 bytes.
+        Assert.Equal(WebPushValidationError.KeyInvalid,
+            Check(P256, B64Url([.. Enumerable.Range(1, 12).Select(i => (byte)i)]))); // 12 bytes
+        Assert.Equal(WebPushValidationError.KeyInvalid,
+            Check(P256, B64Url([.. Enumerable.Range(1, 32).Select(i => (byte)i)]))); // 32 bytes
     }
 
     [Fact]
@@ -77,4 +97,7 @@ public sealed class WebPushRegistrationTests
     [InlineData(AlertEventKind.Risk, "Risco de incêndio elevado")]
     public void Title_maps_each_kind_to_its_pt_copy(string kind, string expected) =>
         Assert.Equal(expected, WebPushCopy.Title(kind));
+
+    private static string B64Url(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

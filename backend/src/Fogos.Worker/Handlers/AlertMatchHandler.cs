@@ -81,13 +81,18 @@ public sealed class AlertMatchHandler(
                 s.Point is { } p && s.RadiusKm is { } r && point.DistanceKm(p) <= r));
         }
 
+        // Push only for winning inserts (exactly-once), with the same copy the events carry — collected
+        // first, then dispatched as one batch (one dry-run capture per event; bounded parallelism live).
         var url = $"/?incident={incident.Id}";
+        var won = new List<AlertDelivery>();
         foreach (var sub in matched.DistinctBy(s => s.Id))
         {
-            // Push only on the winning insert (exactly-once), with the same copy the event carries.
             if (await events.TryAppendAsync(sub.Id, kind, incident.Id, message, dedupeKey, ct))
-                await delivery.DeliverAsync(sub, dedupeKey, kind, message, url, ct);
+                won.Add(new AlertDelivery(sub, dedupeKey, kind, message, url));
         }
+
+        if (won.Count > 0)
+            await delivery.DeliverManyAsync(won, ct);
     }
 
     private static string Place(Incident incident) =>

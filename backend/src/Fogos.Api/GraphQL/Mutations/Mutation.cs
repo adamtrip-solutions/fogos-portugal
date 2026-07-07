@@ -269,10 +269,13 @@ public sealed class Mutation
         await ValidateAndApplyAsync(subscription, input, locations, o, ct);
 
         // Optional Web Push binding: the device must exist and be enabled (capability check by its GUID id).
+        // An owned device may only be bound by its owner; a mismatch reports exactly like not-found so the
+        // response never becomes an existence oracle for another user's device id.
         if (!string.IsNullOrEmpty(input.DeviceId))
         {
             var device = await devices.GetByIdAsync(input.DeviceId, ct);
-            if (device is null || device.Disabled)
+            if (device is null || device.Disabled
+                || (device.OwnerUserId is not null && device.OwnerUserId != caller.UserId))
                 throw Fail("Dispositivo desconhecido.", "DEVICE_NOT_FOUND");
             subscription.DeviceId = device.Id;
         }
@@ -285,9 +288,13 @@ public sealed class Mutation
     /// Registers (or refreshes) a browser's Web Push subscription as a <c>devices</c> document, returning the
     /// device's capability id (a random GUID the browser persists). Anonymous-allowed and per-IP rate-limited
     /// exactly like <see cref="CreateAlertSubscription"/>. The endpoint must be an absolute https URL on an
-    /// allow-listed push host (SSRF guard) and the keys base64url-decodable. Upsert by endpoint: re-registering
-    /// refreshes the keys, clears any failure/disabled state, and adopts the signed-in owner when it was
-    /// anonymous. Errors <c>WEB_PUSH_DISABLED</c> when no VAPID key is configured.
+    /// allow-listed push host (SSRF guard) and the keys valid P-256/auth material. Upsert by endpoint is
+    /// key-gated: a browser re-registering always presents the same p256dh for the same endpoint (keys never
+    /// rotate without a new endpoint), so a matching key refreshes LastSeenAt / re-enables the device and
+    /// adopts the signed-in owner when it was anonymous — while a differing key is rejected with a generic
+    /// error, updating nothing and never leaking the id (an endpoint alone must not escalate into the device
+    /// capability or let an attacker overwrite keys to silence delivery). Errors <c>WEB_PUSH_DISABLED</c>
+    /// when no VAPID key is configured.
     /// </summary>
     public async Task<RegisteredDevice> RegisterWebPushDevice(
         RegisterWebPushDeviceInput input,
@@ -324,20 +331,7 @@ public sealed class Mutation
             .FirstOrDefaultAsync(ct);
 
         if (existing is not null)
-        {
-            var update = Builders<Device>.Update
-                .Set(x => x.PushP256dh, input.P256dh)
-                .Set(x => x.PushAuth, input.Auth)
-                .Set(x => x.LastSeenAt, now)
-                .Set(x => x.Disabled, false)
-                .Set(x => x.FailureCount, 0);
-            // Adopt the signed-in owner if the device was registered anonymously.
-            if (caller.IsUser && caller.UserId is { } uid && existing.OwnerUserId is null)
-                update = update.Set(x => x.OwnerUserId, uid);
-
-            await mongo.Devices.UpdateOneAsync(Builders<Device>.Filter.Eq(x => x.Id, existing.Id), update, cancellationToken: ct);
-            return new RegisteredDevice(existing.Id);
-        }
+            return await RefreshRegistrationAsync(mongo, existing, input, caller, now, ct);
 
         var device = new Device
         {
@@ -350,8 +344,48 @@ public sealed class Mutation
             CreatedAt = now,
             LastSeenAt = now,
         };
-        await mongo.Devices.InsertOneAsync(device, cancellationToken: ct);
+        try
+        {
+            await mongo.Devices.InsertOneAsync(device, cancellationToken: ct);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // Lost a registration race on the unique pushEndpoint index — converge on the winner through
+            // the same key-gated refresh instead of surfacing a raw duplicate-key error.
+            existing = await mongo.Devices
+                .Find(Builders<Device>.Filter.Eq(x => x.PushEndpoint, input.Endpoint))
+                .FirstOrDefaultAsync(ct);
+            if (existing is null)
+                throw Fail("A subscrição de push é inválida.", "INVALID_PUSH_SUBSCRIPTION");
+            return await RefreshRegistrationAsync(mongo, existing, input, caller, now, ct);
+        }
         return new RegisteredDevice(device.Id);
+    }
+
+    /// <summary>
+    /// Key-gated re-registration of an existing device (same endpoint). A legitimate browser always presents
+    /// the SAME p256dh for the same endpoint — keys never rotate without a new endpoint — so a differing key
+    /// means an endpoint-only caller fishing for the device id or trying to overwrite the keys (a silent
+    /// delivery DoS): reject with a generic error, update nothing, leak nothing. A matching key bumps
+    /// LastSeenAt, re-enables the device, and adopts the signed-in owner when it was anonymous.
+    /// </summary>
+    private static async Task<RegisteredDevice> RefreshRegistrationAsync(
+        MongoContext mongo, Device existing, RegisterWebPushDeviceInput input, FogosCaller caller,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        if (!string.Equals(existing.PushP256dh, input.P256dh, StringComparison.Ordinal))
+            throw Fail("A subscrição de push é inválida.", "INVALID_PUSH_SUBSCRIPTION");
+
+        var update = Builders<Device>.Update
+            .Set(x => x.LastSeenAt, now)
+            .Set(x => x.Disabled, false)
+            .Set(x => x.FailureCount, 0);
+        // Adopt the signed-in owner if the device was registered anonymously.
+        if (caller.IsUser && caller.UserId is { } uid && existing.OwnerUserId is null)
+            update = update.Set(x => x.OwnerUserId, uid);
+
+        await mongo.Devices.UpdateOneAsync(Builders<Device>.Filter.Eq(x => x.Id, existing.Id), update, cancellationToken: ct);
+        return new RegisteredDevice(existing.Id);
     }
 
     /// <summary>

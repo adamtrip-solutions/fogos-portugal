@@ -83,16 +83,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Alerts.AlertEventStore>();
 
         // Web Push delivery: the device write path + sender + the delivery service the matchers call after
-        // a won dedupe insert. The named client has a fixed per-send timeout and no retry handler (a failed
-        // send bumps the device's FailureCount, mirroring the webhook client).
+        // a won dedupe insert. The named client has a fixed per-send timeout, no retry handler (a failed
+        // send bumps the device's FailureCount, mirroring the webhook client), and no redirect following —
+        // the endpoint passed SSRF validation as-is, so a push service must never bounce us elsewhere.
         services.AddSingleton<Notifications.DeviceStore>();
         services.AddSingleton<Notifications.WebPushSender>();
         services.AddSingleton<Notifications.AlertDeliveryService>();
         services.AddHttpClient(Notifications.WebPushSender.HttpClientName, (sp, client) =>
-        {
-            var o = sp.GetRequiredService<IOptions<WebPushOptions>>().Value;
-            client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
-        });
+            {
+                var o = sp.GetRequiredService<IOptions<WebPushOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         return services;
     }

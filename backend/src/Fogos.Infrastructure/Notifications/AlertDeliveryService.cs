@@ -5,11 +5,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Fogos.Infrastructure.Notifications;
 
+/// <summary>One push to make: a subscription that just won its alert_event insert, plus the alert copy.</summary>
+public sealed record AlertDelivery(AlertSubscription Subscription, string DedupeKey, string Kind, string Message, string Url);
+
 /// <summary>
-/// The push side of the alert pipeline. Called by the matcher handlers ONLY after
-/// <c>AlertEventStore.TryAppendAsync</c> won the dedupe insert — so a subscriber is pushed exactly once per
-/// alert. Resolves the subscription's device and dispatches to the platform channel (today: Web Push).
-/// Never throws — delivery failures must not fail the handler that recorded the alert.
+/// The push side of the alert pipeline. The matcher handlers collect one <see cref="AlertDelivery"/> per
+/// subscription whose <c>AlertEventStore.TryAppendAsync</c> won the dedupe insert (exactly-once) and hand the
+/// whole batch here per handled event: devices are resolved in one query and sends go out as one batch (one
+/// aggregated dry-run capture; bounded parallelism when live). Never throws — delivery failures must not fail
+/// the handler that recorded the alerts.
 /// </summary>
 public sealed class AlertDeliveryService(
     DeviceReads devices,
@@ -17,36 +21,41 @@ public sealed class AlertDeliveryService(
     ILogger<AlertDeliveryService> logger)
 {
     /// <summary>
-    /// Delivers one alert to the device behind <paramref name="sub"/>, if any. No-op when the subscription
-    /// has no device or the device is disabled/unknown.
+    /// Delivers a batch of alerts to the devices behind their subscriptions. Subscriptions without a device,
+    /// and unknown/disabled devices, are skipped.
     /// </summary>
-    public async Task DeliverAsync(
-        AlertSubscription sub, string dedupeKey, string kind, string message, string url, CancellationToken ct = default)
+    public async Task DeliverManyAsync(IReadOnlyList<AlertDelivery> deliveries, CancellationToken ct = default)
     {
         try
         {
-            if (string.IsNullOrEmpty(sub.DeviceId))
+            var ids = deliveries
+                .Where(d => !string.IsNullOrEmpty(d.Subscription.DeviceId))
+                .Select(d => d.Subscription.DeviceId!)
+                .Distinct()
+                .ToList();
+            if (ids.Count == 0)
                 return;
 
-            var device = await devices.GetByIdAsync(sub.DeviceId, ct);
-            if (device is null || device.Disabled)
-                return;
+            var byId = await devices.GetByIdsAsync(ids, ct);
 
-            var payload = new WebPushPayload(WebPushCopy.Title(kind), message, url, dedupeKey);
-
-            switch (device.Platform)
+            var sends = new List<(Device Device, WebPushPayload Payload)>();
+            foreach (var d in deliveries)
             {
-                case DevicePlatform.Web:
-                    await webPush.SendAsync(device, payload, ct);
-                    break;
-                // Ios/Android are reserved for the Expo mobile plan (N1) — no channel wired yet.
-                default:
-                    break;
+                if (d.Subscription.DeviceId is not { Length: > 0 } id
+                    || !byId.TryGetValue(id, out var device) || device.Disabled)
+                    continue;
+                if (device.Platform != DevicePlatform.Web)
+                    continue; // Ios/Android reserved for the Expo mobile plan (N1) — no channel wired yet.
+
+                sends.Add((device, new WebPushPayload(WebPushCopy.Title(d.Kind), d.Message, d.Url, d.DedupeKey)));
             }
+
+            if (sends.Count > 0)
+                await webPush.SendManyAsync(sends, ct);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Alert delivery failed for subscription {SubscriptionId}", sub.Id);
+            logger.LogWarning(ex, "Alert delivery batch failed ({Count} deliveries)", deliveries.Count);
         }
     }
 }

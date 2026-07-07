@@ -14,6 +14,18 @@ public sealed class DeviceReads(MongoContext context)
             .Find(Builders<Device>.Filter.Eq(x => x.Id, deviceId))
             .FirstOrDefaultAsync(ct);
 
+    /// <summary>Devices by their capability ids, keyed by id (one query per delivery batch).</summary>
+    public async Task<IReadOnlyDictionary<string, Device>> GetByIdsAsync(
+        IReadOnlyCollection<string> deviceIds, CancellationToken ct = default)
+    {
+        if (deviceIds.Count == 0)
+            return new Dictionary<string, Device>();
+        var found = await context.Devices
+            .Find(Builders<Device>.Filter.In(x => x.Id, deviceIds))
+            .ToListAsync(ct);
+        return found.ToDictionary(d => d.Id);
+    }
+
     /// <summary>A device by its push endpoint (unique), or null when unknown.</summary>
     public async Task<Device?> GetByEndpointAsync(string endpoint, CancellationToken ct = default) =>
         await context.Devices

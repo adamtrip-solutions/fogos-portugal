@@ -15,15 +15,20 @@ public enum WebPushValidationError
 /// <summary>
 /// Pure validation of a Web Push subscription before it is persisted as a device. The endpoint is what the
 /// worker later POSTs to, so it is the SSRF surface: it must be an absolute <c>https</c> URL whose host
-/// suffix-matches the allow-list (defeating private-host / http / arbitrary-host endpoints). The p256dh/auth
-/// keys must be non-empty, base64url-decodable, and within sane length caps.
+/// suffix-matches the allow-list (defeating private-host / http / arbitrary-host endpoints). The keys must
+/// decode (base64url) to their exact spec'd shapes: p256dh an uncompressed P-256 point (65 bytes, leading
+/// <c>0x04</c>), auth a 16-byte secret — anything else is garbage no browser produces.
 /// </summary>
 public static class WebPushRegistration
 {
-    // Uncompressed P-256 point is 65 bytes (~88 base64url chars); auth secret is 16 bytes (~22). Cap
-    // generously so a spec-compliant browser always fits while a garbage blob is rejected.
     private const int MaxEndpointLength = 2048;
+
+    /// <summary>Decode-attempt cap; the largest legitimate key (p256dh) is ~88 base64url chars.</summary>
     private const int MaxKeyLength = 256;
+
+    private const int P256PointLength = 65; // 0x04 ‖ X(32) ‖ Y(32)
+    private const byte UncompressedPointPrefix = 0x04;
+    private const int AuthSecretLength = 16;
 
     public static WebPushValidationError Validate(WebPushSubscriptionInput input, IReadOnlyList<string> allowedHosts)
     {
@@ -35,7 +40,11 @@ public static class WebPushRegistration
         if (!HostIsAllowed(uri.Host, allowedHosts))
             return WebPushValidationError.EndpointHostNotAllowed;
 
-        if (!IsBase64UrlKey(input.P256dh) || !IsBase64UrlKey(input.Auth))
+        if (!TryDecodeKey(input.P256dh, out var point)
+            || point.Length != P256PointLength || point[0] != UncompressedPointPrefix)
+            return WebPushValidationError.KeyInvalid;
+
+        if (!TryDecodeKey(input.Auth, out var auth) || auth.Length != AuthSecretLength)
             return WebPushValidationError.KeyInvalid;
 
         return WebPushValidationError.None;
@@ -59,11 +68,12 @@ public static class WebPushRegistration
         return false;
     }
 
-    private static bool IsBase64UrlKey(string? value)
+    private static bool TryDecodeKey(string? value, out byte[] bytes)
     {
+        bytes = [];
         if (string.IsNullOrWhiteSpace(value) || value.Length > MaxKeyLength)
             return false;
-        return TryDecodeBase64Url(value, out _);
+        return TryDecodeBase64Url(value, out bytes);
     }
 
     /// <summary>Decodes a base64url string (no padding), tolerating standard base64 too.</summary>

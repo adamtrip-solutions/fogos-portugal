@@ -41,6 +41,9 @@ public sealed class RiskAlertHandler(
             .GroupBy(r => r.Dico)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Push only for winning inserts (exactly-once) — collected first, then dispatched as one batch
+        // (one dry-run capture per RCM run; bounded parallelism live).
+        var won = new List<AlertDelivery>();
         foreach (var sub in subs)
         {
             if (!byDico.TryGetValue(sub.Dico!, out var risk) || risk.Today is not int level)
@@ -51,7 +54,10 @@ public sealed class RiskAlertHandler(
             var message = AlertCopy.Risk(risk.Concelho, RiskLevels.Label(level));
             var dedupe = $"risk:{sub.Dico}:{day:yyyy-MM-dd}";
             if (await events.TryAppendAsync(sub.Id, AlertEventKind.Risk, null, message, dedupe, ct))
-                await delivery.DeliverAsync(sub, dedupe, AlertEventKind.Risk, message, "/risco", ct);
+                won.Add(new AlertDelivery(sub, dedupe, AlertEventKind.Risk, message, "/risco"));
         }
+
+        if (won.Count > 0)
+            await delivery.DeliverManyAsync(won, ct);
     }
 }

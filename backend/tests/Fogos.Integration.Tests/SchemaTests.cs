@@ -11,8 +11,8 @@ public sealed class SchemaTests(ContainerFixture fixture)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);
 
-        var resolver = fixture.Factory.Services.GetRequiredService<IRequestExecutorResolver>();
-        var executor = await resolver.GetRequestExecutorAsync();
+        var provider = fixture.Factory.Services.GetRequiredService<IRequestExecutorProvider>();
+        var executor = await provider.GetExecutorAsync();
         var sdl = executor.Schema.ToString();
 
         // Query surface.
@@ -49,7 +49,7 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("burnAreaCumulative(year: Int!): [DayArea!]!", sdl);
         Assert.Contains("causeBreakdown(year: Int!): [CauseCount!]!", sdl);
         Assert.Contains("falseAlarmStats(year: Int!): [DistrictFalseAlarms!]!", sdl);
-        Assert.Contains("responseTimeStats(year: Int! district: String): ResponseTimeStats", sdl);
+        Assert.Contains("responseTimeStats(year: Int!, district: String): ResponseTimeStats", sdl);
         Assert.Contains("concelhoProfile(dico: String!): ConcelhoProfile", sdl);
         Assert.Contains("ignitionClusters(activeOnly: Boolean! = true): [IgnitionCluster!]!", sdl);
         Assert.Contains("clusterId: ID", sdl);
@@ -62,7 +62,7 @@ public sealed class SchemaTests(ContainerFixture fixture)
         // WP4 — alert subscriptions, webhooks, situation reports.
         Assert.Contains("createAlertSubscription(input: CreateAlertSubscriptionInput!): AlertSubscription!", sdl);
         Assert.Contains("deleteAlertSubscription(id: ID!): Boolean!", sdl);
-        Assert.Contains("registerWebhook(url: String! events: [String!]!): Webhook!", sdl);
+        Assert.Contains("registerWebhook(url: String!, events: [String!]!): Webhook!", sdl);
         Assert.Contains("deleteWebhook(id: ID!): Boolean!", sdl);
         Assert.Contains("situationReports(first: Int! = 7): [SituationReport!]!", sdl);
         Assert.Contains("webhooks: [Webhook!]!", sdl);
@@ -85,7 +85,7 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.Contains("alertSubscriptions: [AlertSubscription!]!", sdl);
         Assert.Contains("createApiKey(name: String!): CreatedApiKey!", sdl);
         Assert.Contains("revokeApiKey(id: ID!): Boolean!", sdl);
-        Assert.Contains("updateAlertSubscription(id: ID! input: CreateAlertSubscriptionInput!): AlertSubscription!", sdl);
+        Assert.Contains("updateAlertSubscription(id: ID!, input: CreateAlertSubscriptionInput!): AlertSubscription!", sdl);
         Assert.Contains("type ApiKeyInfo", sdl);
         Assert.Contains("keyPrefix: String", sdl);
         Assert.Contains("type CreatedApiKey", sdl);

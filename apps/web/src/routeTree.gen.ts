@@ -17,6 +17,7 @@ import { Route as CreditosRouteImport } from './routes/creditos'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as AvisosRouteImport } from './routes/avisos'
 import { Route as ApiRouteImport } from './routes/api'
+import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConcelhoDicoRouteImport } from './routes/concelho.$dico'
 import { Route as ApiWeatherTilesRouteImport } from './routes/api/weather-tiles'
@@ -61,6 +62,11 @@ const ApiRoute = ApiRouteImport.update({
   path: '/api',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertasRoute = AlertasRouteImport.update({
+  id: '/alertas',
+  path: '/alertas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,6 +85,7 @@ const ApiWeatherTilesRoute = ApiWeatherTilesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
   '/api': typeof ApiRouteWithChildren
   '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
   '/api': typeof ApiRouteWithChildren
   '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
   '/api': typeof ApiRouteWithChildren
   '/avisos': typeof AvisosRoute
   '/conta': typeof ContaRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/alertas'
     | '/api'
     | '/avisos'
     | '/conta'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/alertas'
     | '/api'
     | '/avisos'
     | '/conta'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/alertas'
     | '/api'
     | '/avisos'
     | '/conta'
@@ -161,6 +173,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertasRoute: typeof AlertasRoute
   ApiRoute: typeof ApiRouteWithChildren
   AvisosRoute: typeof AvisosRoute
   ContaRoute: typeof ContaRoute
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alertas': {
+      id: '/alertas'
+      path: '/alertas'
+      fullPath: '/alertas'
+      preLoaderRoute: typeof AlertasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -266,6 +286,7 @@ const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertasRoute: AlertasRoute,
   ApiRoute: ApiRouteWithChildren,
   AvisosRoute: AvisosRoute,
   ContaRoute: ContaRoute,

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -74,6 +74,14 @@ export function IncidentPanel({
 }: IncidentPanelProps) {
   const isMobile = useIsMobile()
 
+  // Retain the last selected incident so the sheet keeps rendering it through
+  // vaul's ~500ms close animation (matching how AnimatePresence retains the
+  // exiting desktop card). Clearing on `incident == null` would otherwise animate
+  // an empty sheet and rip recharts/radix out mid-animation on every close.
+  const lastIncidentRef = useRef(incident)
+  if (incident) lastIncidentRef.current = incident
+  const shownIncident = incident ?? lastIncidentRef.current
+
   // Close on Escape (desktop card; the drawer handles it natively).
   useEffect(() => {
     if (!incident || isMobile) return
@@ -94,15 +102,21 @@ export function IncidentPanel({
         snapPoints={[0.55, 1]}
       >
         <DrawerContent className="max-h-[96vh] border-black/5 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/85">
-          {incident && (
+          {shownIncident && (
             // Native scroll container (not radix ScrollArea): vaul detects a real
             // overflow-y ancestor to decide between scrolling the content and
             // dragging the sheet. At the top snap point this scrolls; at scrollTop
             // 0 a downward drag still dismisses. `overscroll-contain` stops the
             // gesture from chaining to the page behind.
+            //
+            // Keyed by incident id: switching fires while the sheet is open
+            // remounts the content cleanly instead of reusing one instance across
+            // incidents (which would bleed the scrubber / perimeter-version state
+            // of the previous fire into the next).
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               <PanelContent
-                incident={incident}
+                key={shownIncident.id}
+                incident={shownIncident}
                 onClose={onClose}
                 onOverlaysChange={onOverlaysChange}
               />
@@ -417,10 +431,12 @@ function PanelContent({
             setScrubTime(value)
           }}
           onTogglePlay={() => {
-            setPlaying((p) => {
-              if (!p && scrubTime >= range.end) setScrubTime(range.start)
-              return !p
-            })
+            // Keep the updater pure: decide the next state and rewind here rather
+            // than calling setScrubTime from inside the setPlaying updater (which
+            // re-runs, and thus double-fires the rewind, under StrictMode).
+            const willPlay = !playing
+            if (willPlay && scrubTime >= range.end) setScrubTime(range.start)
+            setPlaying(willPlay)
           }}
           weather={detail?.weather ?? null}
         />

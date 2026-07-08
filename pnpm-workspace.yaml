@@ -7,3 +7,6 @@ allowBuilds:
   '@scarf/scarf': false
   esbuild: true
   lightningcss: true
+
+patchedDependencies:
+  expo-modules-jsi: patches/expo-modules-jsi.patch

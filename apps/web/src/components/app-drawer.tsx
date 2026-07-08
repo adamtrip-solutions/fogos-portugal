@@ -8,6 +8,7 @@ import {
   ChartColumn,
   CircleUser,
   Code,
+  ExternalLink,
   Flame,
   Gauge,
   Info,
@@ -152,7 +153,17 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
               Sem publicidade. Sem fins lucrativos.
             </p>
             <p className="mt-1 text-xs leading-snug text-muted-foreground">
-              Código aberto — em breve no GitHub.
+              Código aberto —{' '}
+              <a
+                href="https://github.com/adamtrip-solutions/fogos-portugal"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+              >
+                ver no GitHub
+                <ExternalLink className="size-3" aria-hidden />
+              </a>
+              .
             </p>
             <p className="mt-2 text-xs leading-snug text-muted-foreground">
               Fonte não oficial — em emergência, ligue{' '}

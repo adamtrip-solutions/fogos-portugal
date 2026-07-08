@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { HeartHandshake, TriangleAlert } from 'lucide-react'
+import { ExternalLink, HeartHandshake, TriangleAlert } from 'lucide-react'
 
 import { ContentPage, InfoCard } from '#/components/content-page.tsx'
 import { pageMeta } from '#/lib/seo.ts'
@@ -84,9 +84,19 @@ function Sobre() {
             <p className="text-sm leading-relaxed text-muted-foreground">
               Este projeto não tem publicidade, não tem subscrições pagas e não
               tem fins lucrativos — e nunca terá. Ninguém ganha dinheiro com o
-              acesso a esta informação. O código será aberto e disponibilizado
-              publicamente, para que qualquer pessoa o possa consultar, verificar
-              ou reutilizar.
+              acesso a esta informação. O código é aberto e está disponível
+              publicamente no{' '}
+              <a
+                href="https://github.com/adamtrip-solutions/fogos-portugal"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-emerald-700 hover:underline dark:text-emerald-300"
+              >
+                GitHub
+                <ExternalLink className="size-3.5" aria-hidden />
+              </a>
+              , para que qualquer pessoa o possa consultar, verificar ou
+              reutilizar.
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground">
               É um trabalho de natureza cívica, feito por quem se interessa pelo

@@ -72,6 +72,10 @@ public sealed class ContainerFixture : IAsyncLifetime
         // Alert-subscription creation gate defaults high (all TestServer requests share one IP).
         ["Alerts:CreatePerIpPerMinute"] = "100000",
         ["Alerts:CreatePerIpPerDay"] = "100000",
+        // Device-registration gate (Web Push + app devices) likewise defaults high — all TestServer
+        // requests share one IP, so the real per-IP limit would trip cumulatively across the suite.
+        ["WebPush:RegisterPerIpPerMinute"] = "100000",
+        ["WebPush:RegisterPerIpPerDay"] = "100000",
     };
 
     public async Task InitializeAsync()

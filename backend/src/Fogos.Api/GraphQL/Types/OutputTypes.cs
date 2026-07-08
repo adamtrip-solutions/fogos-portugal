@@ -122,6 +122,13 @@ public sealed record Webhook(
 /// </summary>
 public sealed record RegisteredDevice([property: ID] string Id);
 
+/// <summary>
+/// The credential minted by <c>registerAppDevice</c>: the device id plus its secret, shown exactly ONCE.
+/// The server stores only the SHA-256 hash of the secret (never the plaintext). The app persists both in
+/// secure storage and thereafter authenticates with <c>X-Device-Key: fdv1.{deviceId}.{deviceSecret}</c>.
+/// </summary>
+public sealed record AppDeviceCredential([property: ID] string DeviceId, string DeviceSecret);
+
 /// <summary>Metadata of a stored KML perimeter version (the raw KML is reached only via REST by id).</summary>
 public sealed record KmlVersionMeta(
     string Id,

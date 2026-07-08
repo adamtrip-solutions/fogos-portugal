@@ -42,10 +42,10 @@ public sealed class AlertDeliveryService(
             foreach (var d in deliveries)
             {
                 if (d.Subscription.DeviceId is not { Length: > 0 } id
-                    || !byId.TryGetValue(id, out var device) || device.Disabled)
+                    || !byId.TryGetValue(id, out var device) || device.Disabled || device.Revoked)
                     continue;
                 if (device.Platform != DevicePlatform.Web)
-                    continue; // Ios/Android reserved for the Expo mobile plan (N1) — no channel wired yet.
+                    continue; // Ios/Android (the Expo mobile app) deliver via the Expo channel, not Web Push.
 
                 sends.Add((device, new WebPushPayload(WebPushCopy.Title(d.Kind), d.Message, d.Url, d.DedupeKey)));
             }

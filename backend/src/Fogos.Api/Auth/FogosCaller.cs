@@ -13,6 +13,13 @@ public sealed class FogosCaller
     public string? Name { get; init; }
     public IReadOnlyList<string> Scopes { get; init; } = [];
 
+    /// <summary>
+    /// The <c>devices</c> id when the caller authenticated with an <c>X-Device-Key</c> (mobile app, <c>App</c>
+    /// tier); null otherwise. Deliberately distinct from <see cref="ClientId"/> so the read-only-API-key guard
+    /// (which keys off <see cref="ClientId"/>) never classifies a device caller as a read-only machine caller.
+    /// </summary>
+    public string? DeviceId { get; init; }
+
     /// <summary>The local <c>users</c> id when the caller is a signed-in human (Clerk Bearer); null otherwise.</summary>
     public string? UserId { get; init; }
 

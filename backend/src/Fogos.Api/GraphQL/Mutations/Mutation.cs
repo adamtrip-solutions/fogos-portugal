@@ -228,14 +228,19 @@ public sealed class Mutation
         {
             Kind = input.Kind,
             OwnerUserId = caller.UserId,
+            // A device caller (App tier) owns the subscription by its device id — the device-analogue of
+            // OwnerUserId. Only that device may later update/delete it.
+            DeviceId = caller.DeviceId,
             CreatedAt = clock.UtcNow,
         };
         await ValidateAndApplyAsync(subscription, input, locations, o, ct);
 
-        // Optional Web Push binding: the device must exist and be enabled (capability check by its GUID id).
-        // An owned device may only be bound by its owner; a mismatch reports exactly like not-found so the
-        // response never becomes an existence oracle for another user's device id.
-        if (!string.IsNullOrEmpty(input.DeviceId))
+        // Optional Web Push binding (anonymous / signed-in web callers only): the device must exist and be
+        // enabled (capability check by its GUID id). An owned device may only be bound by its owner; a
+        // mismatch reports exactly like not-found so the response never becomes an existence oracle for
+        // another user's device id. Skipped for App-tier device callers, whose subscription is already bound
+        // to their own device above.
+        if (caller.DeviceId is null && !string.IsNullOrEmpty(input.DeviceId))
         {
             var device = await devices.GetByIdAsync(input.DeviceId, ct);
             if (device is null || device.Disabled
@@ -246,6 +251,42 @@ public sealed class Mutation
 
         await mongo.AlertSubscriptions.InsertOneAsync(subscription, cancellationToken: ct);
         return subscription;
+    }
+
+    /// <summary>
+    /// Registers a mobile app install on first launch: creates an app <c>devices</c> document and mints its
+    /// device-bound credential. The secret is generated with the shared key generator, returned ONCE, and
+    /// stored only as its SHA-256 hash (never plaintext — the <c>ApiClient</c> posture). Anonymous-allowed and
+    /// per-IP rate-limited with the same <see cref="DeviceRegistrationGate"/> as Web Push registration. The
+    /// client presents the credential thereafter as <c>X-Device-Key: fdv1.{deviceId}.{deviceSecret}</c>.
+    /// </summary>
+    public async Task<AppDeviceCredential> RegisterAppDevice(
+        RegisterAppDeviceInput input,
+        MongoContext mongo,
+        DeviceRegistrationGate gate,
+        IClock clock,
+        IFogosCallerAccessor callerAccessor,
+        CancellationToken ct)
+    {
+        var caller = callerAccessor.Caller;
+        if (!await gate.TryAcquireAsync(caller.RemoteIp, ct))
+            throw Fail("Demasiados registos de dispositivo. Tente novamente dentro de momentos.", "RATE_LIMITED");
+
+        var secret = ApiKeyGenerator.NewPlaintext();
+        var now = clock.UtcNow;
+        var device = new Device
+        {
+            Id = Guid.NewGuid().ToString("N"), // capability id — random, NOT an enumerable ObjectId.
+            Platform = input.Platform == AppPlatform.Ios ? DevicePlatform.Ios : DevicePlatform.Android,
+            SecretHash = ApiKeyGenerator.Hash(secret),
+            Model = Clean(input.Model),
+            AppVersion = Clean(input.AppVersion),
+            CreatedAt = now,
+            LastSeenAt = now,
+        };
+        await mongo.Devices.InsertOneAsync(device, cancellationToken: ct);
+
+        return new AppDeviceCredential(device.Id, secret);
     }
 
     /// <summary>
@@ -372,7 +413,8 @@ public sealed class Mutation
 
     /// <summary>
     /// Updates one of the caller's own alert subscriptions, re-running the full create validation. Owner-only:
-    /// throws when the id is unknown or owned by someone else.
+    /// a signed-in user may touch only their own (OwnerUserId) subscriptions; an App-tier device may touch
+    /// only its own (DeviceId) subscriptions. Throws when the id is unknown or owned by someone else.
     /// </summary>
     public async Task<AlertSubscription> UpdateAlertSubscription(
         [ID] string id,
@@ -383,14 +425,18 @@ public sealed class Mutation
         IOptions<AlertOptions> options,
         CancellationToken ct)
     {
-        var userId = RequireUser(callerAccessor);
+        // Update is owner-only: a signed-in user or an App-tier device. Anonymous callers (who cannot prove
+        // ownership) recreate rather than update, exactly as before this mutation learned about devices.
+        var caller = callerAccessor.Caller;
+        if (caller.UserId is null && caller.DeviceId is null)
+            throw Fail("É necessária autenticação de utilizador ou dispositivo.", "UNAUTHENTICATED");
 
         AlertSubscription? existing;
         try
         {
             var f = Builders<AlertSubscription>.Filter;
             existing = await mongo.AlertSubscriptions
-                .Find(f.Eq(x => x.Id, id) & f.Eq(x => x.OwnerUserId, userId))
+                .Find(f.Eq(x => x.Id, id) & OwnershipFilter(caller))
                 .FirstOrDefaultAsync(ct);
         }
         catch (FormatException)
@@ -417,25 +463,39 @@ public sealed class Mutation
     }
 
     /// <summary>
-    /// Deletes an alert subscription by id. Only unowned subscriptions, or those owned by the caller, are
-    /// removable — so an anonymous caller can no longer delete a user-owned subscription. Returns false when
-    /// the id is unknown, malformed, or owned by another user.
+    /// Deletes an alert subscription by id. An App-tier device may delete only its own (DeviceId)
+    /// subscriptions — never another device's. A user/anonymous caller may delete unowned subscriptions or
+    /// those they own — so an anonymous caller can no longer delete a user-owned subscription. Returns false
+    /// when the id is unknown, malformed, or not owned by the caller.
     /// </summary>
     public async Task<bool> DeleteAlertSubscription(
         [ID] string id, MongoContext mongo, IFogosCallerAccessor callerAccessor, CancellationToken ct)
     {
-        var userId = callerAccessor.Caller.UserId;
         var f = Builders<AlertSubscription>.Filter;
         try
         {
             var result = await mongo.AlertSubscriptions.DeleteOneAsync(
-                f.Eq(x => x.Id, id) & f.Or(f.Eq(x => x.OwnerUserId, null), f.Eq(x => x.OwnerUserId, userId)), ct);
+                f.Eq(x => x.Id, id) & OwnershipFilter(callerAccessor.Caller), ct);
             return result.DeletedCount > 0;
         }
         catch (FormatException)
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// The mutate-ownership predicate for alert subscriptions. An App-tier device caller may touch only
+    /// subscriptions bound to its own device id. A user/anonymous caller may touch unowned subscriptions or
+    /// those they own (a signed-in user's OwnerUserId). This is what keeps one device out of another device's
+    /// subscriptions while leaving anonymous/IP-created subscriptions freely mutable as before.
+    /// </summary>
+    private static FilterDefinition<AlertSubscription> OwnershipFilter(FogosCaller caller)
+    {
+        var f = Builders<AlertSubscription>.Filter;
+        if (caller.DeviceId is { } deviceId)
+            return f.Eq(x => x.DeviceId, deviceId);
+        return f.Or(f.Eq(x => x.OwnerUserId, null), f.Eq(x => x.OwnerUserId, caller.UserId));
     }
 
     /// <summary>
@@ -613,6 +673,13 @@ public sealed class Mutation
         if (!caller.IsUser || string.IsNullOrEmpty(caller.UserId))
             throw Fail("É necessária autenticação de utilizador.", "UNAUTHENTICATED");
         return caller.UserId;
+    }
+
+    /// <summary>Trims optional free-text metadata to null when blank (so IgnoreIfNull keeps it out of Mongo).</summary>
+    private static string? Clean(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
     private static string? ComposePositNarrative(PositInput input)

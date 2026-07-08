@@ -10,10 +10,12 @@ namespace Fogos.Api.Auth;
 /// <summary>
 /// Resolves the caller for every request in order: (1) <c>Authorization: Bearer</c> JWT — a self-issued
 /// machine token or a Clerk session token, routed by an unverified <c>iss</c> peek (trust still comes
-/// only from the routed validator); (2) <c>X-API-Key</c>; (3) anonymous. Populates
-/// <see cref="HttpContext.Items"/> and a <see cref="ClaimsPrincipal"/> (so ASP.NET/HotChocolate
-/// authorization policies work), then enforces Origin pinning for public-context credentials. A present
-/// Bearer that fails validation is always a hard 401 — it is never silently downgraded to anonymous.
+/// only from the routed validator); (2) <c>X-API-Key</c>; (3) <c>X-Device-Key</c> (mobile app device
+/// credential → App tier); (4) anonymous. When both an API key and a device key are presented the API key
+/// wins (it is checked first and returns early). Populates <see cref="HttpContext.Items"/> and a
+/// <see cref="ClaimsPrincipal"/> (so ASP.NET/HotChocolate authorization policies work), then enforces Origin
+/// pinning for public-context credentials. Any present-but-invalid credential (Bearer, X-API-Key, or
+/// X-Device-Key) is always a hard 401 — it is never silently downgraded to anonymous.
 /// </summary>
 public sealed class AuthenticationMiddleware(RequestDelegate next)
 {
@@ -21,6 +23,7 @@ public sealed class AuthenticationMiddleware(RequestDelegate next)
         HttpContext context,
         JwtService jwt,
         ApiKeyResolver apiKeys,
+        DeviceKeyResolver deviceKeys,
         ClientIpResolver ipResolver,
         ClerkTokenValidator clerk,
         UserProvisioningService provisioning,
@@ -114,7 +117,34 @@ public sealed class AuthenticationMiddleware(RequestDelegate next)
             return;
         }
 
-        // (3) Anonymous.
+        // (3) X-Device-Key (mobile app device credential). Checked AFTER X-API-Key, so when BOTH headers are
+        // present the API key wins (the X-API-Key branch above returns before reaching here) — an issued key
+        // is the more privileged, origin-pinnable credential. A present-but-invalid device key is a hard 401
+        // (DEVICE_UNAUTHENTICATED), never silently downgraded to anonymous — same invariant as Bearer/API-key.
+        var deviceKey = context.Request.Headers["X-Device-Key"].ToString();
+        if (!string.IsNullOrWhiteSpace(deviceKey))
+        {
+            var device = await deviceKeys.ResolveAsync(deviceKey, context.RequestAborted);
+            if (device is null)
+            {
+                await WriteError(context, StatusCodes.Status401Unauthorized, "DEVICE_UNAUTHENTICATED", "The device key is unknown or revoked.");
+                return;
+            }
+
+            // App tier: partitioned per device (dk:{deviceId}). ClientId stays null so the read-only-API-key
+            // guard leaves device callers alone; zero scopes so no operator/write policy ever passes.
+            var caller = new FogosCaller
+            {
+                Tier = ApiTier.App,
+                DeviceId = device.Id,
+                RemoteIp = ip,
+            };
+            Assign(context, caller);
+            await next(context);
+            return;
+        }
+
+        // (4) Anonymous.
         Assign(context, FogosCaller.Anonymous(ip));
         await next(context);
     }

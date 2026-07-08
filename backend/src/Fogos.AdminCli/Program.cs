@@ -38,6 +38,9 @@ switch (command)
     case "keys":
         return await KeyCommands.RunAsync(host.Services, args);
 
+    case "devices":
+        return await DeviceCommands.RunAsync(host.Services, args);
+
     case "demo-seed":
         return await DemoSeedCommand.RunAsync(host.Services, args);
 
@@ -53,6 +56,8 @@ switch (command)
         Console.Error.WriteLine("                 issue a new fgs_live_ API key (plaintext printed once)");
         Console.Error.WriteLine("  keys list       list issued keys (id, name, tier, scopes, publicContext, created, revoked)");
         Console.Error.WriteLine("  keys revoke <id>  revoke a key by id");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("  devices revoke <id>  revoke a mobile app device by id (kills its X-Device-Key + push)");
         Console.Error.WriteLine();
         Console.Error.WriteLine("  demo-seed [--database fogos_demo] [--drop] [--locations <path>]");
         Console.Error.WriteLine("                 populate a demo database with deterministic, live-looking sample data");

@@ -11,6 +11,7 @@ import {
   WIND_PARTICLES_CREDIT,
 } from '#/lib/weather/catalog.ts'
 import type { WeatherLayerKey } from '#/lib/weather/catalog.ts'
+import { FWI_CREDIT, FWI_HELP_TEXT } from '#/lib/weather/effis.ts'
 import type { WeatherAvailability } from '#/lib/weather/api.ts'
 import type { RadarFrame } from '#/lib/weather/radar.ts'
 
@@ -153,6 +154,15 @@ export function WeatherLayerControl({
             )}
             <p className="text-[11px] text-muted-foreground">{RADAR_CREDIT}</p>
           </div>
+        </div>
+      )}
+
+      {activeDef?.kind === 'effis' && (
+        <div className="mt-3 space-y-2 border-t border-black/5 pt-3 dark:border-white/10">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {FWI_HELP_TEXT}
+          </p>
+          <p className="text-[11px] text-muted-foreground">{FWI_CREDIT}</p>
         </div>
       )}
 

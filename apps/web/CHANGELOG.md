@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.10.0...web-v1.11.0) (2026-07-11)
+
+
+### Features
+
+* **web:** EFFIS fire weather index map overlay with forecast day selector ([#67](https://github.com/adamtrip-solutions/fogos-portugal/issues/67)) ([bb91035](https://github.com/adamtrip-solutions/fogos-portugal/commit/bb910356d41c849151f3810037c5391530879c45))
+
+
+### Bug Fixes
+
+* retain and key mobile incident sheet across close/switch ([#68](https://github.com/adamtrip-solutions/fogos-portugal/issues/68)) ([5a79b51](https://github.com/adamtrip-solutions/fogos-portugal/commit/5a79b510db85248890966e7da08ce34577c5ecc3))
+* **web:** link the public GitHub repository from footer and about page ([#65](https://github.com/adamtrip-solutions/fogos-portugal/issues/65)) ([76fd83c](https://github.com/adamtrip-solutions/fogos-portugal/commit/76fd83c60083a10a9439ae4807598f895c76d299))
+
 ## [1.10.0](https://github.com/adamtrip-solutions/fogos-portugal/compare/web-v1.9.0...web-v1.10.0) (2026-07-07)
 
 

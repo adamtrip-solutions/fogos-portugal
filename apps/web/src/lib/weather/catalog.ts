@@ -8,8 +8,11 @@
 // domain. RainViewer radar (`kind: 'radar'`) is not WMS-based — it is fetched
 // and animated client-side (see `radar.ts`), so it carries no WMS metadata.
 
+import { FWI_LAYER_LABEL } from '#/lib/weather/effis.ts'
+
 export type WeatherLayerKey =
   | 'risk'
+  | 'fwi'
   | 'radar'
   | 'temperature'
   | 'wind'
@@ -42,7 +45,19 @@ export interface RadarLayerDef {
   label: string
 }
 
-export type WeatherLayerDef = WmsLayerDef | RadarLayerDef
+/**
+ * EFFIS Fire Weather Index: a Copernicus WMS hit directly (CORS `*`, no proxy),
+ * with a forecast-day dimension. Source, legend and copy live in `effis.ts`;
+ * the def here only registers it as a selectable layer.
+ */
+export interface EffisLayerDef {
+  kind: 'effis'
+  key: 'fwi'
+  /** European-Portuguese label shown in the control. */
+  label: string
+}
+
+export type WeatherLayerDef = WmsLayerDef | RadarLayerDef | EffisLayerDef
 
 const CONTINENT_ONLY: WeatherRegion[] = ['continent']
 const ALL_REGIONS: WeatherRegion[] = ['continent', 'madeira', 'azores']
@@ -55,6 +70,7 @@ function legendUrl(layer: string): string {
 /** Concrete def type per key, so indexing narrows to the right shape. */
 interface WeatherLayerDefs {
   risk: WmsLayerDef
+  fwi: EffisLayerDef
   radar: RadarLayerDef
   temperature: WmsLayerDef
   wind: WmsLayerDef
@@ -71,6 +87,11 @@ export const WEATHER_LAYERS: WeatherLayerDefs = {
     timeBased: false,
     regions: CONTINENT_ONLY,
     legendUrl: legendUrl('lsasaf.risk.continent'),
+  },
+  fwi: {
+    kind: 'effis',
+    key: 'fwi',
+    label: FWI_LAYER_LABEL,
   },
   radar: {
     kind: 'radar',
@@ -118,6 +139,7 @@ export const WEATHER_LAYERS: WeatherLayerDefs = {
 /** Ordered list for rendering the control (matches the spec's label order). */
 export const WEATHER_LAYER_LIST: WeatherLayerDef[] = [
   WEATHER_LAYERS.risk,
+  WEATHER_LAYERS.fwi,
   WEATHER_LAYERS.radar,
   WEATHER_LAYERS.temperature,
   WEATHER_LAYERS.wind,

@@ -25,6 +25,7 @@ import type { WeatherLayerKey } from '#/lib/weather/catalog.ts'
 import { useTheme } from '#/lib/theme.ts'
 import { pageMeta } from '#/lib/seo.ts'
 import { AppToolbar } from '#/components/app-toolbar.tsx'
+import { FireDangerPanel } from '#/components/fire-danger-panel.tsx'
 import { FireFilterControl } from '#/components/fire-filter-control.tsx'
 import { FireMap } from '#/components/fire-map.tsx'
 import type { IncidentMapOverlays } from '#/components/fire-map.tsx'
@@ -84,6 +85,9 @@ function Home() {
   const [weatherLayer, setWeatherLayer] = useState<WeatherLayerKey | 'none'>(
     'none',
   )
+  // EFFIS FWI forecast day (0 = today, 1 = +1, 2 = +2); only used while the
+  // 'fwi' layer is active.
+  const [fireDangerDay, setFireDangerDay] = useState(0)
   const [radarPlaying, setRadarPlaying] = useState(true)
 
   // "Só ativos" is a shortcut over the same bucket state: pressed exactly when
@@ -253,6 +257,7 @@ function Home() {
           radarData={radar.data}
           radarActiveIndex={radarActiveIndex}
           windFields={wind.data}
+          fireDangerDay={fireDangerDay}
           incidentOverlays={incidentOverlays}
         />
       </ClientOnly>
@@ -292,7 +297,13 @@ function Home() {
           }
         />
 
-        <div className="pointer-events-auto absolute bottom-6 left-4 z-10">
+        <div className="pointer-events-auto absolute bottom-6 left-4 z-10 flex flex-col gap-2">
+          {weatherLayer === 'fwi' && (
+            <FireDangerPanel
+              day={fireDangerDay}
+              onDayChange={setFireDangerDay}
+            />
+          )}
           <MapLegend />
         </div>
 

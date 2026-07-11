@@ -37,6 +37,11 @@ const SOURCES = [
     href: 'https://firms.modaps.eosdis.nasa.gov',
   },
   {
+    name: 'EFFIS — European Forest Fire Information System (Copernicus Emergency Management Service, © União Europeia)',
+    desc: 'Índice meteorológico de perigo de incêndio (FWI).',
+    href: 'https://forest-fire.emergency.copernicus.eu/',
+  },
+  {
     name: 'RainViewer',
     desc: 'Radar de precipitação.',
     href: 'https://www.rainviewer.com',

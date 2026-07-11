@@ -36,6 +36,11 @@ import type { Theme } from '#/lib/theme.ts'
 import type { IncidentListItem } from '#/lib/fogos/types.ts'
 import { WEATHER_LAYERS, wmsLayersFor } from '#/lib/weather/catalog.ts'
 import type { WeatherLayerKey } from '#/lib/weather/catalog.ts'
+import {
+  FWI_ATTRIBUTION,
+  effisFwiTiles,
+  fireDangerDate,
+} from '#/lib/weather/effis.ts'
 import type { WeatherAvailability } from '#/lib/weather/api.ts'
 import { radarTileUrl } from '#/lib/weather/radar.ts'
 import type { RadarData } from '#/lib/weather/radar.ts'
@@ -171,7 +176,17 @@ interface FireMapProps {
   radarData: RadarData | undefined
   radarActiveIndex: number
   windFields: WindField[] | undefined
+  /** EFFIS FWI forecast day: 0 = today, 1 = +1, 2 = +2 (Europe/Lisbon). */
+  fireDangerDay: number
   incidentOverlays: IncidentMapOverlays | null
+}
+
+// EFFIS FWI raster: below all fire layers, ~0.55 opacity with a short fade so a
+// day switch (source remount) crossfades rather than flickering.
+const fireDangerPaint: RasterLayerSpecification['paint'] = {
+  'raster-opacity': 0.55,
+  'raster-fade-duration': 300,
+  'raster-resampling': 'linear',
 }
 
 const weatherRasterPaint: RasterLayerSpecification['paint'] = {
@@ -276,6 +291,7 @@ export function FireMap({
   radarData,
   radarActiveIndex,
   windFields,
+  fireDangerDay,
   incidentOverlays,
 }: FireMapProps) {
   const mapRef = useRef<MapRef | null>(null)
@@ -319,6 +335,11 @@ export function FireMap({
   // Wind particles ride over the IPMA windintensity raster.
   const showWindParticles =
     weatherLayer === 'wind' && windFields != null && windFields.length > 0
+  // EFFIS FWI raster, hit directly (CORS `*`, no proxy). The tile URL carries
+  // the selected forecast day's date; keying the source on it makes a day
+  // switch remove + re-add the source (react-map-gl reconciles reactively).
+  const showFireDanger = weatherLayer === 'fwi'
+  const fireDangerTileDate = fireDangerDate(fireDangerDay)
 
   const numericIdFor = useCallback(
     (id: string | null): number | null => {
@@ -745,6 +766,27 @@ export function FireMap({
           </button>
         </Marker>
       ))}
+
+      {/* EFFIS Fire Weather Index raster (direct WMS, no proxy). beforeId keeps
+          it below the fire halos/dots/labels; the source key includes the date
+          so switching forecast day remounts the source. */}
+      {showFireDanger && (
+        <Source
+          key={`fire-danger-${fireDangerTileDate}`}
+          id="fire-danger"
+          type="raster"
+          tiles={[effisFwiTiles(fireDangerTileDate)]}
+          tileSize={256}
+          attribution={FWI_ATTRIBUTION}
+        >
+          <Layer
+            id="fire-danger-raster"
+            type="raster"
+            beforeId="fires-halo"
+            paint={fireDangerPaint}
+          />
+        </Source>
+      )}
 
       {/* Rendered after the fires source; beforeId slots it below the fires
           layers, which react-map-gl v8 reconciles reactively. */}

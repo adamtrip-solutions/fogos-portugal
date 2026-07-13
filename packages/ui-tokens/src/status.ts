@@ -1,10 +1,20 @@
-// Status/bucket presentation helpers — ported from
-// apps/web/src/lib/fogos/format.ts (map + sheet subset). pt-PT throughout.
+// Status buckets, palette colors, and pt-PT labels shared by every surface (map
+// dots, sheet badges, legends). Single source of truth so all agree on grouping
+// and color. No React / RN imports.
 
 const ACTIVE_STATUS_CODES = new Set([3, 4, 5, 6])
 
 export function isActiveStatus(code: number): boolean {
   return ACTIVE_STATUS_CODES.has(code)
+}
+
+/**
+ * Still-ongoing statuses: active (3–6) plus Em Resolução (7) and Vigilância (9).
+ * These show on the map regardless of age; only finished fires (Conclusão,
+ * Encerrada, close-out 13, falso alarme/alerta) get time-windowed out.
+ */
+export function isOngoingStatus(code: number): boolean {
+  return ACTIVE_STATUS_CODES.has(code) || code === 7 || code === 9
 }
 
 const STATUS_RED = '#B81E1F' // em curso
@@ -33,6 +43,19 @@ export const STATUS_BUCKET_LABEL: Record<StatusBucket, string> = {
   resolving: 'Em resolução',
   vigilancia: 'Vigilância',
   done: 'Concluído',
+}
+
+/**
+ * Status codes that map to each bucket — the inverse of {@link statusBucket},
+ * kept in lockstep with it. Translates a set of selected buckets into the
+ * `statusCodes` filter the API expects (see `buildIncidentsFilter`).
+ */
+export const STATUS_BUCKET_CODES: Record<StatusBucket, number[]> = {
+  dispatch: [3, 4],
+  ongoing: [5, 6],
+  resolving: [7],
+  vigilancia: [9],
+  done: [8, 10, 11, 12, 13],
 }
 
 export function statusBucket(code: number): StatusBucket {
@@ -65,52 +88,4 @@ export function statusColorForCode(code: number): string {
 /** Gray badges need dark text; every other status color reads on white. */
 export function badgeNeedsDarkText(color: string): boolean {
   return color.toUpperCase() === STATUS_GRAY
-}
-
-const rtf = new Intl.RelativeTimeFormat('pt', { numeric: 'auto' })
-
-const DIVISIONS: Array<{ amount: number; unit: Intl.RelativeTimeFormatUnit }> = [
-  { amount: 60, unit: 'second' },
-  { amount: 60, unit: 'minute' },
-  { amount: 24, unit: 'hour' },
-  { amount: 30, unit: 'day' },
-  { amount: 12, unit: 'month' },
-  { amount: Number.POSITIVE_INFINITY, unit: 'year' },
-]
-
-/** e.g. "há 2 horas". */
-export function formatRelative(iso: string): string {
-  let duration = (Date.parse(iso) - Date.now()) / 1000
-  for (const division of DIVISIONS) {
-    if (Math.abs(duration) < division.amount) {
-      return rtf.format(Math.round(duration), division.unit)
-    }
-    duration /= division.amount
-  }
-  return rtf.format(Math.round(duration), 'year')
-}
-
-/** Join freguesia · concelho · district, skipping empties and repeats. */
-export function locationParts(
-  freguesia: string | null,
-  concelho: string | null,
-  district: string | null,
-): string {
-  const parts: string[] = []
-  for (const raw of [freguesia, concelho, district]) {
-    const value = raw?.trim()
-    if (!value) continue
-    if (parts.some((p) => p.toLowerCase() === value.toLowerCase())) continue
-    parts.push(value)
-  }
-  return parts.join(' · ')
-}
-
-/** Resource counts use -1 as an "unknown" sentinel; treat <= 0 as absent. */
-export function hasResource(value: number): boolean {
-  return value > 0
-}
-
-export function incidentTitle(item: { natureza: string | null }): string {
-  return item.natureza?.trim() || 'Incêndio'
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 import { StyleSheet } from 'react-native'
 import {
   Camera,
@@ -7,14 +7,15 @@ import {
   Map,
 } from '@maplibre/maplibre-react-native'
 import type {
+  CameraRef,
   CircleLayerSpecification,
   FilterSpecification,
 } from '@maplibre/maplibre-react-native'
 import type { Feature, FeatureCollection, Point } from 'geojson'
 
-import { isActiveStatus, statusBucket, statusColorForCode } from '@/lib/fogos/format'
-import type { StatusBucket } from '@/lib/fogos/format'
-import type { IncidentListItem } from '@/lib/fogos/types'
+import { isActiveStatus, statusBucket, statusColorForCode } from '@fogos/ui-tokens'
+import type { StatusBucket } from '@fogos/ui-tokens'
+import type { Coordinates, IncidentListItem } from '@fogos/api-client'
 
 // Keyless Carto basemaps — same styles the web map uses. Native has no CORS, so
 // these load directly.
@@ -27,6 +28,10 @@ const HIT_LAYER_ID = 'fires-hit'
 // Continental Portugal — center + zoom (matches the web map's initial framing).
 const PORTUGAL_CENTER: [number, number] = [-8.2, 39.6]
 const PORTUGAL_ZOOM = 5.4
+
+// Zoom the deep-link camera settles on when focusing a single fire (plan 1.4).
+const FOCUS_ZOOM = 9
+const FOCUS_DURATION_MS = 1200
 
 // Stacking severity when dots overlap — live fires on top, finished at the
 // bottom. Ported verbatim from the web map so both surfaces agree.
@@ -117,20 +122,47 @@ interface FireMapProps {
   incidents: IncidentListItem[]
   isDark: boolean
   onSelect: (id: string) => void
+  /**
+   * Bottom safe/tab-bar inset (px). Offsets MapLibre's bottom-right attribution
+   * button so the tab bar never overlaps it (the button is legally required).
+   */
+  bottomInset?: number
 }
 
-export function FireMap({ incidents, isDark, onSelect }: FireMapProps) {
+/** Imperative handle: fly the camera to a fire (used by deep-link selection). */
+export interface FireMapRef {
+  /** Animate the camera to center on a coordinate at the single-fire zoom. */
+  focus: (coordinate: Coordinates) => void
+}
+
+export const FireMap = forwardRef<FireMapRef, FireMapProps>(function FireMap(
+  { incidents, isDark, onSelect, bottomInset = 0 },
+  ref,
+) {
   const data = useMemo(() => buildFeatureCollection(incidents), [incidents])
+  const cameraRef = useRef<CameraRef>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: ({ longitude, latitude }) => {
+      cameraRef.current?.flyTo({
+        center: [longitude, latitude],
+        zoom: FOCUS_ZOOM,
+        duration: FOCUS_DURATION_MS,
+      })
+    },
+  }), [])
 
   return (
     <Map
       style={StyleSheet.absoluteFill}
       mapStyle={isDark ? DARK_STYLE : LIGHT_STYLE}
       attribution
+      attributionPosition={{ bottom: bottomInset + 8, right: 8 }}
       logo={false}
       compass={false}
     >
       <Camera
+        ref={cameraRef}
         initialViewState={{ center: PORTUGAL_CENTER, zoom: PORTUGAL_ZOOM }}
       />
       <GeoJSONSource
@@ -158,4 +190,4 @@ export function FireMap({ incidents, isDark, onSelect }: FireMapProps) {
       </GeoJSONSource>
     </Map>
   )
-}
+})

@@ -133,6 +133,128 @@ public class SignalRulesTests
     public void Status_regression_matrix(int from, int to, bool expected) =>
         Assert.Equal(expected, SignalRules.IsStatusRegression(from, to));
 
+    // ── Demobilization (zero-personnel streak) ───────────────────────────────────
+
+    [Fact]
+    public void Demobilized_is_null_when_currently_manned()
+    {
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-3), 20),
+            (Now.AddHours(-1), 8),
+        ];
+        Assert.Null(SignalRules.DemobilizedSince(history, currentMan: 8, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_is_null_when_man_is_unknown_minus_one()
+    {
+        // Missing data (the -1 sentinel) must never read as demobilized, even with prior zero snapshots.
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-3), 20),
+            (Now.AddHours(-2), 0),
+        ];
+        Assert.Null(SignalRules.DemobilizedSince(history, currentMan: -1, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_is_transition_time_when_man_drops_to_zero()
+    {
+        // Manned until 2h ago, then zero: the streak starts at the first zero snapshot.
+        var transition = Now.AddHours(-2);
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-4), 15),
+            (Now.AddHours(-3), 6),
+            (transition, 0),
+            (Now.AddHours(-1), 0),
+        ];
+        Assert.Equal(transition, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_transition_dates_from_unknown_to_zero()
+    {
+        // A jump from unknown (-1) straight to 0 is a transition; the streak starts at the first zero.
+        var transition = Now.AddHours(-2);
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-4), -1),
+            (transition, 0),
+        ];
+        Assert.Equal(transition, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_falls_back_to_first_record_when_zero_from_the_start()
+    {
+        var first = Now.AddHours(-5);
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (first, 0),
+            (Now.AddHours(-2), 0),
+        ];
+        Assert.Equal(first, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_single_zero_record_dates_from_that_record()
+    {
+        var only = Now.AddHours(-6);
+        List<(DateTimeOffset At, int Man)> history = [(only, 0)];
+        Assert.Equal(only, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_falls_back_when_history_is_empty()
+    {
+        // Current man is 0 but no history to date it → the conservative fallback (e.g. updatedAt).
+        List<(DateTimeOffset At, int Man)> history = [];
+        Assert.Equal(Now, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_falls_back_when_newest_snapshot_is_non_zero()
+    {
+        // Resources say 0 now, but the latest snapshot still shows crews: the drop post-dates the series,
+        // so we cannot date it from history and use the conservative fallback.
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-3), 12),
+            (Now.AddHours(-1), 4),
+        ];
+        Assert.Equal(Now, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_resets_the_streak_after_re_manning()
+    {
+        // Zero early, re-manned, then zero again: the streak dates from the SECOND (current) drop.
+        var secondDrop = Now.AddHours(-1);
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-6), 0),   // earlier zero streak
+            (Now.AddHours(-4), 18),  // re-manned — resets the streak
+            (Now.AddHours(-2), 9),
+            (secondDrop, 0),         // current streak starts here
+        ];
+        Assert.Equal(secondDrop, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
+    [Fact]
+    public void Demobilized_tolerates_unsorted_history()
+    {
+        var transition = Now.AddHours(-2);
+        List<(DateTimeOffset At, int Man)> history =
+        [
+            (Now.AddHours(-1), 0),
+            (Now.AddHours(-4), 15),
+            (transition, 0),
+        ];
+        Assert.Equal(transition, SignalRules.DemobilizedSince(history, currentMan: 0, fallbackAt: Now));
+    }
+
     // ── 30-30-30 critical conditions ─────────────────────────────────────────────
 
     [Fact]

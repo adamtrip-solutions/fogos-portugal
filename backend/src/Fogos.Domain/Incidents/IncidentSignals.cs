@@ -39,4 +39,13 @@ public sealed class IncidentSignals
     public List<string> CriticalReasons { get; set; } = [];
 
     public DateTimeOffset? ConditionsEvaluatedAt { get; set; }
+
+    /// <summary>
+    /// Start of the incident's current streak of explicitly-reported zero personnel (when <c>man</c> last hit
+    /// 0), or null when it is currently manned or its man is unknown. Computed at read time from the resource
+    /// history (see <see cref="SignalRules.DemobilizedSince"/>) and never persisted — the signals pipeline runs
+    /// only on active fires, so this must stay fresh for the resolving/vigilância fires that the live-map
+    /// demobilized-hide rule feeds. Absent in the stored document.
+    /// </summary>
+    public DateTimeOffset? DemobilizedSince { get; set; }
 }

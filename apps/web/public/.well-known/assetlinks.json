@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "pt.fogosportugal.app",
+      "sha256_cert_fingerprints": [
+        "48:B9:6F:E8:C7:26:B6:17:06:CE:2B:8A:44:0B:64:93:62:FF:2C:20:E8:BD:7D:DB:9B:77:4F:3C:5F:6C:5A:43"
+      ]
+    }
+  }
+]

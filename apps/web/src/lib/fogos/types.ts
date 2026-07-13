@@ -100,6 +100,12 @@ export interface IncidentSignalsLite {
   escalating: boolean
   rekindle: boolean
   criticalConditions: boolean
+  /**
+   * Start of the current zero-personnel streak (man last hit 0), or null when
+   * manned/unknown. Drives the live-map demobilized-hide rule. Optional so the
+   * client tolerates an older API deployed before the field existed.
+   */
+  demobilizedSince?: string | null
 }
 
 /** Operational response durations derived from the status log; null when empty. */

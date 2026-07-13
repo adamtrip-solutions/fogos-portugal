@@ -39,7 +39,7 @@ const ACTIVE_INCIDENTS_QUERY = /* GraphQL */ `
       updatedAt
       statusChangedAt
       resources { man terrain aerial aquatic }
-      signals { escalating rekindle criticalConditions }
+      signals { escalating rekindle criticalConditions demobilizedSince }
     }
   }
 `
@@ -123,11 +123,62 @@ const RECENT_INCIDENTS_QUERY = /* GraphQL */ `
         updatedAt
         statusChangedAt
         resources { man terrain aerial aquatic }
-        signals { escalating rekindle criticalConditions }
+        signals { escalating rekindle criticalConditions demobilizedSince }
       }
     }
   }
 `
+
+// ── demobilizedSince graceful degradation ─────────────────────────────────────
+//
+// The list feeds above select `signals.demobilizedSince`, a field a freshly
+// deployed API has but an OLDER one (a rollback, or a preview pointed at a stale
+// API) does not. GraphQL validates the whole document up front, so an unknown
+// field hard-fails the ENTIRE query — which would blank the map on every poll.
+// Fallback documents drop just that field (the map predicate treats an absent
+// demobilizedSince as null anyway). We try the full document first; on the
+// schema-validation error naming the field we retry once with the fallback and
+// latch a module-level flag so subsequent polls skip straight to the fallback
+// (no repeated double request until the process restarts against a newer API).
+const ACTIVE_INCIDENTS_QUERY_FALLBACK = ACTIVE_INCIDENTS_QUERY.replace(
+  ' demobilizedSince',
+  '',
+)
+const RECENT_INCIDENTS_QUERY_FALLBACK = RECENT_INCIDENTS_QUERY.replace(
+  ' demobilizedSince',
+  '',
+)
+
+let demobilizedSinceUnsupported = false
+
+/** Whether a GraphQL error message points at the unknown `demobilizedSince` field. */
+function isDemobilizedSinceUnknown(error: unknown): boolean {
+  return error instanceof FogosApiError && /demobilizedSince/i.test(error.message)
+}
+
+/**
+ * Run a list-feed document, degrading gracefully when the deployed API predates
+ * the `demobilizedSince` field: retry once without it and latch so later calls
+ * use the fallback directly.
+ */
+async function graphqlListFeed<T>(
+  primary: string,
+  fallback: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  if (demobilizedSinceUnsupported) {
+    return graphql<T>(fallback, variables)
+  }
+  try {
+    return await graphql<T>(primary, variables)
+  } catch (error) {
+    if (isDemobilizedSinceUnknown(error)) {
+      demobilizedSinceUnsupported = true
+      return graphql<T>(fallback, variables)
+    }
+    throw error
+  }
+}
 
 interface GraphQLResponse<T> {
   data?: T
@@ -219,8 +270,9 @@ function forwardedClientIpHeaders(): Record<string, string> {
 // GraphQL calls run only on the server — the API has no CORS.
 export const fetchActiveIncidents = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const data = await graphql<{ activeIncidents: IncidentListItem[] }>(
+    const data = await graphqlListFeed<{ activeIncidents: IncidentListItem[] }>(
       ACTIVE_INCIDENTS_QUERY,
+      ACTIVE_INCIDENTS_QUERY_FALLBACK,
     )
     return data.activeIncidents
   },
@@ -270,8 +322,9 @@ async function fetchIncidentFeed(
   let cursor: string | null = null
 
   for (let page = 0; page < maxPages; page++) {
-    const data: RecentIncidentsPage = await graphql<RecentIncidentsPage>(
+    const data: RecentIncidentsPage = await graphqlListFeed<RecentIncidentsPage>(
       RECENT_INCIDENTS_QUERY,
+      RECENT_INCIDENTS_QUERY_FALLBACK,
       { filter, cursor },
     )
     nodes.push(...data.incidents.nodes)

@@ -167,6 +167,69 @@ export function locationParts(
  */
 export const WINDOW_HOURS = 3
 
+/**
+ * Live-map hide thresholds for winding-down fires. Em Resolução (7) and
+ * Vigilância (9) are "ongoing" (isOngoingStatus) so they NEVER time-window out
+ * via WINDOW_HOURS — they can sit on the map indefinitely once crews leave or
+ * the record goes quiet. See {@link isHiddenFromMap}.
+ */
+export const DEMOBILIZED_HIDE_HOURS = 12
+export const STALE_HIDE_HOURS = 24
+
+/**
+ * Map-DOT-only hide rule for Em Resolução (7) / Vigilância (9) fires. Returns
+ * true when such a fire should drop off the live map; it stays in /ocorrencias,
+ * deep links (?incident=ID), and every other surface — this decides map dots
+ * alone. Never hides any other status bucket.
+ *
+ *  1. Demobilized: `signals.demobilizedSince` is ≥ DEMOBILIZED_HIDE_HOURS old —
+ *     the crews left (man hit 0) that long ago but the fire was never closed.
+ *  2. Stale AND unmanned: the status last changed ≥ STALE_HIDE_HOURS ago and
+ *     `resources.man <= 0` — a declutter catch-all for unreported/unknown-crew
+ *     zombies the importer stopped touching. A staffed long-running fire never
+ *     hides on staleness alone; man 0 AND the -1 unknown sentinel both count as
+ *     unmanned for THIS rule (unlike `demobilizedSince`, where -1 correctly
+ *     never counts as demobilized). Staleness is keyed on `statusChangedAt`
+ *     (with an `occurredAt` fallback), NOT `updatedAt`: the backend's ICNF
+ *     enrichment job bumps `updatedAt` unconditionally every few hours on fires
+ *     of ANY status, so `updatedAt` never reads as stale for the recent fires
+ *     this targets, whereas enrichment never touches `statusChangedAt`.
+ *
+ * `demobilizedSince` is read defensively (an older API that predates the field
+ * simply never triggers rule 1).
+ */
+export function isHiddenFromMap(
+  inc: {
+    status: { code: number }
+    statusChangedAt: string | null
+    occurredAt: string
+    resources: { man: number }
+    signals: { demobilizedSince?: string | null }
+  },
+  now: number = Date.now(),
+): boolean {
+  const bucket = statusBucket(inc.status.code)
+  if (bucket !== 'resolving' && bucket !== 'vigilancia') return false
+
+  const demobilizedSince = inc.signals.demobilizedSince
+  if (
+    demobilizedSince != null &&
+    now - Date.parse(demobilizedSince) >= DEMOBILIZED_HIDE_HOURS * 3_600_000
+  ) {
+    return true
+  }
+
+  const lastChange = inc.statusChangedAt ?? inc.occurredAt
+  if (
+    inc.resources.man <= 0 &&
+    now - Date.parse(lastChange) >= STALE_HIDE_HOURS * 3_600_000
+  ) {
+    return true
+  }
+
+  return false
+}
+
 export function countLabel(count: number, activeOnly = false): string {
   if (activeOnly) {
     if (count <= 0) return 'Sem incêndios ativos'

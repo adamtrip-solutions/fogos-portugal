@@ -4,10 +4,8 @@ import type { ExpoConfig, ConfigContext } from 'expo/config'
 // committed). EAS writes `extra.eas.projectId` and `updates.url` in below once
 // `eas init` / `eas update:configure` bind the project.
 //
-// Icon/splash: sourced from apps/web/public/icon-512.png (copied to
-// assets/images/fogos-icon.png). Store submission will need a 1024px master
-// icon later — the 512px source is fine for dev/preview builds but must be
-// swapped before the first App Store / Play upload.
+// The store icon uses the 1024px master. The smaller Fogos mark remains useful
+// for the splash screen and Android adaptive icon foreground.
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'FogosPortugal',
@@ -19,10 +17,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   // New Architecture is always enabled in SDK 57 — the `newArchEnabled` flag was
   // removed from the config type (there is no legacy arch to opt back into).
-  icon: './assets/images/fogos-icon.png',
+  icon: './assets/images/icon.png',
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'pt.fogosportugal.app',
+    appleTeamId: '2A56G82R2N',
+    // Universal Links (plan 1.4/F5): opens https://fogosportugal.pt/?incident=…
+    // in-app. Requires the AASA file hosted at
+    // https://fogosportugal.pt/.well-known/apple-app-site-association.
+    associatedDomains: ['applinks:fogosportugal.pt'],
   },
   android: {
     package: 'pt.fogosportugal.app',
@@ -30,6 +33,23 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/images/fogos-icon.png',
       backgroundColor: '#18181b',
     },
+    // App Links (plan 1.4/F5): autoVerify against the hosted
+    // /.well-known/assetlinks.json so https fogosportugal.pt links open in-app
+    // without a chooser. The `fogosportugal://` scheme intent filter is added by
+    // expo-router from the top-level `scheme`.
+    //
+    // Scoped to the home path ONLY (`path: '/'` is Android's exact-match, mirroring
+    // the iOS AASA which is already scoped to '/'). The app only handles the root
+    // route (`/?incident=…` deep links); other site paths (/ocorrencias, /situacao,
+    // /risco, …) must keep opening in the browser, not get captured by the app.
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: 'fogosportugal.pt', path: '/' }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   web: {
     output: 'static',

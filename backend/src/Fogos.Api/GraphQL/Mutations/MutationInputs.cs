@@ -37,6 +37,26 @@ public sealed record RegisterWebPushDeviceInput
     public required string Auth { get; init; }
 }
 
+/// <summary>The mobile app platform of a device being registered (a restricted view of the domain
+/// <c>DevicePlatform</c> — Web has no place here, only the two app stores).</summary>
+public enum AppPlatform
+{
+    Ios,
+    Android,
+}
+
+/// <summary>
+/// Registers a mobile app install as a device on first launch and mints its device-bound credential. The
+/// caller is IP-gated (the same <c>DeviceRegistrationGate</c> as Web Push). <see cref="Model"/> and
+/// <see cref="AppVersion"/> are optional diagnostics.
+/// </summary>
+public sealed record RegisterAppDeviceInput
+{
+    public required AppPlatform Platform { get; init; }
+    public string? Model { get; init; }
+    public string? AppVersion { get; init; }
+}
+
 /// <summary>
 /// Operator POSIT ("ponto de situação") input. The resource counts overwrite the incident's committed
 /// means (any omitted field keeps the current value); <see cref="Cos"/> / <see cref="Pco"/> / <see cref="Notes"/>

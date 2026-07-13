@@ -101,9 +101,9 @@ public sealed class WebPushSender(
     {
         try
         {
-            var subscription = new PushSubscription { Endpoint = device.PushEndpoint };
+            var subscription = new PushSubscription { Endpoint = device.PushEndpoint ?? "" };
             subscription.SetKey(PushEncryptionKeyName.P256DH, device.PushP256dh ?? "");
-            subscription.SetKey(PushEncryptionKeyName.Auth, device.PushAuth);
+            subscription.SetKey(PushEncryptionKeyName.Auth, device.PushAuth ?? "");
 
             using var auth = new VapidAuthentication(o.PublicKey!, o.PrivateKey!)
             {
@@ -162,7 +162,7 @@ public sealed class WebPushSender(
         JsonSerializer.Serialize(
             new { title = payload.Title, body = payload.Body, url = payload.Url, tag = payload.Tag }, Json);
 
-    private static string Host(string endpoint) =>
+    private static string Host(string? endpoint) =>
         Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ? uri.Host : "?";
 
     /// <summary>

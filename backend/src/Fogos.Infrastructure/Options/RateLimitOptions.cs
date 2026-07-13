@@ -52,11 +52,19 @@ public sealed class RateLimitOptions
     public TierLimits FirstParty { get; set; } = new(1200, 50000, 10);
     public TierLimits Operator { get; set; } = new(600, 20000, 4);
 
+    /// <summary>
+    /// Mobile app devices (App tier, partition <c>dk:{deviceId}</c>). Deliberately ~8× real app usage so a
+    /// genuine device NEVER feels a limit (owner's ship condition): 240 requests/min and a GraphQL cost
+    /// budget of 20000 = 4× the Registered tier's 5000. Fully tunable via <c>RateLimit:App:*</c>.
+    /// </summary>
+    public TierLimits App { get; set; } = new(240, 20_000, 2);
+
     public TierLimits For(ApiTier tier) => tier switch
     {
         ApiTier.Registered => Registered,
         ApiTier.FirstParty => FirstParty,
         ApiTier.Operator => Operator,
+        ApiTier.App => App,
         _ => Anonymous,
     };
 }

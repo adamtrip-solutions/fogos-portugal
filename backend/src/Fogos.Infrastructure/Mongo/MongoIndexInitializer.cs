@@ -137,12 +137,7 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
             Model(Builders<AlertSubscription>.IndexKeys.Ascending("deviceId"), "deviceId"),
         ], ct);
 
-        await context.Devices.Indexes.CreateManyAsync(
-        [
-            Unique(Builders<Device>.IndexKeys.Ascending("pushEndpoint"), "pushEndpoint"),
-            Model(Builders<Device>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
-            Model(Builders<Device>.IndexKeys.Ascending("disabled").Ascending("lastSeenAt"), "disabled_lastSeenAt"),
-        ], ct);
+        await EnsureDeviceIndexesAsync(ct);
 
         await context.AlertEvents.Indexes.CreateManyAsync(
         [
@@ -168,6 +163,33 @@ public sealed class MongoIndexInitializer(MongoContext context, IOptions<MongoOp
         [
             Model(Builders<HistoryTotal>.IndexKeys.Descending("at"), "at_desc"),
         ], ct);
+    }
+
+    /// <summary>
+    /// Device indexes. The <c>pushEndpoint</c> uniqueness is SPARSE: mobile app devices carry no push
+    /// endpoint (the field is absent) and are simply not indexed, so any number of them coexist while web
+    /// push devices remain endpoint-unique. A database created before app devices has a non-sparse
+    /// <c>pushEndpoint</c> index; that conflicts on options, so we drop and recreate it once (safe at startup).
+    /// </summary>
+    private async Task EnsureDeviceIndexesAsync(CancellationToken ct)
+    {
+        CreateIndexModel<Device>[] models =
+        [
+            new(Builders<Device>.IndexKeys.Ascending("pushEndpoint"),
+                new CreateIndexOptions { Name = "pushEndpoint", Unique = true, Sparse = true }),
+            Model(Builders<Device>.IndexKeys.Ascending("ownerUserId"), "ownerUserId"),
+            Model(Builders<Device>.IndexKeys.Ascending("disabled").Ascending("lastSeenAt"), "disabled_lastSeenAt"),
+        ];
+
+        try
+        {
+            await context.Devices.Indexes.CreateManyAsync(models, ct);
+        }
+        catch (MongoCommandException ex) when (ex.CodeName is "IndexOptionsConflict" or "IndexKeySpecsConflict")
+        {
+            await context.Devices.Indexes.DropOneAsync("pushEndpoint", ct);
+            await context.Devices.Indexes.CreateManyAsync(models, ct);
+        }
     }
 
     private static CreateIndexModel<T> Model<T>(IndexKeysDefinition<T> keys, string name) =>

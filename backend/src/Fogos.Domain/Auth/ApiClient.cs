@@ -6,6 +6,12 @@ public enum ApiTier
     Registered,
     FirstParty,
     Operator,
+
+    /// <summary>
+    /// A mobile app device authenticated by its <c>X-Device-Key</c> credential (not an issued API key).
+    /// Rate-partitioned per device (<c>dk:{deviceId}</c>) with limits deliberately far above real app usage.
+    /// </summary>
+    App,
 }
 
 /// <summary>Scope names carried by JWTs and operator keys.</summary>

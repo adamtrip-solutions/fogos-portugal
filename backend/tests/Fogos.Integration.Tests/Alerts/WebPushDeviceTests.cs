@@ -236,9 +236,10 @@ public sealed class WebPushDeviceTests(ContainerFixture fixture)
         await ctx.Users.DeleteManyAsync(FilterDefinition<User>.Empty);
         await ctx.Locations.DeleteManyAsync(FilterDefinition<Location>.Empty);
         await ctx.Locations.InsertOneAsync(new Location { Level = LocationLevel.Concelho, Code = "1106", Name = "LISBOA", Dico = "1106" });
-        // Ensure the unique pushEndpoint index exists (idempotent; same name as app init).
+        // Ensure the sparse-unique pushEndpoint index exists (idempotent; same options as app init, which
+        // makes it sparse so app devices — which carry no endpoint — coexist without collisions).
         await ctx.Devices.Indexes.CreateOneAsync(new CreateIndexModel<Device>(
             Builders<Device>.IndexKeys.Ascending("pushEndpoint"),
-            new CreateIndexOptions { Unique = true, Name = "pushEndpoint" }));
+            new CreateIndexOptions { Unique = true, Sparse = true, Name = "pushEndpoint" }));
     }
 }

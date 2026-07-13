@@ -94,6 +94,15 @@ public sealed class SchemaTests(ContainerFixture fixture)
         Assert.DoesNotContain("pushEndpoint", sdl);
         Assert.DoesNotContain("pushAuth", sdl);
 
+        // Mobile app device credentials (mobile-app v1): registration mints a device-bound credential.
+        Assert.Contains("registerAppDevice(input: RegisterAppDeviceInput!): AppDeviceCredential!", sdl);
+        Assert.Contains("input RegisterAppDeviceInput", sdl);
+        Assert.Contains("enum AppPlatform", sdl);
+        Assert.Contains("type AppDeviceCredential", sdl);
+        Assert.Contains("deviceSecret: String!", sdl);
+        // The device secret is stored only as a hash — it must NEVER appear anywhere in the schema.
+        Assert.DoesNotContain("secretHash", sdl);
+
         // Accounts (Clerk) — the signed-in user's own identity; nullable for machine/anonymous callers.
         Assert.Contains("me: Me", sdl);
         Assert.Contains("type Me", sdl);

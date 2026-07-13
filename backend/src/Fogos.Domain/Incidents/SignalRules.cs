@@ -132,6 +132,44 @@ public static class SignalRules
         return assetsGrew || aerialJump;
     }
 
+    /// <summary>
+    /// Start of the incident's CURRENT streak of explicitly-reported zero personnel: the timestamp at
+    /// which <c>man</c> most recently transitioned to exactly 0 (from &gt;0 or from unknown), per the stored
+    /// resource history. Returns null when the incident is currently manned (<paramref name="currentMan"/>
+    /// &gt; 0) or its man is unknown (&lt; 0, e.g. the -1 sentinel) — missing data must never read as
+    /// demobilized. When the current man is 0 but the history cannot date the transition (empty, or its
+    /// newest snapshot is non-zero so the drop post-dates the series), falls back to
+    /// <paramref name="fallbackAt"/> — the most conservative available evidence that man is now 0 (typically
+    /// the incident's updatedAt). Never returns a time earlier than the history supports.
+    /// </summary>
+    public static DateTimeOffset? DemobilizedSince(
+        IReadOnlyList<(DateTimeOffset At, int Man)> history,
+        int currentMan,
+        DateTimeOffset fallbackAt)
+    {
+        // Manned (>0) or unknown (<0, the -1 sentinel): not a demobilization.
+        if (currentMan != 0)
+            return null;
+
+        if (history.Count == 0)
+            return fallbackAt;
+
+        // Ascending by time so the tail is the newest snapshot.
+        var ordered = history.OrderBy(h => h.At).ToList();
+
+        // The current zero must be corroborated by the newest snapshot; otherwise the drop to 0 post-dates
+        // the series and the best available evidence is the conservative fallback.
+        if (ordered[^1].Man != 0)
+            return fallbackAt;
+
+        // Walk back over the trailing run of zero snapshots; the streak starts at the earliest of them
+        // (a preceding >0 or unknown entry, or the first record, bounds the run).
+        var start = ordered[^1].At;
+        for (var i = ordered.Count - 1; i >= 0 && ordered[i].Man == 0; i--)
+            start = ordered[i].At;
+        return start;
+    }
+
     /// <summary>A fire dropping back to "Em Curso" from a winding-down state (7/8/9 → 5) is a rekindle.</summary>
     public static bool IsStatusRegression(int from, int to) =>
         to == IncidentStatusCatalog.EmCurso && RegressionFromCodes.Contains(from);

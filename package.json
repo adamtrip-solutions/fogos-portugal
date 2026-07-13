@@ -1,9 +1,11 @@
 {
   "name": "fogos-portugal",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "dev:web": "pnpm --filter web run dev",
     "build:web": "pnpm --filter web run build",
-    "test:web": "pnpm --filter web run test"
+    "test:web": "pnpm --filter web run test",
+    "check:mobile": "pnpm --filter mobile run check"
   }
 }

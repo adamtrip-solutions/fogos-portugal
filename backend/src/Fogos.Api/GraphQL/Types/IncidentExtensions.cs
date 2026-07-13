@@ -27,8 +27,37 @@ public sealed class IncidentExtensions
     [ID]
     public string Id([Parent] Incident incident) => incident.Id;
 
-    /// <summary>Derived escalation / rekindle / critical-conditions signals; never null (absent → defaults).</summary>
-    public IncidentSignals Signals([Parent] Incident incident) => incident.Signals ?? new IncidentSignals();
+    /// <summary>
+    /// Derived escalation / rekindle / critical-conditions signals; never null (absent → defaults).
+    /// <c>demobilizedSince</c> is computed here from the resource history (the signals pipeline runs only on
+    /// active fires, so it cannot maintain this for the resolving/vigilância fires the live map filters).
+    /// It is ONLY populated for statuses 7 (Em Resolução) / 9 (Vigilância) with zero personnel currently
+    /// on scene — the only case consumers read it (the map's demobilized buckets). For every other status,
+    /// or when man is non-zero, it stays null and this resolver does ZERO extra I/O (no history load):
+    /// <see cref="SignalRules.DemobilizedSince"/> returns null for man != 0 anyway, and a concluded/done
+    /// fire that already reports man 0 must not trigger a history load per incident.
+    /// </summary>
+    public async Task<IncidentSignals> Signals(
+        [Parent] Incident incident,
+        IncidentHistoryDataLoader loader,
+        CancellationToken ct)
+    {
+        var signals = incident.Signals ?? new IncidentSignals();
+
+        // Gate the history load: demobilizedSince is only meaningful (and only consumed) for the
+        // resolving/vigilância buckets that have actually stood down (man == 0). Everything else
+        // returns signals with DemobilizedSince = null and no DataLoader round-trip.
+        if (incident.Status.Code is 7 or 9 && incident.Resources.Man == 0)
+        {
+            var history = await loader.LoadAsync(incident.Id, ct) ?? [];
+            signals.DemobilizedSince = SignalRules.DemobilizedSince(
+                history.Select(h => (h.At, h.Man)).ToList(),
+                incident.Resources.Man,
+                incident.UpdatedAt);
+        }
+
+        return signals;
+    }
 
     /// <summary>Operational response durations derived from the status log; null when the log is empty.</summary>
     public async Task<ResponseTimes?> ResponseTimes(

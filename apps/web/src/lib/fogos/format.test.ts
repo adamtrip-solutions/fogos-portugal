@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CRITICAL_REASON_LABELS,
+  DEMOBILIZED_HIDE_HOURS,
+  STALE_HIDE_HOURS,
   compassBearing,
   criticalReasonLabel,
   formatDuration,
+  isHiddenFromMap,
   isOngoingStatus,
   statusBucket,
   statusColorForCode,
@@ -86,6 +89,103 @@ describe('statusColorForCode (bucket palette)', () => {
   it('keeps Em Resolução green and paints Vigilância blue', () => {
     expect(statusColorForCode(7)).toBe('#6ABF59')
     expect(statusColorForCode(9)).toBe('#1E88E5')
+  })
+})
+
+describe('isHiddenFromMap', () => {
+  const NOW = Date.parse('2026-08-01T12:00:00Z')
+  const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString()
+
+  const fire = (o: {
+    code: number
+    demobilizedSince?: string | null
+    statusChangedAt?: string | null
+    occurredAt?: string
+    /** Defaults to 0 (unmanned) — the population the hide rules target. */
+    man?: number
+  }) => ({
+    status: { code: o.code },
+    statusChangedAt: 'statusChangedAt' in o ? o.statusChangedAt! : hoursAgo(1),
+    occurredAt: o.occurredAt ?? hoursAgo(1),
+    resources: { man: o.man ?? 0 },
+    signals: { demobilizedSince: o.demobilizedSince },
+  })
+
+  it('never hides fires outside the resolving/vigilância buckets', () => {
+    for (const code of [3, 4, 5, 6, 8, 10, 11, 12, 13]) {
+      // Even with a long-ago demobilization and a stale status, other buckets stay.
+      const inc = fire({
+        code,
+        demobilizedSince: hoursAgo(48),
+        statusChangedAt: hoursAgo(72),
+        occurredAt: hoursAgo(72),
+      })
+      expect(isHiddenFromMap(inc, NOW)).toBe(false)
+    }
+  })
+
+  it('hides a resolving fire demobilized ≥ 12h ago', () => {
+    const inc = fire({ code: 7, demobilizedSince: hoursAgo(DEMOBILIZED_HIDE_HOURS) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
+  })
+
+  it('hides a vigilância fire demobilized ≥ 12h ago', () => {
+    const inc = fire({ code: 9, demobilizedSince: hoursAgo(13) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
+  })
+
+  it('keeps a resolving fire demobilized less than 12h ago', () => {
+    const inc = fire({ code: 7, demobilizedSince: hoursAgo(11) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(false)
+  })
+
+  it('keeps a resolving fire that is not demobilized (null) and fresh', () => {
+    const inc = fire({ code: 7, demobilizedSince: null, statusChangedAt: hoursAgo(2) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(false)
+  })
+
+  it('tolerates the demobilizedSince field being absent (older API)', () => {
+    const inc = {
+      status: { code: 7 },
+      statusChangedAt: hoursAgo(2),
+      occurredAt: hoursAgo(2),
+      resources: { man: 0 },
+      signals: {}, // no demobilizedSince key at all
+    }
+    expect(isHiddenFromMap(inc, NOW)).toBe(false)
+  })
+
+  it('hides an unmanned (man 0) resolving fire whose status last changed ≥ 24h ago (stale)', () => {
+    const inc = fire({ code: 7, demobilizedSince: null, statusChangedAt: hoursAgo(STALE_HIDE_HOURS), man: 0 })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
+  })
+
+  it('hides an unknown-crew (man -1) stale fire — the sentinel counts as unmanned for the stale rule', () => {
+    const inc = fire({ code: 9, demobilizedSince: null, statusChangedAt: hoursAgo(30), man: -1 })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
+  })
+
+  it('keeps a currently-crewed fire visible however stale its status is', () => {
+    // A staffed long-running em resolução fire must never hide on staleness alone.
+    const inc = fire({ code: 7, demobilizedSince: null, statusChangedAt: hoursAgo(72), man: 4 })
+    expect(isHiddenFromMap(inc, NOW)).toBe(false)
+  })
+
+  it('keeps a fresh vigilância fire just under the 24h stale threshold', () => {
+    const inc = fire({ code: 9, demobilizedSince: null, statusChangedAt: hoursAgo(23) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(false)
+  })
+
+  it('falls back to occurredAt for staleness when statusChangedAt is null', () => {
+    const inc = fire({ code: 9, demobilizedSince: null, statusChangedAt: null, occurredAt: hoursAgo(30) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
+  })
+
+  it('does not key staleness on updatedAt (ICNF enrichment pollutes it)', () => {
+    // A fire whose record was re-enriched moments ago (implicit: we never read
+    // updatedAt) but whose status has not changed in 30h is still stale.
+    const inc = fire({ code: 7, demobilizedSince: null, statusChangedAt: hoursAgo(30) })
+    expect(isHiddenFromMap(inc, NOW)).toBe(true)
   })
 })
 

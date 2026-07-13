@@ -11,6 +11,7 @@ import {
 import {
   STATUS_BUCKETS,
   WINDOW_HOURS,
+  isHiddenFromMap,
   isOngoingStatus,
   statusBucket,
 } from '#/lib/fogos/format.ts'
@@ -152,7 +153,8 @@ function Home() {
   // whatever their age; finished ones only while their last change is within
   // the window. The activeIncidents version wins the dedup.
   const baseList = useMemo<IncidentListItem[]>(() => {
-    const cutoff = Date.now() - WINDOW_HOURS * 60 * 60 * 1000
+    const now = Date.now()
+    const cutoff = now - WINDOW_HOURS * 60 * 60 * 1000
     const byId = new Map<string, IncidentListItem>()
     for (const inc of recent.data ?? []) {
       // Finished fires are windowed by when they FINISHED (statusChangedAt;
@@ -167,7 +169,13 @@ function Home() {
       const finishedAt = inc.statusChangedAt ?? inc.occurredAt
       const keep =
         isOngoingStatus(inc.status.code) || Date.parse(finishedAt) >= cutoff
-      if (keep) byId.set(inc.id, inc)
+      // Drop resolução/vigilância zombies that demobilized long ago or went
+      // stale (see isHiddenFromMap) from the base set entirely, so they are
+      // excluded from BOTH the map dots AND the count badge (baseList.length).
+      // Map-only — the fire stays in /ocorrencias, deep links, and everywhere
+      // else; a deep-linked hidden fire still opens via the detail fallback
+      // below (that path keys off the separate incidentQuery, not baseList).
+      if (keep && !isHiddenFromMap(inc, now)) byId.set(inc.id, inc)
     }
     for (const inc of activeList) byId.set(inc.id, inc)
     return [...byId.values()]

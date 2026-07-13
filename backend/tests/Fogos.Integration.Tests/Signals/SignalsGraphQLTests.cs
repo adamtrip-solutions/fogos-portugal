@@ -15,7 +15,7 @@ public sealed class SignalsGraphQLTests(ContainerFixture fixture)
           incident(id: $id) {
             signals {
               escalating peakAssets rekindle rekindleOfId
-              criticalConditions criticalReasons
+              criticalConditions criticalReasons demobilizedSince
             }
             responseTimes {
               dispatchToArrivalSeconds arrivalToControlSeconds
@@ -88,5 +88,32 @@ public sealed class SignalsGraphQLTests(ContainerFixture fixture)
         Assert.Empty(signals.GetProperty("criticalReasons").EnumerateArray());
 
         Assert.Equal(System.Text.Json.JsonValueKind.Null, incidentNode.GetProperty("responseTimes").ValueKind);
+        // Man defaults to >0 in the seed factory → not demobilized.
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, signals.GetProperty("demobilizedSince").ValueKind);
+    }
+
+    [SkippableFact]
+    public async Task DemobilizedSince_is_dated_from_the_resource_history_zero_transition()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await SeedData.ResetAsync(fixture);
+        var ctx = SeedData.Context(fixture);
+
+        var incident = SeedData.Incident("GQL_DEMOB", statusCode: IncidentStatusCatalog.EmResolucao, active: false);
+        incident.Resources = incident.Resources with { Man = 0 }; // currently demobilized
+        await ctx.Incidents.InsertOneAsync(incident);
+
+        var transition = new DateTimeOffset(2026, 8, 1, 9, 0, 0, TimeSpan.Zero);
+        await ctx.IncidentHistory.InsertManyAsync(
+        [
+            new IncidentHistorySnapshot { IncidentId = "GQL_DEMOB", At = transition.AddHours(-2), Man = 24, Terrain = 6, Aerial = 1 },
+            new IncidentHistorySnapshot { IncidentId = "GQL_DEMOB", At = transition, Man = 0, Terrain = 0, Aerial = 0 },
+            new IncidentHistorySnapshot { IncidentId = "GQL_DEMOB", At = transition.AddHours(1), Man = 0, Terrain = 0, Aerial = 0 },
+        ]);
+
+        using var doc = await fixture.GraphQLAsync(Query, new { id = "GQL_DEMOB" });
+        var signals = doc.RootElement.GetProperty("data").GetProperty("incident").GetProperty("signals");
+
+        Assert.Equal(transition, signals.GetProperty("demobilizedSince").GetDateTimeOffset());
     }
 }

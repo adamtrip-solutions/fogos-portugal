@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["2A56G82R2N.pt.fogosportugal.app"],
+        "components": [
+          {
+            "/": "/",
+            "?": { "incident": "?*" },
+            "comment": "Incident deep link: /?incident=<id>"
+          },
+          {
+            "/": "/",
+            "comment": "Map root"
+          }
+        ]
+      }
+    ]
+  }
+}

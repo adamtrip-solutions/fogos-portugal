@@ -5,5 +5,10 @@ packages:
 # Install-script (build) approval. Only these may run postinstall scripts.
 allowBuilds:
   '@scarf/scarf': false
+  '@shopify/react-native-skia': true
   esbuild: true
   lightningcss: true
+  'unrs-resolver': true
+
+patchedDependencies:
+  expo-modules-jsi: patches/expo-modules-jsi.patch

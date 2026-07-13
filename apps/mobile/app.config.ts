@@ -22,6 +22,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: 'pt.fogosportugal.app',
     appleTeamId: '2A56G82R2N',
+    config: {
+      usesNonExemptEncryption: false,
+    },
     // Universal Links (plan 1.4/F5): opens https://fogosportugal.pt/?incident=…
     // in-app. Requires the AASA file hosted at
     // https://fogosportugal.pt/.well-known/apple-app-site-association.
